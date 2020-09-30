@@ -1,0 +1,90 @@
+doc ///
+   Key
+     "Toric variety from Kreuzer-Skarke database"
+   Headline
+     An example of using the functionality of the package
+   Description
+    Text
+      Let's analyze one particular toric variety, and the corresponding 
+      Calabi-Yau hypersurface.
+
+    Example
+      str = getKreuzerSkarke(5, 57, Limit=>2000);
+      polytopes = parseKS str;
+      A = matrixFromString (first oo)_1
+    Text
+      Let's first take the polytope 
+    Example
+      P1 = convexHull A
+      latticePoints P1
+      vertices P1
+    Text
+      How many lattice points are in the interior of P1?
+    Text
+      Now let's take the dual polytope
+    Example
+      P2 = polar P1
+      latticePoints P2
+      
+      V1 = normalToricVariety normalFan P1
+      LP = latticePoints P2
+      Amat = matrix {select(LP, x -> x != 0)}
+      elapsedTime TRI = findMaxRegularStarTriangulation(Amat, MonomialOrder=>Lex)
+      V = normalToricVariety(entries transpose Amat, TRI)
+    Text
+      This is the toric variety we want!  Actually, any other
+      smooth toric variety will work too (i.e. any other 
+      triangulation of the point configuration Amat (points are 
+      the columns of this matrix.
+    Text
+      Let's check whether the polytope is favorable.
+      We need to 
+      faces(1, P2)
+
+      pts = entries transpose Amat
+      
+      The second method is somewhat more complicated.  We use the Kreuzer-Skarke database,
+      to find a reflexive 4-dimensional polytope.  The complication is that the resulting
+      toric variety is not usually simplicial or smooth.
+      
+      First, we search to find an example (or many examples) of interest.  Let's search for
+      polytopes which have $h^{1,1} = 10$, and $h^{1,2} = 100$.  Question: are these the numbers for
+      the Calabi-Yau, or the toric variety?
+    Example
+      str = getKreuzerSkarke(3, 43, Limit=>2000);
+      polytopes = parseKS str;
+      #polytopes
+      polytopes_500
+      A = matrixFromString oo_1
+    Text
+      The columns are the vertices of the convex hull of the reflexive polytope.  This
+      example has 11 vertices.
+    Example
+      P1 = convexHull A
+      latticePoints P1
+    Text
+    Example
+      fan1 = normalFan P1
+      V1 = normalToricVariety fan1
+      dim V1
+      isSmooth V1
+      isSimplicial V1
+      isProjective V1
+      isComplete V1
+    Text
+    Example
+      P2 = polar P1
+      normalToricVariety P2
+      LP = latticePoints P2
+      Amat = matrix {select(LP, x -> x != 0)}
+      elapsedTime TRI = findMaxRegularStarTriangulation(Amat, MonomialOrder=>Lex)
+      V = normalToricVariety(entries transpose Amat, TRI)
+    Example
+      dim V
+      isSmooth V
+      isSimplicial V
+      isProjective V -- uugh, takes a long time.
+      isComplete V
+
+   SeeAlso
+///
