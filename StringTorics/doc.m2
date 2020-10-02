@@ -24,25 +24,29 @@ doc ///
     Text
       @SUBSECTION "Additional polyhedral functions"@
     Text
-      @UL {
-          {}
-          }@
-    Text
       @SUBSECTION "Triangulations"@
     Text
-      @UL {
-          {}
-          }@
-    Text
       @SUBSECTION "Cohomology"@
-    Text
-      @UL {
-          {}
-          }@
    Caveat
    SeeAlso
      "installing StringTorics"
 ///
+
+-*
+    Text
+      @UL {
+          {}
+          }@
+
+    Text
+      @UL {
+          {}
+          }@
+    Text
+      @UL {
+          {}
+          }@
+*-
 
 doc ///
    Key
@@ -339,6 +343,7 @@ doc ///
   
 ///
 
+-*
 ///
   Key
   Headline
@@ -352,3 +357,5 @@ doc ///
   Caveat
   SeeAlso
 ///
+*-
+

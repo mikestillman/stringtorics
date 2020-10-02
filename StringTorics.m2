@@ -1091,14 +1091,14 @@ needsPackage "StringTorics"
 restart
 uninstallPackage "StringTorics"
 restart
-installPackage "StringTorics"
+installPackage "StringTorics" -- ERROR at end.  Not sure what it is...
 
 restart
 needsPackage "StringTorics"
 check oo
 
 -- Generation of some examples
-L = kreuzerSkarke(20, Limit => 100)
+L = kreuzerSkarke(20, Limit => 100, Access=>"wget")
 L = kreuzerSkarke(15, Limit => 100)
 L = kreuzerSkarke(13, Limit => 100)
 L = kreuzerSkarke(10, Limit => 100)
