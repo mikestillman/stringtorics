@@ -46,9 +46,11 @@ cohomologyBasis(1,V,{0,0,-3,0})
 
 HH^0(V,OO_V(1,1,-2,1))
 
-------Oct. 28,
+------Oct. 28, 2020
 D=subcomplex(V,{2,3})
 HH_0(D)
+help toricCohomologySetup
+toricCohomologySetup(V)
 V.cache#CohomologySetup#1
 neg1=for x in V.cache#CohomologySetup#1 list positions (x#0, n->n==1)
 for l in neg1 list prune HH_0(subcomplex(V,l))
@@ -70,3 +72,13 @@ L = for d in {-4,-4,-4,-4}..{1,1,1,1} list (
     );
 #L
 L = select (L,x->x#1>0)
+
+----------------
+for i from 0 to 4 do X_i = smoothFanoToricVariety(2,i);
+for i from 0 to 4 list transpose matrix rays X_i ---X_4 has 6 rays, so it may have HH^1 greater than 1
+S = ring X_4
+B = ideal X_4
+L = toricCohomologySetup(X_4)
+degree x_0 +degree x_2 +degree x_4
+HH^1(X_4,OO_(X_4)(-2,1,1,-2)) --- equals 2
+cohomologyBasis(1,X_4,{-2,1,1,-2})
