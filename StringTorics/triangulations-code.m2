@@ -227,7 +227,7 @@ generateTriangulations = method(Options => {Limit=>infinity, Regular=>false})
 -- TODO: REMOVE?
 -- TODO: is this Amat homogenized or not?
 generateTriangulations(Matrix) := opts -> Amat -> (
-    TRI := findMaxRegularStarTriangulation Amat;
+    TRI := regularFineStarTriangulation Amat;
     allT := new MutableHashTable;
     allT#TRI = true;
     TODO := {TRI};
@@ -245,13 +245,14 @@ generateTriangulations(Matrix) := opts -> Amat -> (
                     TODO = append(TODO, T);
                     );
                 ));
-        << "todo = " << #TODO << " and #triang = " << #(keys allT) << endl;
+        if debugLevel > 0 then 
+            << "todo = " << #TODO << " and #triang = " << #(keys allT) << endl;
         );
     keys allT
     )
 
 -- Amat: a homogenized version of the matrix?
--- This onoe seems to work.
+-- This one seems to work.
 generateTriangulations(Matrix, List) := opts -> (Amat, TRI) -> (
     TRI = sortTriangulation TRI;
     allT := new MutableHashTable;

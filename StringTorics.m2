@@ -57,6 +57,11 @@ export {
     "pointConfiguration",
     "regularStarTriangulation",
     "generateTriangulations",
+    "isFine",
+    "isStar",
+    "volumeVector",
+    "delaunaySubdivision",
+    "delaunayWeights",
     
     -- This set maybe should be included in NormalToricVarieties?
     "singularCones",
@@ -71,7 +76,6 @@ export {
     "sortTriangulation",
     "matchNonZero",
     "applyPermutation",
-    "findMaxRegularStarTriangulation",
     "affineCircuits",
     "checkFan",
     "sageTri",
@@ -1091,7 +1095,7 @@ needsPackage "StringTorics"
 restart
 uninstallPackage "StringTorics"
 restart
-installPackage "StringTorics" -- ERROR at end.  Not sure what it is...
+installPackage "StringTorics"
 
 restart
 needsPackage "StringTorics"

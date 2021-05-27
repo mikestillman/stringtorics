@@ -1,4 +1,3 @@
-
 TEST ///
 -*
   restart
@@ -18,12 +17,17 @@ TEST ///
   I = intersectionRing Xa
   a*t_1
   hodgeDiamond X
+  assert(h11OfCY P == 6)
+  assert(h21OfCY P == 50)
   a*t_1 -- should still work...
 ///
 
 
 TEST ///
-  debug needsPackage "StringTorics"
+-*
+  restart
+  needsPackage "StringTorics"
+*-
   -- augment
     mat = "   1   0   0   1  -3   3   3  -3   5
             0   1   0   0   2  -4  -6   4  -8  
@@ -68,7 +72,8 @@ TEST ///
       )
 ///
 
-TEST ///
+-- commenting this out.  It should really be a test in ReflexivePolytopesDB
+///
   L1 = kreuzerSkarke(5,57, Access => "wget");
   assert(#L1 == 197)
 
@@ -84,7 +89,7 @@ TEST ///
   -- 
 -*  
 restart
-debug needsPackage "StringTorics"
+needsPackage "StringTorics"
 *-
   -- WARNING: currently, we use the polar dual of a convex polytope to determine
   -- minimal faces, etc.  However, for this to work, the convex polytope
@@ -211,13 +216,13 @@ TEST ///
       )  
   
   regularFineTriangulation vertices P
-  regularStarTriangulation P -- it is a shame that this returns something differnt from regularFineTriangulation.
+  regularStarTriangulation P -- it is a shame that this returns something different from regularFineTriangulation.
 ///
 
 TEST ///
   -- Test functionality of triangulations, part 2. reflexive polytope in 4D
   -- We try one with h11=3
-  debug needsPackage "StringTorics"
+  needsPackage "StringTorics"
   tope = "4 13  M:64 13 N:8 7 H:3,51 [-96]
    1   0   0   2  -2   0  -1  -1   0   2   2  -3  -3
    0   1   1   3  -5   2   0   0   2   4   4  -6  -6
@@ -256,7 +261,7 @@ TEST ///
   elapsedTime halfspaces P2
   LP = latticePoints P2
   # faces(1,P2)
-  elapsedTime regularFineTriangulation matrix transpose latticePointList P2
+  elapsedTime regularFineTriangulation matrix transpose latticePointList P2;
   V = reflexiveToSimplicialToricVariety P
   rays V
   max V
@@ -269,8 +274,10 @@ TEST ///
   -- How do we create Amat?  This is the way:
   --      4 11  M:58 11 N:10 8 H:5,51 [-92]
   -- XXXXXXXXXX
+-*
   restart
-  debug needsPackage "StringTorics"
+*-
+  needsPackage "StringTorics"
   mat = "  1   1   1  -1   0   1   1  -1  -3  -1  -3
          0   2   0   0   0   0   2  -2  -2  -2  -4
          0   0   2  -2   0  -2   2   2  -2   4   2
@@ -278,7 +285,7 @@ TEST ///
   A = matrixFromString mat
   P1 = convexHull A -- (extremal) vertices in RR^4
   P2 = polar P1
-  LP = Polyhedra$latticePoints P2 -- these will be the origin, the extremal vertices of P2 and possibly some more.
+  LP = latticePoints P2 -- these will be the origin, the extremal vertices of P2 and possibly some more.
   Amat = matrix {select(LP, x -> x != 0)}
   elapsedTime   allTRIS = generateTriangulations Amat; -- removed in commit 33e77a592d2890c7ebf134e13b95d5915a624039
 
@@ -293,31 +300,29 @@ TEST ///
   (fromM2, toM2) = matchNonZero(Amat, Bmat)
 
   Ts = readSageTriangulations sageTri
-  for T in Ts do time checkFan(Bmat, T)
+  --elapsedTime for T in Ts do time checkFan(Bmat, T) -- this takes a while (24 seconds), too long for testing
+  elapsedTime checkFan(Bmat, Ts_5)
   applyPermutation(fromM2, allTRIS)
 
   -- the following are all in this list
-  time TRI = findMaxRegularStarTriangulation Amat
-  time   TRI2 = findMaxRegularStarTriangulation(Amat, MonomialOrder=>Lex)
-  time   TRI3 = findMaxRegularStarTriangulation(Amat, MonomialOrder=>{Weights=>{10,4,8,2,3,9,8,5,6,8}})  
-  time   TRI4 = findMaxRegularStarTriangulation(Amat, MonomialOrder=>{Weights=>{10,4,8,2,3,9,8,10,6,8}})
-  time   TRI5 = findMaxRegularStarTriangulation(Amat, MonomialOrder=>{Weights=>{10,1,8,2,3,9,8,10,6,8}})
-  unique {TRI, TRI2, TRI3, TRI4, TRI5} -- 4 different
+  time TRI = regularFineStarTriangulation Amat
 
   -- make a toric variety from one of the triangulations:
-  for T in allTRIS list (
+  elapsedTime assert({(true, true, true)} === 
+      unique for T in allTRIS list (
       X = normalToricVariety(entries transpose Amat, T);
       time (isSimplicial X, isComplete X, isProjective X)
       )
-
+  )
 ///
 
 TEST ///
   -- analyze polytopes with h11=30, h12=50.
   -- grabbed 3000 examples, but there are more!
+-*
   restart
-  loadPackage "StringTorics"
-
+  needsPackage "StringTorics"
+*-
   -- one of the "favorable" examples
   --  4 7  M:51 7 N:45 7 H:30,50 [-40]
   mat = "    1    0    0    0    0   -4  -10
@@ -331,10 +336,9 @@ TEST ///
   LP = Polyhedra$latticePoints P2 -- these will be the origin, the extremal vertices of P2 and possibly some more.
   Amat = matrix {select(LP, x -> x != 0)}
 
-  regularStarTriangulation P2
-  time   TRI = findMaxRegularStarTriangulation(Amat, MonomialOrder=>Lex);
-  sort unique flatten TRI  
-  length oo  
+  elapsedTime regularStarTriangulation P2;
+  elapsedTime   TRI = regularFineStarTriangulation Amat;
+  assert(sort unique flatten TRI == toList(0..numcols Amat - 1))
 ///
 
 TEST ///
@@ -350,10 +354,8 @@ TEST ///
   LP = Polyhedra$latticePoints P2 -- these will be the origin, the extremal vertices of P2 and possibly some more.
   Amat = matrix {select(LP, x -> x != 0)}
 
-  time   TRI = findMaxRegularStarTriangulation(Amat, MonomialOrder=>Lex);
-  sort unique flatten TRI  
-  length oo  
-
+  elapsedTime   TRI = regularFineStarTriangulation Amat;
+  assert(sort unique flatten TRI == toList(0..numcols Amat - 1))
 ///
 
 TEST ///
@@ -371,7 +373,7 @@ TEST ///
   V = normalToricVariety(LP,tri)  
   assert isSimplicial V
   assert not isSmooth V
-  --assert isWellDefined V -- this currently takes some time
+  --assert elapsedTime isWellDefined V -- this currently takes some time
 
   (LP,tri) = regularStarTriangulation(2,P2)
   V = normalToricVariety(LP,tri)  
@@ -387,8 +389,10 @@ TEST ///
 TEST ///
   -- toric complete intersection cohomology code
   -- YYY
+-*
   restart
   needsPackage "StringTorics"
+*-
   mat = "  1   1   1  -1   0   1   1  -1  -3  -1  -3
          0   2   0   0   0   0   2  -2  -2  -2  -4
          0   0   2  -2   0  -2   2   2  -2   4   2
@@ -405,17 +409,16 @@ TEST ///
   cohomologyVector(X, degree(V_0+V_1+V_2))
   allsums = drop(subsets for i from 0 to #rays V - 1 list V_i, 1);
   allsums = allsums/sum;
-  for i from 0 to 100 list cohomologyVector(X, degree allsums_i)
+  elapsedTime for i from 0 to 100 list cohomologyVector(X, degree allsums_i)
   for i from 0 to 10 list cohomologyVector(X, 2 * degree allsums_i)
-  #allsums
 ///
 
 -- example: regular star triangulations
 ///
 -*
   restart
-  debug needsPackage "StringTorics"
 *-
+  needsPackage "StringTorics"
   mat = "  1   1   1  -1   0   1   1  -1  -3  -1  -3
          0   2   0   0   0   0   2  -2  -2  -2  -4
          0   0   2  -2   0  -2   2   2  -2   4   2
@@ -453,7 +456,6 @@ TEST ///
 TEST ///
 -*
   restart
-  needsPackage "ToricCompleteIntersections"
 *-
   -- from Kreuzer-Skarke database
   -- 4 9  M:32 9 N:11 8 H:6,30 [-48]
@@ -506,9 +508,20 @@ TEST ///
   -- need to run through all lattice points, and find max face containing it
   -- check this against Polyhedra code
   H = latticePointHash P2
-  for f in faceList P2 do (
+
+  (vertexMatrix P2)_{0}
+  Q = convexHull oo
+  vertexList Q
+  vertexMatrix Q
+  
+  latticePoints Q
+  -- TODO: fix the following bug.  This results when using these functions in cases when 
+  -- the polytope isn't e.g. reflexive, or really, doesn't have the origin in the interior...
+  -- latticePointList Q -- fails, since polar Q isn't really what should be used here...
+
+  for f in (faceList P2)_{0} do (
       Q := convexHull (vertexMatrix P2)_f;
-      lp := (latticePointList Q)/(m -> flatten entries m);
+      lp := (latticePoints Q)/(m -> flatten entries m);
       lpi := latticePointList(P2,f);
       lpi2 := lp/(p -> H#p);
       assert(lpi == sort lpi2)
@@ -517,7 +530,7 @@ TEST ///
   H = latticePointHash P1
   for f in faceList P1 do (
       Q := convexHull (vertexMatrix P1)_f;
-      lp := (latticePointList Q)/(m -> flatten entries m);
+      lp := (latticePoints Q)/(m -> flatten entries m);
       lpi := latticePointList(P1,f);
       lpi2 := lp/(p -> H#p);
       assert(lpi == sort lpi2)
@@ -525,15 +538,23 @@ TEST ///
   
   -- test interior lattice point code
   lpi = (latticePointHash P1)#{-2, 2, 2, -1}
-  assert(minimalFace(P1, lpi) == {0})
-  H = interiorLatticeHash P1
-  assert(interiorLatticePoints(P1, {0,2,3,5,7}) == {13,16,20})
+  assert(minimalFace(P1, {-2,2,2,-1}) == {0})
+  
+  assert(interiorLatticePointList(P1, {0,2,3,5,7}) == {24, 26, 28})
 
   hashTable for f in faceList(2,P2) list (
-      f => {faceDim(P2,f), latticePointList(P2,f), # interiorLatticePoints(P2,f), # interiorLatticePoints(P1, dualFace(P2,f))}
+      f => {dim(P2,f), 
+          latticePointList(P2,f), 
+          # interiorLatticePointList(P2,f), 
+          # interiorLatticePointList(P1, dualFace(P2,f))}
       )
   allinfo = sort for f in faceList P2 list (
-      {faceDim(P2,f), f, latticePointList(P2,f), # interiorLatticePoints(P2,f), # interiorLatticePoints(P1, dualFace(P2,f))}
+      {dim(P2,f), 
+          f, 
+          latticePointList(P2,f), 
+          # interiorLatticePointList(P2,f), 
+          # interiorLatticePointList(P1, dualFace(P2,f))
+          }
       )
   allinfo'ans = {
       {0, {0}, {0}, 1, 0}, 
@@ -595,18 +616,19 @@ TEST ///
       {3, {1, 2, 4, 5, 7}, {1, 2, 4, 5, 7, 8}, 0, 1}, 
       {3, {1, 5, 6, 7}, {1, 5, 6, 7, 9}, 0, 1}, 
       {3, {2, 3, 4, 5, 6}, {2, 3, 4, 5, 6, 9}, 0, 1}, 
-      {3, {4, 5, 6, 7}, {4, 5, 6, 7, 9}, 0, 1}
+      {3, {4, 5, 6, 7}, {4, 5, 6, 7, 9}, 0, 1},
+      {4, {0, 1, 2, 3, 4, 5, 6, 7}, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, 1, 0}
       }
   assert(allinfo == allinfo'ans)
-  
+  assert(allinfo == annotatedFaces P2)  
+
   hodgeOfCYToricDivisors P1
   hodgeOfCYToricDivisors P2
   elapsedTime hashTable for p in latticePointList P2 list p => hodgeCY(P1, p)
   elapsedTime hashTable for p in latticePointList P1 list p => hodgeCY(P2, p)
-  -- StringTorics and CohomCalg are needed to effectively test hodgeCY
   
   netList annotatedFaces(0,P1)
-    netList annotatedFaces(3,P2)
+  netList annotatedFaces(3,P2)
   netList annotatedFaces(1,P1)
   netList annotatedFaces(2,P1)
   netList annotatedFaces(3,P1)
@@ -614,11 +636,10 @@ TEST ///
 
 TEST ///
   -- Test of h11 and h21 formulae for an example from Kreuzer-Skarke database.
+  -- as well as minimalFace, dim, genus, isFavorable.
 -*
   restart
-  needsPackage "ToricCompleteIntersections"
 *-
-  -- XXX
   -- from Kreuzer-Skarke database
   -- 4 9  M:32 9 N:11 8 H:6,30 [-48]
   polystr = "   1   0   1   1  -1   1   0  -1  -2
@@ -639,8 +660,8 @@ TEST ///
   assert not isFavorable P2 
   
   for f in faceList P2 list {dim(P2,f), genus(P2,f)}
-  for lpi from 0 to # (latticePointList P2) - 1 list dim(P2,minimalFace(P2,(latticePointList P2)#lpi))
-  minimalFace(P2, {0,8})
+  minfaces = for lp in latticePointList P2 list dim(P2,minimalFace(P2,lp))
+  assert(minfaces == {0,0,0,0,0,0,0,0,1,1,4})
 ///
 
 TEST ///
@@ -666,14 +687,16 @@ TEST ///
   -- Now compute all of the cohomologies of the (irreducible) toric divisors 
   LP = latticePointList polar P
   assert(#LP == 8)
+  LP = drop(LP, -1)
   cohoms = for v in LP list hodgeOfCYToricDivisor(P, v)
   cohomH = hodgeOfCYToricDivisors P
-  cohoms1 = for v from 0 to #LP-1 list cohomH#v
+  cohoms1 = for v from 0 to #LP-1 list cohomH#v -- last LP is the origin, which isn't one of these divisors
   assert(cohoms == cohoms1)
   assert isFavorable P
 
   -- Now compute all of the cohomologies of the (irreducible) toric divisors for the polar dual
   LP = latticePointList P
+  LP = drop(LP, -1)
   cohoms = for v in LP list hodgeOfCYToricDivisor(polar P, v)
   cohomH = hodgeOfCYToricDivisors polar P
   cohoms1 = for v from 0 to #LP-1 list cohomH#v
@@ -699,7 +722,9 @@ TEST ///
 
   -- Now compute all of the cohomologies of the (irreducible) toric divisors 
   LP = latticePointList polar P  
+  LP = drop(LP, -1)
   assert(#LP == 15)
+  
   --elapsedTime cohoms = for v in LP list hodgeOfCYToricDivisor(P, v)
   cohomH = hodgeOfCYToricDivisors P
   cohoms1 = for v from 0 to #LP-2 list cohomH#v
@@ -711,10 +736,11 @@ TEST ///
 
   -- Now compute all of the cohomologies of the (irreducible) toric divisors for the polar dual
   LP = latticePointList P
+  LP = drop(LP, -1)
   assert(#LP == 22)
-  elapsedTime cohoms = for v in drop(LP,-1) list hodgeOfCYToricDivisor(polar P, v)
+  elapsedTime cohoms = for v in LP list hodgeOfCYToricDivisor(polar P, v)
   cohomH = hodgeOfCYToricDivisors polar P
-  cohoms1 = for v from 0 to #LP-2 list cohomH#v
+  cohoms1 = for v from 0 to #LP-1 list cohomH#v
   assert(cohoms == cohoms1)
   -- the following line is too slow, and 
 --  cohoms = for v in LP list hodgeOfCYToricDivisor(P, v) -- actually, gives an error here...
@@ -725,7 +751,6 @@ TEST ///
 TEST ///
 -*
 restart
-needsPackage "ToricCompleteIntersections"
 *-
 str = "    1    0    0    0  -11   -3   -1   -3
     0    1    0    0   -6   -2   -2   -6
@@ -754,17 +779,18 @@ assert(h21OfCY(polar P) == 90)
 TEST ///  
   A = transpose matrix {{-1,-1,2},{-1,0,1},{-1,1,1},{0,-1,2},{0,1,1},{1,-1,3},{1,0,-1},{1,1,-2}}
   tri = regularFineTriangulation A
-
-  augmentBack A  
-  B = transpose matrix drop(latticePointList polar convexHull A,-1) -- fails
+  volumeVector(augment A,tri)
+  P = convexHull A
 
   A = transpose matrix {{-1, 0, -1, -1}, {-1, 0, 0, -1}, {-1, 1, 2, -1}, {-1, 1, 2, 0}, {1, -1, -1, -1}, {1, -1, -1, 1}, {1, 0, -1, 2}, {1, 0, 1, 2}}
   C = transpose matrix latticePointList polar convexHull A
   tri = regularFineTriangulation C
-  delaunayTriangulation C
+
+  elapsedTime delaunaySubdivision C -- takes 20 seconds?!
   isRegularTriangulation(C, tri)
   P2 = polar convexHull A
   regularStarTriangulation P2
+  volume P2
 ///
 
 
@@ -781,7 +807,7 @@ TEST ///
   debugLevel = 3
   tri = regularStarTriangulation P
   normalToricVariety(drop(latticePointList P,-1), tri_1)
-  isWellDefined oo -- ouch, pretty long (4/27/20)
+  -- elapsedTime isWellDefined oo -- ouch, pretty long (4/27/20) (96 sec)
 
   -- vertices
   vertexList P
@@ -824,91 +850,14 @@ TEST ///
   for i from 0 to 4 list netList annotatedFaces(i,P)
 ///
 
-TEST ///
-  -- triangulation code, test 1.  
-  -- some triangulation code is in Topcom, Polyhedra
-  -- (comes froom KS database, h11=3, #232.
--*
-  restart
-*-  
-  debug needsPackage "StringTorics"
-  A0 = matrix {{1, 1, 1, 1, -11}, {0, 2, 2, 2, -10}, {0, 0, 4, 4, -8}, {0, 0, 0, 12, -12}}
-
-  P2 = polar convexHull A0
-  LP = latticePointList P2
-  A  = transpose matrix LP
-  
-  -- We want triangulations of the point configuration given by the columns of A.
-  T = regularFineTriangulation A
-  isFineTriangulation(A, T)
-  isStarTriangulation(A, T)
-  isRegularTriangulation(A, 
-      
-  -- second: is the union the same as the polytope? How do we tell?
-  -- consider all facets of each cell.  Each must occur once or twice.  Internal ones
-  -- must occur twice, ones on the boundary must occur once.
-  facetsA = T/(t -> subsets(t, #t-1))//flatten//tally
-  outerfacets = select(keys facetsA, k -> facetsA#k == 1)
-  facetsP2 = (annotatedFaces(3, P2))/(x -> x#1) -- sets of LP's on each facet.
-  all(outerfacets, f -> any(facetsP2, g -> isSubset(f, g))) -- this checks 
-  -- now make sure no interior simplices overlap in their interior.
-  volume P2
-  sum for t in T list volume convexHull A_t
-
-  elapsedTime tris = allTriangulations A;
-  elapsedTime tris = generateTriangulations(A, T);
-  
-
-  --viewHelp Polyhedra
-  --viewHelp Topcom
-  wts = regularTriangulationWeights(A, T)
-  assert(regularSubdivision(A, matrix{wts}) == T//sort)
-  assert isRegularTriangulation(A, T) -- from Topcom.
-  -- also check Topcom's code...
-  flips(A, T) -- not unpacked...
-  A1 = A || splice matrix{{numColumns A: 1}}
-  volumeVector(A, T) -- need to homogenize A? at bottom or at top?
-  volumeVector(A1, T) -- need to homogenize A? at bottom or at top?
-  -- check that T is a triangulation?
-  circs = affineCircuits(A, T) -- NEEDS CLEANING UP
-  flip(T, {{5}, {0, 1, 2}})  
-  for c in circs list flip(T, c)
-  codim2 T
-  codim2s T
-
-  for v in subsets(T, 2) list {v#0, v#1, sort unique flatten v}
-  select(oo, v -> #v#2 == 6)
-
-  -- now generate new triangulations from these.
-  -- check: they are triangulations, are they regular?
-  -- go from fine regular --> fine star regular
-  -- can we get all affine circuits of A?  Yes: from topcom...  also, can just do it?
-  
-  -- flips, generating more triangulations.  Are they regular?
-  -- volume of a polytope.
-  
-  A = transpose matrix {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}, {0,0}}
-  A = A ** QQ
-  T = (regularFineTriangulation A)//sort
-  wts = regularTriangulationWeights(A, T)
-  (regularSubdivision(A, matrix{wts})) 
-  assert(oo == T) -- BUG in Polyhedra.
-///
 
 TEST /// -- test of functions here on the square and the cube
 -*
   restart
-  debug needsPackage "StringTorics"
-  debug needsPackage "Topcom"
+  needsPackage "StringTorics"
 *-
   square = transpose matrix{{1,1},{-1,1},{-1,-1},{1,-1}}
   
-  pts = topcomPoints(square, new OptionTable from {Homogenize=>true})
-  assert(pts == [[1, 1, 1], [-1, 1, 1], [-1, -1, 1], [1, -1, 1]])
-
-  pts = topcomPoints(square, new OptionTable from {Homogenize=>false})
-  assert(pts == [[1, 1], [-1, 1], [-1, -1], [1, -1]])  
-
   regularFineTriangulation square
   assert(# allTriangulations square == 2)
     
@@ -919,9 +868,9 @@ TEST /// -- test of functions here on the square and the cube
   -- test function from Topcom.
   t1 = regularFineTriangulation sq9
   regularTriangulationWeights(sq9, t1)
-  fineStarTriangulation(sq9, t1) 
-  delaunaySubdivision sq9
-  orientedCircuits sq9
+  fineStarTriangulation(sq9, t1) -- has central element removed.  Don't do that?
+  delaunaySubdivision sq9 -- not a triangulation (4 squares).
+  orientedCircuits sq9 -- many of these are not useful when considering only fine triangulations.
 
   -- Polyhedra command, bug fix currently in StringTorics.
   t2 = regularSubdivision(sq9, matrix{{4,4,4,4,1,1,1,1,0}})
@@ -935,42 +884,109 @@ TEST /// -- test of functions here on the square and the cube
   t4 = regularSubdivision(sq9, matrix{{1,1,1,1,1,1,1,1,-4}})
   
   affineCircuits(sq9, t3)
-  elapsedTime affineCircuits(sq9, t1) -- TODO: change the name of this function.  
+  elapsedTime affineCircuits(sq9, t1) -- TODO: change the name of this function? Why? affineOrientedCircuits?
   
-  elapsedTime tris = allTriangulations sq9;
-  assert(387 == #tris) -- check this number.
-  elapsedTime tris1 = generateTriangulations(sq9, t1);
-  assert(sort tris1 == sort tris)
+  elapsedTime tris = allTriangulations sq9; -- computes all triangulations, Fine => false, regular.
+  assert(387 == #tris) -- check this number. 
+  elapsedTime tris1 = allTriangulations(sq9, Fine => true);
+  assert(64 == #tris1)
+  elapsedTime tris2 = generateTriangulations(sq9, t1);
+  elapsedTime tris2a = generateTriangulations(sq9, t1, Regular => true); -- slow...
+  #tris2 == #tris2a
 
   -- via topcom:
-  elapsedTime assert(387 == # select(tris, t -> isRegularTriangulation(sq9, t)))
+  elapsedTime assert(387 == # select(tris, t -> isRegularTriangulation(sq9, t))) -- slow
   -- via Polyhedra/
-  elapsedTime assert(387 == # select(tris, t -> null =!= regularTriangulationWeights(sq9, t)))
+  elapsedTime assert(387 == # select(tris, t -> null =!= regularTriangulationWeights(sq9, t))) -- slow, same as Polyhedra, I think (same code is being used)
   -- 64 fine triangulations
-  assert(64 == # select(tris, t -> isFineTriangulation(sq9, t)))
-  assert(16 == # select(tris, t -> isStarTriangulation(sq9, t)))
-  assert(1 == # select(tris, t -> isStarTriangulation(sq9, t) and isFineTriangulation(sq9, t)))
+  assert(64 == # select(tris, t -> isFine(sq9, t)))
+  assert(16 == # select(tris, t -> isStar(sq9, t)))
+  assert(1 == # select(tris, t -> isStar(sq9, t) and isFine(sq9, t)))
 
   -- generate only fine 
   elapsedTime finetris = allTriangulations(sq9, Fine => true);
   -- elapsedTime finetris1 = generateTriangulations(sq9, t1, Fine => true); -- TODO
   elapsedTime finetris1 = generateTriangulations(sq9, t1);
   assert(sort finetris == sort finetris1)
-  
-  finetris/volumeVector_sq9 -- TODO: allow this?  In any case
-  finetris/volumeVector_(augment sq9) -- TODO: augment?  what to do with that?
+
+  finetris/volumeVector_(augment sq9) -- TODO: augment?  what to do with that?  
+  --finetris/volumeVector_sq9 -- TODO: allow this?  In any case: this fails now...
+  -- TODO: augment, in TopCom, change to a method.
   
   -- TODO: audit/allow "A" matrices to be homogeneous or not?
   --   one way: default is not, and Homogenize => true will add the extra row.
   --   use this for most routines taking point configurations or vector configurations.
+
+  -- note: given two regular, fine, star, triangulations, they can be connected via 
+  -- bistellar flips that keep the triangulation fine and star (and regular, I believe).
 ///
 
+TEST ///
+  -- triangulation code, test 1.  
+  -- some triangulation code is in Topcom, Polyhedra
+  -- (comes from KS database, h11=3, #232.
+-*
+  restart
+*-  
+  needsPackage "StringTorics"
+  A0 = matrix {{1, 1, 1, 1, -11}, {0, 2, 2, 2, -10}, {0, 0, 4, 4, -8}, {0, 0, 0, 12, -12}}
+
+  P2 = polar convexHull A0
+  LP = latticePointList P2
+  A  = transpose matrix LP
+  
+  -- We want triangulations of the point configuration given by the columns of A.
+  T = regularFineTriangulation A
+  assert isFine(A, T)
+  assert isStar(A, T)
+  assert isRegularTriangulation(A, T)
+      
+  -- second: is the union the same as the polytope? How do we tell?
+  -- consider all facets of each cell.  Each must occur once or twice.  Internal ones
+  -- must occur twice, ones on the boundary must occur once.
+  facetsA = T/(t -> subsets(t, #t-1))//flatten//tally
+  outerfacets = select(keys facetsA, k -> facetsA#k == 1)
+  facetsP2 = (annotatedFaces(3, P2))/(x -> x#1) -- sets of LP's on each facet.
+  all(outerfacets, f -> any(facetsP2, g -> isSubset(f, g))) -- this checks 
+  -- now make sure no interior simplices overlap in their interior.
+  volume P2
+  sum for t in T list volume convexHull A_t
+
+  elapsedTime tris = allTriangulations A;
+  FRST = first select(tris, t -> isFine(A, t) and isStar(A,t) and isRegularTriangulation(A,t))
+  volumeVector(augment A, FRST) -- WRONG?? Somehow an extra element is being considered...
+  elapsedTime tris = generateTriangulations(A, T);
+
+  wts = regularTriangulationWeights(A, T)
+  assert(regularSubdivision(A, matrix{wts}) == T//sort)
+  assert isRegularTriangulation(A, T) -- from Topcom.
+  -- also check Topcom's code...
+  flips(A, T) -- not unpacked... TODO: need to understand and document what this gives
+  --A1 = A || splice matrix{{numColumns A: 1}}
+  A1 = augment A
+  --volumeVector(A, T) -- need to homogenize A? at bottom or at top?
+  volumeVector(A1, T) -- need to homogenize A? at bottom or at top?
+  -- check that T is a triangulation?
+  circs = affineCircuits(A, T) -- NEEDS CLEANING UP (? why)
+  flip(T, {{5}, {0, 1, 2}})  
+  for c in circs list flip(T, c)
+
+  for v in subsets(T, 2) list {v#0, v#1, sort unique flatten v}
+  select(oo, v -> #v#2 == 6)
+
+  -- now generate new triangulations from these.
+  -- check: they are triangulations, are they regular?
+  -- go from fine regular --> fine star regular
+  -- can we get all affine circuits of A?  Yes: from topcom...  also, can just do it?
+  
+  -- flips, generating more triangulations.  Are they regular?
+  -- volume of a polytope.
+///
 
 TEST /// -- medium size (h^11 = 15) example
 -*
   restart
-  debug needsPackage "StringTorics"
-  debug needsPackage "Topcom"
+  needsPackage "StringTorics"
 *-
   topes = kreuzerSkarke(15, Limit=>10, Access=>"wget")
   A1 = matrix topes_8
@@ -985,69 +1001,32 @@ TEST /// -- medium size (h^11 = 15) example
   isFine(A, tri)
   isStar(A, tri)
   wts = regularTriangulationWeights(A, tri)
-  elapsedTime regularSubdivision(A, matrix{wts})
+  elapsedTime regularSubdivision(A, matrix{wts}) -- this is slower than we would like
   assert(sortTriangulation oo == tri)
 
-  elapsedTime tris = generateTriangulations(A, tri, Limit => 1000);
+  circs = affineCircuits(A, tri)
+  circs0 = select(circs, x -> not member(numcols A - 1, flatten x))  
+  for c in circs0 list flip(tri, c)
+  flip(tri, circs0_1)
+  
+  elapsedTime tris = generateTriangulations(A, tri, Limit => 50);
   tris/isFine_A//tally
   tris/isStar_A//tally
   elapsedTime(tris/regularTriangulationWeights_A);
   
-  
-
-
   elapsedTime tri = regularFineTriangulation A; -- topcom, fast.
-  elapsedTime tris = allTriangulations(A, Fine => true);
+  --  elapsedTime tris = allTriangulations(A, Fine => true); -- pretty long, how many are there?
 
-  -- Now consider all of the lattice points of the square
-  sq9 = transpose matrix latticePointList convexHull square
-  assert(sq9 == matrix {{-1, -1, 1, 1, -1, 0, 0, 1, 0}, {-1, 1, -1, 1, 0, -1, 1, 0, 0}})
-
-  -- test function from Topcom.
-  t1 = regularFineTriangulation sq9
-  regularTriangulationWeights(sq9, t1)
-  fineStarTriangulation(sq9, t1) 
-  delaunaySubdivision sq9
-  orientedCircuits sq9
-
-  -- Polyhedra command, bug fix currently in StringTorics.
-  t2 = regularSubdivision(sq9, matrix{{4,4,4,4,1,1,1,1,0}})
-  assert(
-    sortTriangulation t2 
-    == 
-    {{0, 4, 5}, {1, 4, 6}, {2, 5, 7}, {3, 6, 7}, {4, 5, 8}, {4, 6, 8}, {5, 7, 8}, {6, 7, 8}}
-    )
-
-  t3 = regularSubdivision(sq9, matrix{{4,4,4,4,1,1,1,1,-4}})
-  t4 = regularSubdivision(sq9, matrix{{1,1,1,1,1,1,1,1,-4}})
-  
-  affineCircuits(sq9, t3)
-  elapsedTime affineCircuits(sq9, t1) -- TODO: change the name of this function.  
-  
-  elapsedTime tris = allTriangulations sq9;
-  assert(387 == #tris) -- check this number.
-  elapsedTime tris1 = generateTriangulations(sq9, t1);
-  assert(sort tris1 == sort tris)
-
-  -- via topcom:
-  elapsedTime assert(387 == # select(tris, t -> isRegularTriangulation(sq9, t)))
-  -- via Polyhedra/
-  elapsedTime assert(387 == # select(tris, t -> null =!= regularTriangulationWeights(sq9, t)))
-  -- 64 fine triangulations
-  assert(64 == # select(tris, t -> isFineTriangulation(sq9, t)))
-  assert(16 == # select(tris, t -> isStarTriangulation(sq9, t)))
-  assert(1 == # select(tris, t -> isStarTriangulation(sq9, t) and isFineTriangulation(sq9, t)))
-
-  -- generate only fine 
-  elapsedTime finetris = allTriangulations(sq9, Fine => true);
-  -- elapsedTime finetris1 = generateTriangulations(sq9, t1, Fine => true); -- TODO
-  elapsedTime finetris1 = generateTriangulations(sq9, t1);
-  assert(sort finetris == sort finetris1)
-  
-  finetris/volumeVector_sq9 -- TODO: allow this?  In any case
-  finetris/volumeVector_(augment sq9) -- TODO: augment?  what to do with that?
-  
-  -- TODO: audit/allow "A" matrices to be homogeneous or not?
-  --   one way: default is not, and Homogenize => true will add the extra row.
-  --   use this for most routines taking point configurations or vector configurations.
+  ans = {{0, 2, 3, 5}, {0, 2, 3, 9}, {0, 2, 5, 15}, {0, 2, 6, 9}, {0, 2, 6, 13}, 
+      {0, 2, 7, 13}, {0, 2, 7, 15}, {0, 3, 5, 11}, {0, 3, 9, 11}, {0, 5, 6, 11}, 
+      {0, 5, 6, 13}, {0, 5, 13, 15}, {0, 6, 9, 11}, {0, 7, 13, 15}, {1, 2, 3, 9}, 
+      {1, 2, 3, 10}, {1, 2, 4, 10}, {1, 2, 4, 12}, {1, 2, 6, 9}, {1, 2, 6, 12}, 
+      {1, 3, 5, 10}, {1, 3, 5, 11}, {1, 3, 9, 11}, {1, 4, 5, 10}, {1, 4, 5, 12}, 
+      {1, 5, 6, 11}, {1, 5, 6, 12}, {1, 6, 9, 11}, {2, 3, 5, 10}, {2, 4, 5, 10}, 
+      {2, 4, 5, 16}, {2, 4, 12, 16}, {2, 5, 7, 15}, {2, 5, 7, 16}, {2, 6, 12, 13}, 
+      {2, 7, 12, 13}, {2, 7, 12, 16}, {4, 5, 12, 14}, {4, 5, 14, 16}, {4, 8, 12, 14}, 
+      {4, 8, 12, 16}, {4, 8, 14, 16}, {5, 6, 12, 14}, {5, 6, 13, 14}, {5, 7, 13, 14}, 
+      {5, 7, 13, 15}, {5, 7, 14, 16}, {6, 8, 12, 13}, {6, 8, 12, 14}, {6, 8, 13, 14}, 
+      {7, 8, 12, 13}, {7, 8, 12, 16}, {7, 8, 13, 14}, {7, 8, 14, 16}}
+  assert(ans == regularFineStarTriangulation A)
 ///
