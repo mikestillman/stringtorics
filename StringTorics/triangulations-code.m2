@@ -223,11 +223,8 @@ flip(List,List) := (tri, affineCircuit) -> (
     )
 
 generateTriangulations = method(Options => {Limit=>infinity, Regular=>false})
-
--- TODO: REMOVE?
--- TODO: is this Amat homogenized or not?
-generateTriangulations(Matrix) := opts -> Amat -> (
-    TRI := regularFineStarTriangulation Amat;
+generateTriangulations(Matrix, List) := opts -> (Amat, TRI) -> (
+    TRI = sortTriangulation TRI;
     allT := new MutableHashTable;
     allT#TRI = true;
     TODO := {TRI};
@@ -250,32 +247,8 @@ generateTriangulations(Matrix) := opts -> Amat -> (
         );
     keys allT
     )
-
--- Amat: a homogenized version of the matrix?
--- This one seems to work.
-generateTriangulations(Matrix, List) := opts -> (Amat, TRI) -> (
-    TRI = sortTriangulation TRI;
-    allT := new MutableHashTable;
-    allT#TRI = true;
-    TODO := {TRI};
-    while #TODO > 0 and #(keys allT) < opts.Limit do (
-        nextTRI := TODO#0;
-        TODO = drop(TODO,1);
-        flips := select(affineCircuits(Amat, nextTRI), z -> #z#0 > 1 and #z#1 > 1);
-        fliptris := for f in flips list flip(nextTRI, f);
-        newT := select(fliptris, x -> x =!= null);
-        for T in newT do (
-            if not allT#?T then (
-                --<< "new triangulation: " << T << endl;
-                if not opts.Regular or isRegularTriangulation(Amat, T) then (
-                    allT#T = true;
-                    TODO = append(TODO, T);
-                    );
-                ));
-        --<< "todo = " << #TODO << " and #triang = " << #(keys allT) << endl;
-        );
-    keys allT
-    )
+generateTriangulations Matrix := opts -> Amat -> (
+    generateTriangulations(Amat, regularFineTriangulation Amat, opts))
 
 -- Not working yet.  Make sure this is correct: is it generating the correct kind of triangulations?
 -- 15 May 2018.  REMOVE? (MES, 5/1/2020)
@@ -313,11 +286,18 @@ checkFan = (Amat, tri) -> (
     if not isComplete F then error "triangulation is a fan, but is not complete";
     )
 
--- TODO: rename to gkzVector?  Probably not?
 volumeVector = method()
 volumeVector(Matrix, List) := (Amat, tri) -> (
-    H := hashTable for t in tri list t => abs det Amat_t;
-    << "Volume = " << sum values H << endl;
+    if #tri == 0 then error "expected at least one simplex";
+    nelems := #tri#0;
+    d := nelems-1;
+    if not all(tri, f -> #f == nelems)
+    then error "expected a triangulation";
+    if numrows Amat =!= nelems then Amat = Amat || matrix{{(numcols Amat):1}};
+    if numrows Amat =!= nelems then error "triangulation not compatible with matrix";
+    H := hashTable for t in tri list t => (abs det Amat_t)/d!;
+    if debugLevel > 0 then
+    << "Volume = " << (sum values H)/d! << endl;
     for i from 0 to numColumns Amat - 1 list (
         T := select(tri, t -> member(i,t));
         sum for t in T list H#t

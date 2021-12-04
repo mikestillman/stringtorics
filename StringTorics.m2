@@ -12,11 +12,13 @@
 
 newPackage(
         "StringTorics",
-        Version => "0.1", 
-        Date => "",
-        Authors => {{Name => "Mike Stillman", 
-                  Email => "", 
-                  HomePage => ""}},
+        Version => "0.5", 
+        Date => "26 May 2021",
+        Authors => {
+            {Name => "Mike Stillman", 
+            Email => "mike@math.cornell.edu", 
+            HomePage => "http://pi.math.cornell.edu/~mike"}
+        },
         Headline => "toric variety functions for string theory",
         DebuggingMode => true,
         AuxiliaryFiles => true,
@@ -31,7 +33,7 @@ newPackage(
             "Topcom"
 --            "AbstractToricVarieties"
             },
-        PackageImports => {"Graphs"}
+        PackageImports => {"Graphs", "LLLBases"}
         )
 
 export {
@@ -62,6 +64,7 @@ export {
     "volumeVector",
     "delaunaySubdivision",
     "delaunayWeights",
+    "findAllFRSTs",
     
     -- This set maybe should be included in NormalToricVarieties?
     "singularCones",
@@ -69,6 +72,7 @@ export {
     "normalToricVarietyFromGLSM",
     -- These should stay here
     "reflexiveToSimplicialToricVariety",
+    "reflexiveToSimplicialToricVarietyCleanDegrees",
     "allZeros",
     "augment",
 
@@ -134,6 +138,21 @@ export {
     -- new formula
     "hodgeVectorViaTheorem", -- TODO: is likely not correct currently.
     "tentativeHodgeVector" -- deprecated
+    
+    -- Topology of a CY3-fold.
+    -- input: reflexive poytope, and triangulation.
+    -- Some functions to have here:
+    -- type: CY3ToricHypersurface.
+    -- h11 X
+    -- h12, h21 X
+    -- intersectionNumbers X
+    -- topology X (returns an object of TopologicalDataOfCY3)
+    
+    -- Gopakumar-Vafa invariants
+    -- computed using Andres' code in C++
+    
+    -- Flop chains, Mori cones
+    
     }
 
 
@@ -218,6 +237,79 @@ reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
     P2 := polar P1;
     (LP,tri) := regularStarTriangulation(dim P2-2,P2);
     normalToricVariety(LP,tri,opts)
+    )
+
+-- Subroutines for reflexiveToSimplicialToricVarietyCleanDegrees
+-- These might be generally useful too?
+  findFirstUnitVectors = method()
+  findFirstUnitVectors Matrix := List => (M) -> (
+      -- returns the indices of the the columns which are unit vectors,
+      -- if there are two or more columns corresponding to the same unit vector, take the first.
+      -- the result is in increasing list of integers.
+      e := entries transpose M;
+      unitposition := (col) -> if all(col, a -> a >= 0) and sum col === 1 then position(col, a -> a === 1) else null;
+      H := partition(c -> unitposition e_c, toList(0..numcols M-1));
+      ks := select(keys H, k -> k =!= null);
+      sort for k in ks list min(H#k)
+      )
+
+  -- extend the nice unit vectors to a list p of n columns (n = numrows M)
+  -- so that det M_p = 1 or -1.
+  -- compute the inverse A of this n x n matrix.
+  -- then compute A^-1 * M, and return this list of columns.
+  -- TODO: don't use subsets...
+  findInvertibleSubmatrix = method(Options => {Limit => 10000})
+  findInvertibleSubmatrix(Matrix, List) := List => opts -> (M, p) -> (
+      -- M is a matrix over the integers
+      -- p is a list of column indices of M (indices run from 0 to numcols M - 1)
+      -- Find a list q containing p (if possible), of column indices,
+      --   s.t. det(M_q) = 1 or -1.
+      -- Return q, or null, if one cannot be found.
+      S := set toList(0..numcols M - 1);
+      others := sort toList(S - set p);
+      needed := numrows M - #p;
+      if binomial(#others, needed) > opts.Limit then return null;
+      -- really: do some random choices of q containing p.
+      trythese := subsets(others, needed);
+      tried := 0;
+      for q1 in trythese do (
+          q := join(q1,p);
+          tried = tried+1;
+          if abs det(M_q) == 1 then (
+              if debugLevel >= 1 then (
+                  << "found suitable set of columns after " << tried << " step" 
+                  << if tried == 1 then "" else "s" << endl;
+                  );
+              return sort q;
+              );
+          );
+      << "tried all determinants: none had unit determinant" << endl;
+      null
+      )
+
+reflexiveToSimplicialToricVarietyCleanDegrees = method(Options => options reflexiveToSimplicialToricVariety)
+reflexiveToSimplicialToricVarietyCleanDegrees Polyhedron := Sequence => opts -> (P1) -> (
+    -- returns (V, q) where
+    -- V is essentially reflexiveToSimplicialToricVariety P1
+    --   except that the degrees of the ring have been cleaned up
+    -- AND 
+    -- a list of column indices (or of rays) in ascending order, 
+    -- whose degrees form a basis, in fact the identity matrix.
+    -- null is returned if no such q can be found, or the algorithm
+    -- doesn't find it.
+    -- Note: we don't really need ring V0 here...
+    P2 := polar P1;
+    (LP,tri) := regularStarTriangulation(dim P2-2,P2);
+    D := transpose syz matrix transpose LP;
+    print D;
+    p := findFirstUnitVectors D;
+    q := findInvertibleSubmatrix(D, p);
+    if q === null then null
+    else (
+        A := D_q;
+        D' := A^-1 * D;
+        (normalToricVariety(LP, tri, WeilToClass => D', opts), q)
+        )
     )
 
 augment = (A) -> (
@@ -1071,6 +1163,227 @@ exampleP111122'44 = () -> (value /// () -> (
     ///
     )
 
+ findAllFRSTs = method()
+ findAllFRSTs NormalToricVariety := (V) -> findAllFRSTs transpose matrix rays V
+ findAllFRSTs Matrix := List => (A) -> (
+     A1 := A | map(target A, (ring source A)^1, 0);
+     Ts := allTriangulations(A1, Fine => true, RegularOnly => true);
+     Ts = select(Ts, isStar_A1);
+     assert all(Ts, tri -> all(tri, s -> s#-1 == numcols A));
+     Ts/(t -> (entries transpose A, t/(s -> drop(s, -1))))
+     )
+ findAllFRSTs Polyhedron := List => (P) -> (
+     L := latticePointList P;
+     assert all(L#-1, a -> a == 0);
+     L = drop(L, -1);
+     A := transpose matrix L;
+     findAllFRSTs A
+     )
+
+--------------------------------------
+-- Intersection numbers for CY3's which are hypersurfaces in simplicial res of 4d reflexive torics.
+-- This is used to debug the more involved algorithm for these.
+--------------------------------------
+-- This code is in progress Sep 2021.  It is older code that I want to use now.
+-- It had been in the file: rigid-divisors/m2-example/intersection-rings.m2
+-- TODO: make sure it is correct.
+--       would be nice if it worked for other dimensions of CY's too...
+-- ALLOW
+--       pare down the list to generators only.  Can we compute directly from generators? (I think not...)
+-- WISHLIST
+--       would really be nice to work for non-favorables.
+--       would really be nice to work for CI in torics? (still CY's?)
+possibleNonZeros = (V) -> (
+    -- assumption currently: V has dim 4, is reflexive, and X is the anti-canonical CY3 divisor.
+    -- returns a list of lists of 3 integers (0 <= i1 <= i2 <= i3 <= N-1)
+    --  where N = #rays V.
+    -- and all triples other than those on this list must have triple intersection
+    -- on X being zero.
+    P2 := convexHull transpose matrix rays V;
+    F := annotatedFaces P2;
+    faces2 := select(F, f -> f#0 == 2);
+    faces2 = faces2/(x -> x#2); -- this is a list of all 2-faces in the polytope,
+    -- with which rays are on each face.
+    -- any triple not supported on a 2-face will have triple intersection zero.
+    triangles := (max V)/(t -> subsets(t,3))//flatten//unique;
+    edges := (max V)/(t -> subsets(t,2))//flatten//unique//sort;
+    triples := sort flatten for f in faces2 list select(triangles, t -> isSubset(t,f));
+    singles := for i from 0 to # rays V - 1 list {i,i,i};
+    doubles := sort flatten for f in faces2 list select(edges, t -> isSubset(t,f));
+    doubles = unique flatten for x in doubles list {{x#0,x#0,x#1},{x#0,x#1,x#1}};
+    {singles,doubles,triples}
+    )
+
+  CY3NonzeroMultiplicities = method()
+  CY3NonzeroMultiplicities NormalToricVariety := (V) -> (
+      RAYS := transpose matrix rays V;
+      P2 := convexHull RAYS;
+      (singles,doubles,triples) := toSequence possibleNonZeros V;
+      doubles = doubles/unique/sort//unique;
+      singles = singles/unique/sort//unique;
+      mult3 := new MutableHashTable from for x in triples list (
+           x => 1 + genus(P2, minimalFace(P2, (rays V)_x))
+           );
+      multvec := ij -> (
+          for ell from 0 to #rays V-1 list (
+              if member(ell,ij) then 0 
+              else (
+                  s := sort append(ij,ell);
+                  if mult3#?s then mult3#s else 0
+                  ))
+          );
+      for d in doubles do (
+          RHS := - RAYS *  transpose (matrix{multvec d});
+          vals := flatten entries solve(RAYS_d, RHS);
+          d1 := prepend(d#0,d);
+          d2 := append(d,d#1);
+          if vals#0 != 0 then mult3#d1 = vals#0;
+          if vals#1 != 0 then mult3#d2 = vals#1;
+          );
+      for d in singles do (
+          s := {d#0,d#0};
+          RHS := - RAYS *  transpose (matrix{multvec s});
+          vals := flatten entries solve(RAYS_d, RHS);
+          if vals#0 != 0 then mult3#{d#0,d#0,d#0} = vals#0;
+          );
+      new HashTable from mult3
+      )
+
+-- Simpler code, used to debug the algorithm/implementation above.
+tripleProductsCY = method()
+tripleProductsCY NormalToricVariety := (V) -> (
+    elapsedTime AV := abstractVariety(V, point);
+    IV := intersectionRing AV; 
+    h := sum gens IV;
+    J := ideal select((ideal IV)_*, f -> size f == 1);
+    forceGB gens J;
+    gens gb J;
+    A := (ring J)/J;
+    monoms := ideal basis(3, A);
+    elapsedTime JV := sub(monoms,IV);
+    elapsedTime (JVh := h ** (gens JV));
+    flatJVh := flatten entries JVh;
+    hashTable for i from 0 to numgens monoms - 1 list (
+        m := monoms_i;
+        d := integral(flatJVh#i);
+        if d > 0 then m => d else continue
+        )
+    )
+
+CY3Intersections = method()
+CY3Intersections(NormalToricVariety, List) := (V, indexOfDs) -> (
+    H := CY3NonzeroMultiplicities V;
+    loc := new HashTable from for i from 0 to #indexOfDs-1 list indexOfDs#i => i;
+    tr := k -> sort for k1 in k list loc#k1;
+    new Array from for kv in pairs H list (
+      if not isSubset(kv#0, indexOfDs) then continue;
+      new Array from append(tr kv#0, kv#1)
+      )
+  )
+
+topologyOfCY3 = method(Options => {
+        Variable => "x",
+        Ring => null
+        })
+topologyOfCY3(NormalToricVariety, List) := opts -> (V, basisIndices) -> (
+    -- input: 
+    --   V: a simplicial resolution of a Fano toric 4-fold
+    --      X is a (general) anti-canonical section of V.
+    --   basisIndices: list of integer indicesas to which V_i will be in the 
+    --      basis of Pic X that you choose.
+    -- output: a hash table containing:
+    --  a. triple intersection numbers (a hash table, H#{a,b,c}, with 0 <= a <= b <= c < h11(X))
+    --  b. the h11 numbers: c2(X) . D_i, 0 <= i < h11
+    --  c. the integers h11, h12
+    --  d. the cubic form C(x,y,z) in a polynomial ring ZZ[x_0, ..., x_(h11-1)]
+    --  e. a linear form L(x,y,z) in the same ring, representing c2(X).D_i
+    --
+    P := convexHull transpose matrix rays V;
+    h11 := h21OfCY P; -- we want h11 of `polar P`.
+    h21 := h11OfCY P;
+    if #basisIndices != h11 then error("expected "|h11|" indices");
+    H := CY3NonzeroMultiplicities V;
+    -- basisInv := new MutableHashTable;
+    -- for i from 0 to #basisIndices-1 do basisInv#(basisIndices#i) = i;
+    -- H3 := hashTable for x in keys H list (
+    --     if isSubset(x, basisIndices) then (
+    --         x' := apply(x, i -> basisInv#i);
+    --         x' => H#x 
+    --         ) else continue
+    --     );
+    -- Now let's get the cubic form and the linear form directly from the intersection theory.
+    -- For larger h11, this method will need to change.
+    x := getSymbol opts.Variable;
+    pt := base(x_0..x_(h11-1));
+    A := intersectionRing pt; -- over QQ
+    R := if opts#Ring =!= null then opts#Ring else ZZ (monoid A);
+    if numgens R =!= h11 then error("expected a ring with "|toString h11|" variables");
+
+    X := completeIntersection(V, {-toricDivisor V});
+    Xa := abstractVariety(X, pt);
+    IX := intersectionRing Xa;
+    h := sum(h11, i -> A_i * IX_(basisIndices#i));
+    C := sub(integral(h^3), vars R);
+    L := integral((chern_2 tangentBundle Xa) * h);
+    L = sub(L, vars R);
+    (h11, h21, C, L)
+    )
+
+TEST ///
+-- Test of intersection number computations.
+-- This requires that V be favorable?
+-*
+  restart
+  needsPackage "StringTorics"
+*-
+  debug StringTorics
+
+  topes = kreuzerSkarke(3, Limit => 50);    
+  A = matrix topes_30
+  P = convexHull A
+  (V, basisElems) = reflexiveToSimplicialToricVarietyCleanDegrees(P, CoefficientRing => ZZ/32003)
+  basisElems -- for the moment, we ignore this, and write down all of the elements...
+  GLSM = transpose matrix degrees ring V
+  X = completeIntersection(V, {-toricDivisor V})
+  Xa = abstractVariety(X, base())
+  IX = intersectionRing Xa
+  elemsToConsider = toList(0..numcols GLSM-1);
+  triples = (subsets(elemsToConsider, 3))/sort//sort;
+  Htriples = hashTable for a in triples list (
+      (i,j,k) := toSequence a;
+      val := integral(IX_i * IX_j * IX_k);
+      if val == 0 then continue else {i,j,k} => val
+    )
+
+  Htriples = hashTable for a in join(singles, doubles, triples) list (
+      (i,j,k) := toSequence a;
+      val := integral(IX_i * IX_j * IX_k);
+      if val == 0 then continue else {i,j,k} => val
+    )
+
+  -- Now we try the code above
+  (singles, doubles, triples) = toSequence possibleNonZeros V
+  assert(triples === (keys Htriples)//sort//sort)
+  
+  elapsedTime tripleProductsCY V
+  elapsedTime CY3NonzeroMultiplicities V -- much slower for small h11...
+  
+  (h11, h21, H3, C, L) = toSequence topologyOfCY3(V, basisElems)
+  hashTable for x in keys H3 list (
+      if isSubset(x, basisElems) then x => H3#x else continue
+      )
+
+
+  (h11, h21, C, L) = toSequence topologyOfCY3(V, basisElems)  
+  (h11', h21', C', L') = toSequence topologyOfCY3(V, {0,1,2}, Ring => ring C)  
+  A = ring C;
+  M = GLSM_{0,1,2}  
+  phi1 = map(A, A, flatten entries((M) * transpose vars A))
+  L' == phi1 L
+  C' == phi1 C
+  netList {L, L', phi1 L, phi1 L'}
+  
+  ///
 ----------------------------------------------------------------
 beginDocumentation()
 

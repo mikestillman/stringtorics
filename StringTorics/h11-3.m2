@@ -4,13 +4,13 @@
 
 restart
 needsPackage "StringTorics"
-getKreuzerSkarke(3, Limit=>1000); -- 244 of these
-polys = parseKS getKreuzerSkarke(3, Limit=>1000);
+kreuzerSkarke(3, Limit=>1000); -- 244 of these
+polys = kreuzerSkarke(3, Limit=>1000);
 
 -- for each, we want the simplicial toric variety
 -- such that the class group is 
 polytopes = for p in polys list (
-    convexHull matrixFromString p_1
+    convexHull matrix p
     );
 elapsedTime nonfavs = select(0..#polytopes-1, p -> not isFavorable polytopes#p)
   -- ouch: that line (first time) takes 61 seconds on my mac book pro...

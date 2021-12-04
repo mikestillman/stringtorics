@@ -9,6 +9,12 @@ doc ///
       with facilities already present in Macaulay2, to provide the following 
       functionality.
     Text
+      @SUBSECTION "Examples of use"@
+    Text
+      @UL {
+          {TO "Example use", ", a first example showing basic usage of this package"}
+          }@
+    Text
       @SUBSECTION "Routines to access the Kreuzer-Skarke database"@
     Text
       @UL {
@@ -16,23 +22,33 @@ doc ///
           {TO "kreuzerSkarkeDim3"}
           }@
     Text
-      @SUBSECTION "Examples of use"@
-    Text
-      @UL {
-          {TO "Example use", ", a first example showing basic usage of this package"}
-          }@
-    Text
-      @SUBSECTION "Additional polyhedral functions"@
-    Text
       @SUBSECTION "Triangulations"@
     Text
+      @UL {
+          TO "facilities available for working with triangulations",
+          TO regularFineStarTriangulation,
+          TO allTriangulations,
+          TO generateTriangulations
+          }@
+    Text
       @SUBSECTION "Cohomology"@
+    Text
+      @UL {
+          TO "cohomology of line bundles on toric varieties",
+          TO cohomologyVector,
+          TO toricOrthants,
+          TO cohomologyBasis,
+          TO cohomologyMatrix,
+          TO cohomologyMatrixRank
+          }@
    Caveat
    SeeAlso
      "installing StringTorics"
 ///
 
 -*
+    Text
+      @SUBSECTION "Additional polyhedral functions"@
     Text
       @UL {
           {}
@@ -260,6 +276,138 @@ doc ///
 
 ///
   Key
+    "computing sheaf cohomology of specific Calabi-Yau hypersurfaces in toric varieties"
+  Headline
+    facilities available for computing sheaf cohomology
+  Description
+    Text
+    Example
+  Caveat
+  SeeAlso
+    
+///
+
+doc ///
+  Key
+    "facilities available for working with triangulations"
+  Headline
+    facilities available for working with triangulations
+  Description
+    Text
+      In this introduction, we consider triangulations of the following square
+      in the plane.
+    Example
+      square = transpose matrix{{1,1},{-1,1},{-1,-1},{1,-1}}
+      regularFineTriangulation square
+      assert(# allTriangulations square == 2)
+    Text
+      Now consider all of the lattice points of the square.
+    Example
+      P = convexHull square
+      LP = latticePointList P
+      sq9 = transpose matrix LP
+    Text
+      We could have entered sq9 by hand as so:
+    Example
+      sq9 = matrix {{-1, -1, 1, 1, -1, 0, 0, 1, 0}, 
+                    {-1, 1, -1, 1, 0, -1, 1, 0, 0}}
+    Text
+      We first show some functions from Topcom that are useful.
+    Example
+      t1 = regularFineTriangulation sq9
+      regularTriangulationWeights(sq9, t1)
+      fineStarTriangulation(sq9, t1) -- has central element removed.  Don't do that?
+      delaunaySubdivision sq9 -- not a triangulation (4 squares).
+      orientedCircuits sq9 -- many of these are not useful when considering only fine triangulations.
+    Text
+      Let's generate all of the triangulations of the square.
+      Really, we want all triangulations which are fine (involve all the lattice points)
+      and are star (involve the origin), and are regular.
+    Example
+      regularFineStarTriangulation sq9 -- leaves out 8, the index of the origin in sq9.
+      Ts = allTriangulations sq9;
+      #Ts
+      # select(Ts, t -> isFine(sq9,t))
+      # select(Ts, t -> isStar(sq9,t))
+      # select(Ts, t -> isStar(sq9,t) and isFine(sq9,t))
+      # select(Ts, t -> isFine(sq9,t) and isRegularTriangulation(sq9,t))
+    Text
+      Regular triangulations and subdivisions can be computed.
+      In this example, we take the first 5 fine triangulations found above,
+      find weights (they are all regular triangulations) giving these triangulations,
+      then reconstruct the triangulation using @TO regularSubdivision@.
+      These are the same as the triangulations we started with.
+    Example
+      fineT = take(select(Ts, isFine_sq9), 5)
+      wts = for t in fineT list regularTriangulationWeights(sq9, t)
+      fineT2 = for w in wts list regularSubdivision(sq9, matrix{w})
+      fineT == fineT2
+    Text
+      We might want to check that these are indeed triangulations.
+      I am not completely convinced that @TO topcomIsTriangulation@ always gives a
+      correct answer, so we also implement a slower routine @TO naiveIsTriangulation@.
+    Example
+      starT = first select(Ts, t -> isStar(sq9,t))
+      naiveIsTriangulation(sq9, starT)
+      topcomIsTriangulation(sq9, starT)
+      notSq9 = matrix {{-1, -1, 1, 1, -1, 0, 0, 2, 0}, 
+                    {-1, 1, -1, 1, 0, -1, 1, 0, 0}}
+      naiveIsTriangulation(notSq9, starT)
+      topcomIsTriangulation(notSq9, starT)
+    Text
+      All regular triangulations fit into a polytope, whose vertices are the 
+      GKZ volume vectors (for each lattice point, consider the sum of the volumes
+      of the simplices containing the point as a vertex).  This gives a vector in
+      $\Z^d$, where $d$ is the number of lattice points, which is computed by the method
+      @TO volumeVector@.
+    Example
+      volume convexHull sq9
+      tri = fineT_0
+      for f in tri list volume convexHull(sq9_f)
+      sum oo == volume convexHull sq9
+      volumeVector(sq9, tri)
+      volumeVector(sq9, starT)
+    Text
+      Sometimes we want to generate only some of the triangulations, as there can be
+      a huge number of them.  Unfortunately, the topcom functions do not allow this
+      functionality.  Instead, use @TO generateTriangulations@.  Note that this function
+      only generates fine triangulations.
+    Example
+      T4 = generateTriangulations(sq9, Limit => 100);
+      T3 = select(Ts, t -> isFine(sq9,t));
+      assert(set T4 === set T3)
+  SeeAlso
+    generateTriangulations
+    "Topcom::allTriangulations"
+///
+
+doc ///
+  Key
+    (generateTriangulations, Matrix)
+    [generateTriangulations, Limit]
+    [generateTriangulations, Regular]
+  Headline
+    generate all triangulations with certain properties
+  Usage
+    Ts = generateTriangulations A
+    generateTriangulations(A, Limit => n)
+  Inputs
+    A:Matrix
+        over the integers (or rationals?), whose columns are the
+        points to use
+    Limit => ZZ
+    Regular => Boolean
+  Outputs
+    Ts:List
+        of lists of integers, each such list represents a triangulation
+  Description
+    Text
+  SeeAlso
+    "Topcom::allTriangulations"
+///
+
+///
+  Key
     vertexMatrix
   Headline
   Usage
@@ -273,12 +421,66 @@ doc ///
   SeeAlso
 ///
 
+doc ///
+  Key
+    "cohomology of line bundles on toric varieties"
+  Headline
+    introduction to computing line bundle cohomologies in Macaulay2
+  Description
+    Text
+    Example
+      topes = kreuzerSkarke(3, Access=>"wget");
+      topes_9
+      A = matrix topes_11
+      P = convexHull A
+      P2 = polar P
+      V = reflexiveToSimplicialToricVariety P
+      S = ring V -- the Cox ring
+      GLSM = transpose matrix degrees S
+      SR = dual monomialIdeal V
+      assert isSimplicial V
+      assert isSmooth V
+      picardGroup V === ZZ^3
+    Text
+      As an example, let's compute the cohomology of the line bundle $OO_V(-2,3,-4)$.
+    Example
+      D = 2*V_1 + 3*V_0 - 4*V_6
+      degree D
+      for i from 0 to 4 list HH^i(V, OO(D))
+      for i from 0 to 4 list rank HH^i(V, OO(D))
+      cohomologyVector(V, {-2,3,-4})
+      cohomologyVector(V, D)
+      hashTable for i from 0 to # rays V - 1 list i => cohomologyVector(V, V_i)
+    Text
+      @SUBSECTION "Bases of cohomology groups"@
+    Text
+      We now delve a bit deeper into the bases of these cohomology groups.
+      
+      There are a number of pointed orthants in $\ZZ^n$, where $n$ is the number of rays,
+      which support cohomology.
+    Example
+      netList toricOrthants V
+      cohomologyBasis(1, V, {2, 1, 0})
+      HH^1(V, OO_V(2,1,0))
+      for i from 0 to 3 list cohomologyBasis(i, V, {2, 1, 0})
+      for i from 0 to 3 list rank HH^i(V, OO_V(2, 1, 0))
+      
+      for i from 0 to 3 list cohomologyBasis(i, V, {2, 1, -2})
+      for i from 0 to 3 list cohomologyBasis(i, V, {2, 1, -3})
+    Text
+      @SUBSECTION "Cohomology on Calabi-Yau hypersurfaces"@
+    Text
+  SeeAlso
+///
+
+
 ///
 -*
   restart
   needsPackage "StringTorics"
 *-
   topes = kreuzerSkarke(5, Limit=>10, Access=>"wget")
+
   A = matrix topes_9
   P = convexHull A
   P2 = polar P
@@ -294,7 +496,6 @@ doc ///
   sort unique flatten elems2 == toList(0..numcols LP-1)
   sort unique flatten elems3 == toList(0..numcols LP-1)
   -- I would like to check that these are well-defined triangulations
-  sum oo
   latticeVolume P
   latticeVolume P2
   
