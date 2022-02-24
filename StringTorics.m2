@@ -1281,6 +1281,36 @@ CY3Intersections(NormalToricVariety, List) := (V, indexOfDs) -> (
       )
   )
 
+-- Simple subroutine for finding the list of indices for possible intersections.
+-- e.g. if in the resulting list, {0,1,1} appears, then this will represent the
+-- product H_0 . H_1 . H_1 (which is an integer)
+monoms = (deg, lo, hi) -> (
+    -- input: deg, lo, hi: all integers
+    -- output: a list of lists of integers all of length 'deg',
+    --   sorted in ascending order.
+    if deg == 0 then {{}}
+    else if lo === hi then {splice{deg:lo}}
+    else
+    flatten for i from lo to hi list (
+        L1 := monoms(deg-1, i, hi);
+        for t in L1 list prepend(i, t)
+        )
+    )
+
+intersectionNumbers = method()
+intersectionNumbers(Ring, List) := HashTable => (IX, basisIndices) -> (
+    -- IX: should be a ring produced for Schubert2, having 'integral' function for top degree elements.
+    -- basisIndices is a subList of {0, ..., numgens IX - 1}.
+    -- WARNING: this is cubic in number of generators of IX.  This can be improved,
+    -- using the toric structure of X as a hypersurface in a toric V.
+    mons := monoms(#basisIndices, 0, #basisIndices-1);
+    bas := for i in basisIndices list IX_i;
+    for t in mons list (
+        a := lift(integral product(t, i -> bas_i), ZZ);
+        if a === 0 then continue else t => a
+        )
+    )
+
 topologyOfCY3 = method(Options => {
         Variable => "x",
         Ring => null

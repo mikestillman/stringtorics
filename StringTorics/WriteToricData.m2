@@ -26,11 +26,21 @@ h11OfCY ReflexivePolytopeData := ZZ => P -> (
     P.cache#"h11"
     )
 h21OfCY ReflexivePolytopeData := ZZ => P -> (
-    if not P.cache#?"h11" then P.cache#"h21" = h11OfCY convexHull transpose matrix rays P;
+    if not P.cache#?"h21" then P.cache#"h21" = h11OfCY convexHull transpose matrix rays P;
     P.cache#"h21"
     )
 
 reflexivePolytopeData = method()
+reflexivePolytopeData(List, List, List) := ReflexivePolytopeData => (latticePoints, GLSM, basisIndices) -> (
+    -- What should be checked here to validate the input data?
+    new ReflexivePolytopeData from {
+        symbol cache => new CacheTable,
+        "rays" => latticePoints,
+        "glsm" => GLSM,
+        "basis indices" => basisIndices
+        }
+    )
+
 reflexivePolytopeData Matrix := ReflexivePolytopeData => (A) -> (
     P2 := polar convexHull A;
     LP = select(latticePointList P2, lp -> dim(P2, minimalFace(P2, lp)) <= 2);
@@ -41,13 +51,9 @@ reflexivePolytopeData Matrix := ReflexivePolytopeData => (A) -> (
     if q === null then error ("oops, can't find a good GLSM matrix"); -- hasn't happened yet
     GLSM := (D_q)^-1 * D;
     -- the rays of each triangulation should match LP.
-    new ReflexivePolytopeData from {
-        symbol cache => new CacheTable,
-        "rays" => LP,
-        "glsm" => entries transpose GLSM,
-        "basis indices" => q
-        }
+    reflexivePolytopeData(LP, entries transpose GLSM, q)
     )
+
 
 -- TODO: allow options, e.g. limit the number.
 -- TODO: Another routine: find a random one?
@@ -72,25 +78,40 @@ findAllFRSTs ReflexivePolytopeData := List => P -> (
     for t in T list toricHypersurface(P, last t) -- t is a pair: list of vertices, list of list of indices
     )
 
+normalToricVariety ToricHypersurface := opts -> (X) -> (
+    if not X.cache.?NormalToricVariety then X.cache.NormalToricVariety = (
+        P := X#"polytope";
+        T := X#"triangulation";
+        GLSM := transpose matrix P#"glsm";
+        normalToricVariety(rays P, T, opts, WeilToClass => matrix GLSM)
+        );
+    X.cache.NormalToricVariety
+    -- TODO: this fails if the class group is torsion! (Fails: later it gives an inscrutable error...)
+    )
+
 topologicalDataOfCY3 = method()
-topologicalDataOfCY3(ToricHypersurface, List, Ring) := TopologicalDataOfCY3 => (P, triang, RZ) -> (
-    V := normalToricVariety(P#"rays", triang);
+topologicalDataOfCY3(ToricHypersurface, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
+    V := normalToricVariety X;
+    P := X#"polytope";
     data := topologyOfCY3(V, P#"basis indices");
     -- this data above computes intersection numbers for all toric divisors. 
     -- So we consider only the ones whose indices are contained in basis indices:
     new TopologicalDataOfCY3 from {
-        "h11" => P#"h11",
-        "h21" => P#"h21",
+        "h11" => h11OfCY P,
+        "h21" => h21OfCY P,
         "c2" => sub(data_3, vars RZ),
         "cubic intersection form" => sub(data_2, vars RZ)
         }
     )
 
-normalToricVariety ToricHypersurface := opts -> (X) -> (
-    P := X#"polytope";
-    T := X#"triangulation";
-    GLSM := P#"glsm";
-    normalToricVariety(rays P, T, WeilToClass => transpose matrix GLSM) -- TODO: this fails if the class group is torsion! (Fails: later it gives an inscrutable error...)
+moriCone = method()
+moriCone NormalToricVariety := Cone => (V) -> (
+    IV := intersectionRing (abstractVariety V);
+    Cs := matrix for x in orbits(V, 1) list (
+        c := product(x, i -> IV_i);
+        for d in gens IV list integral(c*d)
+        );
+    posHull transpose lift(Cs, QQ)
     )
 
 gvInputFromToric = method(Options => {
@@ -102,13 +123,17 @@ gvInputFromToric = method(Options => {
 
 gvInputFromToric(NormalToricVariety, List, List) := opts -> (V, basisIndices, moriGenerators) -> (
     << "in gvInput" << endl;
-    H := hashTable for i from 0 to #basisIndices-1 list basisIndices#i => i;
-    intersectionnums := for x in pairs CY3NonzeroMultiplicities V list (
-        if isSubset(x#0, basisIndices) then
-            append(sort for a in x#0 list H#a, x#1)
-        else 
-            continue
-        );
+    X := completeIntersection(V, {-toricDivisor V});
+    Xa := abstractVariety(X, base());
+    IX := intersectionRing Xa;
+    intersectionnums := for x in pairs intersectionNumbers(IX, basisIndices) list append(x#0, x#1);
+    -- H := hashTable for i from 0 to #basisIndices-1 list basisIndices#i => i;
+    -- intersectionnums := for x in pairs CY3NonzeroMultiplicities V list (
+    --     if isSubset(x#0, basisIndices) then
+    --         append(sort for a in x#0 list H#a, x#1)
+    --     else 
+    --         continue
+    --     );
     str1 := toString moriGenerators;
     str2 := "{}";
     str3 := toString if opts.Heft === null then heft ring V else opts.Heft; -- this might not be correct
@@ -123,6 +148,82 @@ gvInputFromToric(NormalToricVariety, List, List) := opts -> (V, basisIndices, mo
     concatenate between("\n", {str1, str2, str3, str4, toString {}, str5, str6})
     )
 
+gvInput = (moriGenerators, heftval, GLSM, intersectionnums, degreelimit, prec) -> (
+    -- moriGenerators: list of lists
+    -- heftval: list of ints
+    -- GLSM: list of list of ints
+    -- intersectionnums: list of triples of ints
+    -- degreelimit: infinity or positive integer
+    -- prec: positive integer
+    str1 := toString moriGenerators;
+    str3 := toString heftval;
+    str4 := toString GLSM;
+    str5 := toString intersectionnums;
+    str6 := toString ({
+            if degreelimit === infinity then -1 else degreelimit, 
+            prec,
+            0,
+            300000
+            });
+    concatenate between("\n", {str1, toString {}, str3, str4, toString {}, str5, str6})
+    )
+
+gvInvariants = method(Options => {
+    Mori => null, -- null means: compute rays of the Mori cone of V in 
+    Heft => null, -- null means: compute it
+    DegreeLimit => infinity,
+    Precision => 150,
+    FilePrefix => "foo",
+    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV",
+    KeepFiles => true
+    })
+
+intersectionNumbersOfCY = method()
+intersectionNumbersOfCY(NormalToricVariety, List) := (V, basisIndices) -> (
+    X := completeIntersection(V, {-toricDivisor V});
+    Xa := abstractVariety(X, base());
+    IX := intersectionRing Xa;
+    intersectionNumbers(IX, basisIndices)
+    )
+
+gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices) -> (
+    -- Compute intersection numbers for X in V (using this basis)
+    -- Compute mori cone (if needed) (?? requires basis too...)
+    -- Compute a vector which dots positively with all these generators.
+    -- Then write the file
+    -- Execute the command
+    -- Read the results, and return them
+    intersectionnums := for t in intersectionNumbersOfCY(V, basisIndices) list append(t#0, t#1);
+    -- X := completeIntersection(V, {-toricDivisor V});
+    -- Xa := abstractVariety(X, base());
+    -- IX := intersectionRing Xa;
+    -- intersectionnums := for x in pairs intersectionNumbers(IX, basisIndices) list append(x#0, x#1);
+    -- H := hashTable for i from 0 to #basisIndices-1 list basisIndices#i => i;
+    -- intersectionnums := for x in pairs CY3NonzeroMultiplicities V list (
+    --     if isSubset(x#0, basisIndices) then
+    --         append(sort for a in x#0 list H#a, x#1)
+    --     else 
+    --         continue
+    --     );
+    mori := if opts.Mori =!= null then opts.Mori else (
+        M := moriCone V;
+        GLSM := matrix degrees ring V;
+        entries transpose((rays M) // GLSM)
+        );
+    heft := if opts.Heft =!= null then opts.Heft else (
+      sum entries transpose rays dualCone posHull transpose matrix mori
+      );
+    -- OK, now we have computed everything we need.  Write it to a file
+    infile := opts.FilePrefix | "-input";
+    outfile := opts.FilePrefix | "-output";
+    infile << gvInput(mori, heft, transpose degrees ring V, intersectionnums,
+        opts.DegreeLimit, opts.Precision) << close;
+    inputLine := opts.Executable | " <" | infile | " >" | outfile;
+    print inputLine;
+    run inputLine;
+    -- Get the output, package as a hash table
+    (lines get outfile)/value//hashTable
+    )
 ------------------------------
 -- Original code below here --
 ------------------------------
@@ -148,6 +249,8 @@ polytopeData Matrix := PolytopeData => (A) -> (
         }
     )
 
+-*
+-- Older version
 topologicalDataOfCY3 = method()
 topologicalDataOfCY3(PolytopeData, List, Ring) := TopologicalDataOfCY3 => (P, triang, RZ) -> (
     V := normalToricVariety(P#"rays", triang);
@@ -159,6 +262,7 @@ topologicalDataOfCY3(PolytopeData, List, Ring) := TopologicalDataOfCY3 => (P, tr
         "cubic intersection form" => sub(data_2, vars RZ)
         }
     )
+*-
 
 writeDataFormat = method()
 writeDataFormat String := (filename) -> (
@@ -207,8 +311,13 @@ computeAndWriteTopologicalData(String, Matrix, ZZ) := (filename, A, idx) -> (
     )
 
 TEST ///
+--
+  restart
+  needs "WriteToricData.m2"
+--
   topes = kreuzerSkarke 3;
   P = reflexivePolytopeData matrix topes_12
+  V = reflexiveToSimplicialToricVariety convexHull matrix topes_12
   -- check consistency:
   transpose matrix rays P
   GLSM = transpose matrix degrees P
@@ -217,21 +326,106 @@ TEST ///
 
   -- Now create triangulations  
   Xs = findAllFRSTs P
-  
-  -- Now compute topology
+
   V = normalToricVariety Xs_0
+  gvInvariants(V, {0, 2, 3}, DegreeLimit => 10, Precision => 150)
+  gvInvariants(V, {2, 3, 6}, DegreeLimit => 10, Precision => 150)
+    
+  -- Now compute topology
   elapsedTime CY3NonzeroMultiplicities V
   for x in pairs oo list append(x#0, x#1)
   elapsedTime tripleProductsCY V -- returns monomials => value.  Bit annoying...
   P#"basis indices"
   topologyOfCY3(V, P#"basis indices")
 
-  "foo1" << gvInputFromToric(V, P#"basis indices", {{1,0,0},{0,1,0},{0,0,1}}) << endl << close;
-  -- Now create computeGV input, then get GV invariants.
-  
 ///
 
 end--
+
+TEST ///
+  -- example: mirror of (hypersurface in) P(1,1,6,9)
+
+  restart
+  needs "WriteToricData.m2"
+  A = matrix"1,0,0,0,-1;0,1,0,0,-1;0,0,1,0,-6;0,0,0,1,-9"
+
+  P2 = convexHull A
+  vertices  P2
+  latticePoints P2
+  isReflexive P2
+
+  V = reflexiveToSimplicialToricVariety(polar P2, CoefficientRing => ZZ/101)
+
+  Ts = findAllFRSTs transpose matrix rays V -- only one.
+  t = Ts#0#1
+  
+  GLSM = transpose matrix degrees ring V -- matches Andres'
+
+  -- XXX
+  gvInvariants(V, {0,5}, DegreeLimit => 10, Precision => 150)
+
+  -- Used to check the above:
+  -- now we need to compute the intersection numbers and Mori cone.
+  pt = base(a,b)
+  X = completeIntersection(V, {-toricDivisor V})
+  Va = abstractVariety(V, pt)
+  Xa = abstractVariety(X, pt)
+  basisIndices = {0,5}
+  use Xa
+  -- Intersection numbers of X:
+  integral(t_0^3) == 0
+  integral(t_0^2*t_5) == 1
+  integral(t_0*t_5^2) == -3
+  integral(t_5^3) == 9
+  
+  --
+  rays moriCone V
+  mori = entries transpose ((rays moriCone V) // (transpose GLSM))
+  -- gives [[1,-3], [0,1]]
+
+
+
+  -- TODO: write triangulate.
+  --   which vertices to take
+  --   how many
+  --   keeps origin in it too (or should?)
+
+  --reflexiveToSimplicialToricVariety(P2, Lattice => "N") -- this might be nice...
+
+  -- t = triangulate(P2, ....) -- which lattice points to use?
+///
+
+
+TEST ///
+  -- example from Naomi (poly_111): Start this over...
+  restart
+  needs "WriteToricData.m2"
+
+  rys = transpose matrix{{-1,-1,0,0},
+         {-1,0,-1,1},
+         {0,-1,-1,0},
+         {-1,-1,-1,0},
+         {-1,-1,-1,1},
+         {1,1,1,-1},
+         {1,1,1,0}}
+
+  A = transpose LLL syz GLSM
+  P2 = convexHull A
+  isReflexive P2
+  P = polar P2
+  assert(h11OfCY P === 2)
+  assert(h21OfCY P === 272)
+  
+  P = reflexivePolytopeData matrix topes_10
+  Ts = findAllFRSTs P
+  netList Ts
+
+  -- want a normal toric variety with the rays in the same location as GLSM
+  -- with this GLSM matrix.
+  
+  -- First, I need the triangulations...?
+///
+
 
 restart
 load "WriteToricData.m2"
@@ -249,16 +443,82 @@ nonTorsionFrees = {0, 3, 4, 5, 12, 15, 796, 800, 803, 1059, 1060, 1064, 1065, 11
 torsionFrees = sort toList(set(0..#topes-1) - set nonTorsionFrees);
 assert(#torsionFrees == 1179) -- not 1197!! -- so 18 are torsion...
 
--- By hand:
+-- By hand:    
 P = reflexivePolytopeData matrix topes_10
 Ts = findAllFRSTs P
 netList Ts
 
-rays P
+V = normalToricVariety(P#"rays", Ts_0#"triangulation", WeilToClass => transpose matrix P#"glsm", CoefficientRing => kk)
+topologicalDataOfCY3(Ts_0, RZ)
+V = normalToricVariety(Ts_0, CoefficientRing => ZZ/32003)
+Va = abstractVariety(V, base())
+IV = intersectionRing Va
+for i in {0,2,3,4} list integral(IV_i * IV_0 * IV_1 * IV_2)
+transpose matrix for x in orbits(V, 1) list (
+  for i in {0,2,3,4} list integral(IV_i * IV_(x#0) * IV_(x#1) * IV_(x#2))
+)
+lift(oo, QQ)
+posHull oo
+rays oo
+X = completeIntersection(V, {-toricDivisor V})
+pt = base(symbol x, symbol y, symbol z, symbol w)
+Xa = abstractVariety(X, pt)
+IX = intersectionRing Xa
 
+cohomologyVector(X, {1,0,0,0})
+cohomologyVector(X, {0,1,0,0})
+c2X = chern_2 tangentBundle Xa
+integral(c2X * t_0)
+integral(c2X * t_2) -- this should be, by Friedman, -6...
+integral(c2X * t_3)    
+integral(c2X * t_4)
 
--- Below this still works (hopefully).
+cohomologyVector(X, {0,0,0,1})
+cohomologyVector(completeIntersection(V, {-toricDivisor V, V_0})) -- (1,0,1)
+cohomologyVector(completeIntersection(V, {-toricDivisor V, V_1})) -- (1,0,1)
+cohomologyVector(completeIntersection(V, {-toricDivisor V, V_2})) -- (1,0,0)
+cohomologyVector(completeIntersection(V, {-toricDivisor V, V_3})) -- (1,0,1)
+cohomologyVector(completeIntersection(V, {-toricDivisor V, V_4})) -- (1,0,0)
+cohomologyVector(completeIntersection(V, {-toricDivisor V, V_5})) -- (1,0,0)
+cohomologyVector(completeIntersection(V, {-toricDivisor V, V_6})) -- (1,0,2)
+cohomologyVector(completeIntersection(V, {-toricDivisor V, V_7})) -- (1,0,0)
 
+h = x*t_0 + y*t_2 + z*t_3 + w*t_4
+
+integral(c2X * t_2) == 10
+integral(c2X * t_4) == -4
+integral(c2X * t_5) == 16
+integral(c2X * t_7) == -4
+
+-- Try to understand these surfaces?
+F = random(-degree toricDivisor V, ring V)
+use ring F
+F4 = sub(F, x_4 => 0)
+factor F4
+-- Below this still works (hopefully). (it doesn't!)
+exponents (F4 // x_7^2)
+oo_{0,1,2,3,5,6}
+convexHull transpose oo
+vertices oo
+latticePoints ooo
+-- How can we investigate the surface which is F = x_4 = 0.  (and so x_7 = 1)?
+-- Method #1: look locally on the toric variety, at the codim 2 locus.
+-- in this example, we consider the generator of ideal V: x_0 x_2 x_3 x_4
+-- this turns out to be a smooth cone.
+G = sub(F, {x_1 => 1, x_5 => 1, x_6 => 1, x_7 => 1})
+G0 = sub(G, {x_4 => 0}) -- surface in CC^3.
+singG = trim(ideal G0 + ideal jacobian G0)
+codim singG
+support G0
+decompose singG
+-- G: F = x_4 = 0, on the patch (x_0 x_2 x_3 x_4), appears to be singular
+-- at x_2 = x_3 = 0.
+trim(ideal G0 + ideal(x_2, x_3))
+singularCones(4, V)
+singularCones(3, V)
+singularCones(2, V)
+singularCones(1, V)
+singularCones(0, V)
 
 
 for x in torsionFrees do (
@@ -280,3 +540,8 @@ elapsedTime toricdata = computeToricData A
 topdatas = for t in last toricdata list elapsedTime computeTopologicalData(RZ, toricdata_2, t, toricdata_4)
 use RZ
 
+-------------------------------------------------
+-- todo: given a toric variety:
+--   1. give (consistent with GLSM charges): curve classes generating all (effective) curves.
+--   2. write out the input to computeGV
+--   3. read in the output from computeGV.

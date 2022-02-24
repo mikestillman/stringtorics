@@ -4,64 +4,8 @@ needsPackage "StringTorics"
 GVinvariants = method(Options => {
         Precision => 100, -- number of bits of accuracy
         Bound => infinity, -- max Heft bound
-        Heft => List, -- list of positive weights
+        Heft => List -- list of positive weights
         })
-
--*
-findFirstUnitVectors = method()
-findFirstUnitVectors Matrix := List => (M) -> (
-    -- returns the indices of the the columns which are unit vectors,
-    -- if there are two or more columns corresponding to the same unit vector, take the first.
-    -- the result is in increasing list of integers.
-    e := entries transpose M;
-    unitposition := (col) -> if all(col, a -> a >= 0) and sum col === 1 then position(col, a -> a === 1) else null;
-    H := partition(c -> unitposition e_c, toList(0..numcols M-1));
-    ks := select(keys H, k -> k =!= null);
-    sort for k in ks list min(H#k)
-    )
-
--- extend the nice unit vectors to a lisp p of n columns (n = numrows M)
--- so that det M_p = 1 or -1.
--- compute the inverse A of this n x n matrix.
--- then compute A^-1 * M, and return this list of columns.
-
-findInvertibleSubmatrix = method(Options => {Limit => 10000})
-findInvertibleSubmatrix(Matrix, List) := List => opts -> (M, p) -> (
-    -- M is a matrix over the integers
-    -- p is a list of column indices of M (indices run from 0 to numcols M - 1)
-    -- Find a list q containing p (if possible), of column indices,
-    --   s.t. det(M_q) = 1 or -1.
-    -- Return q, or null, if one cannot be found.
-    S := set toList(0..numcols M - 1);
-    others := sort toList(S - set p);
-    needed := numrows M - #p;
-    if binomial(#others, needed) > opts.Limit then return null;
-      -- really: do some random choices of q containing p.
-    trythese := subsets(others, needed);
-    tried := 0;
-    for q1 in trythese do (
-        q := join(q1,p);
-        tried = tried+1;
-        if abs det(M_q) == 1 then (
-            << "found suitable set of columns after " << tried << " step" 
-            << if tried == 1 then "" else "s" << endl;
-            return sort q;
-            );
-        );
-    << "tried all determinants: none had unit determinant" << endl;
-    null
-    )
-
-fixGLSMDegrees = method()
-fixGLSMDegrees NormalToricVariety := List => (V) -> (
-    D := transpose degrees ring V;
-    M := matrix D;
-    p := findFirstUnitVectors M;
-    q := findInvertibleSubmatrix(M, p);
-    A := M_q;
-    {A^-1 * M, q}
-    )
-*-
 
 gvInputFromToric = method(Options => {
     Heft => null,
@@ -70,13 +14,37 @@ gvInputFromToric = method(Options => {
     }
 )
 
+-- Can we have the input be:
+--  a. rays for the fan
+--  b. max simplices
+--  c. GLSM charge matrix
+--  d. basis indices for GLSM.  
+--   assume: this submatrix is the identity submatrix: GLSM_basisIndices
+
+-- Some functions needed:
+--   given matrix from KS, get one triangulation (perhaps give input to choose others)
+--   given (rays, triang), create good GLSM matrix and bases.
+--   given (rays,triang,GLSM,basisIndices), compute:
+--     A. topological data
+--     B. (just) intersection numbers
+--     C. input to computeGV (also needs a list of curve classes).
+
+-- WriteToricData:
+--  PolytopeData (contains rays, GLSM charge, basis indices)
+--  TopologicalDataOfCY3
+-- should have
+--  CY3HypersurfaceData
+--    contains: PolytopeData, and triangulation.
+--    
+
 gvInputFromToric(NormalToricVariety, List) := opts -> (V, moriGenerators) -> (
-    str1 := toString toArray moriGenerators;
-    str2 := "[]";
-    str3 := toString  toArray if opts.Heft === null then heft ring V else opts.Heft;
-    str4 := toString toArrayTable transpose degrees ring V;
-    str5 := toString toArray intersectionNumbers(V, X);
-    concatenate between("\n", {str1, str2, str3, str4, str5})
+    str1 := toString moriGenerators;
+    str2 := "{}";
+    str3 := toString if opts.Heft === null then heft ring V else opts.Heft; -- this might not be correct
+    str4 := toString transpose degrees ring V;
+    str5 := for x in pairs CY3NonzeroMultiplicities V list append(x#0, x#1);
+    str6 := {if opts.DegreeLimit === infinity then -1 else opts.DegreeLimit, opts.Precision}
+    concatenate between("\n", {str1, str2, str3, str4, str5, str6})
     )
 
 -- We need to construct the following data for computeGV...
