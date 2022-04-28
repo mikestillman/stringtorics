@@ -7,7 +7,9 @@
 --    Computing FRST's
 -- 4. Cohomology of line bundles on a toric variety
 -- 5. Complete Intersections in torics
--- 6. Intersection rings
+-- 6. Intersection rings (especially intersection numbers).
+--      In particular, I think there is a bug in computing intersection numbers.
+--      Also, handle non-favorable case.
 -- 7. Mori cones
 
 newPackage(
@@ -149,7 +151,7 @@ export {
     -- topology X (returns an object of TopologicalDataOfCY3)
     
     -- Gopakumar-Vafa invariants
-    -- computed using Andres' code in C++
+    -- computed using Andres' computeGV code in C++
     
     -- Flop chains, Mori cones
     
@@ -1168,7 +1170,10 @@ exampleP111122'44 = () -> (value /// () -> (
  findAllFRSTs Matrix := List => (A) -> (
      A1 := A | map(target A, (ring source A)^1, 0);
      Ts := allTriangulations(A1, Fine => true, RegularOnly => true);
+     if #Ts === 0 then error "no triangulations!?";
+     << "Ts = (before selection): " << netList Ts << endl;
      Ts = select(Ts, isStar_A1);
+     << "Ts = (after): " << netList Ts << endl;
      assert all(Ts, tri -> all(tri, s -> s#-1 == numcols A));
      Ts/(t -> (entries transpose A, t/(s -> drop(s, -1))))
      )
@@ -1303,9 +1308,11 @@ intersectionNumbers(Ring, List) := HashTable => (IX, basisIndices) -> (
     -- basisIndices is a subList of {0, ..., numgens IX - 1}.
     -- WARNING: this is cubic in number of generators of IX.  This can be improved,
     -- using the toric structure of X as a hypersurface in a toric V.
-    mons := monoms(#basisIndices, 0, #basisIndices-1);
+    -- TODO WARNING: the 3 in here is for 3-folds...!
+    mons := monoms(3, 0, #basisIndices-1);
     bas := for i in basisIndices list IX_i;
     for t in mons list (
+        m := integral product(t, i -> bas_i);
         a := lift(integral product(t, i -> bas_i), ZZ);
         if a === 0 then continue else t => a
         )

@@ -75,6 +75,7 @@ toricHypersurface(ReflexivePolytopeData, List) := ToricHypersurface => (P, trian
 -- Output: List of ToricHypersurface's.
 findAllFRSTs ReflexivePolytopeData := List => P -> (
     T := findAllFRSTs transpose matrix rays P;
+    for t in T do if last t === {} then error "what?!"; -- this should not happen?
     for t in T list toricHypersurface(P, last t) -- t is a pair: list of vertices, list of list of indices
     )
 
@@ -174,7 +175,7 @@ gvInvariants = method(Options => {
     DegreeLimit => infinity,
     Precision => 150,
     FilePrefix => "foo",
-    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV",
+    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV-good/computeGV",
     KeepFiles => true
     })
 
@@ -326,12 +327,52 @@ TEST ///
 
   -- Now create triangulations  
   Xs = findAllFRSTs P
+  assert(#Xs == 3)
 
+  -- check that these are triangulations.
+  assert all(Xs/normalToricVariety, isWellDefined)
+
+  -- Now let's check the intersection numbers.
+  V = normalToricVariety Xs_0
+  baseIndices = {1,2,3}
+
+  pt = base(a,b,c)
+  X = completeIntersection(V, {-toricDivisor V})
+  Xa = abstractVariety(X, pt)  
+  IX = intersectionRing Xa
+  
+  triples = {{0,0,0},{0,0,1},{0,0,2},
+  {0,1,1},{0,1,2},{0,2,2},
+  {1,1,1},{1,1,2},{1,2,2},{2,2,2}}
+
+  -- These are the gold standard: these are I believe correct, but also might take a bit to compute
+  -- (at least in higher h11).
+  netList for x in triples list (
+      y := baseIndices_x;
+      a := integral product(y, i -> IX_i);
+      if a == 0 then continue else x => a
+      )
+
+  -- Now let's compute the intersection numbers using the various algorithms we have.
+  -- The next way is as a cubic form:
+  H = a*IX_1 + b*IX_2 + c*IX_3
+  C = integral(H^3)
+  c2 = integral(H * chern(2, tangentBundle Xa)  )
+  CY3NonzeroMultiplicities V    
+  tripleProductsCY V
+  topologyOfCY3(V, P#"basis indices") -- this does more...
+  -- XXX: write code to check the equivalence...
+  -- 
+  
   V = normalToricVariety Xs_0
   gvInvariants(V, {0, 2, 3}, DegreeLimit => 10, Precision => 150)
-  gvInvariants(V, {2, 3, 6}, DegreeLimit => 10, Precision => 150)
+  -- the following fails since GLSM_{2,3,6} is not the identity matrix
+  gvInvariants(V, {2, 3, 6}, DegreeLimit => 10, Precision => 150) -- ERROR...
     
-  -- Now compute topology
+
+
+
+  -- Now compute topology (subsumed by checks above?)
   elapsedTime CY3NonzeroMultiplicities V
   for x in pairs oo list append(x#0, x#1)
   elapsedTime tripleProductsCY V -- returns monomials => value.  Bit annoying...
@@ -340,7 +381,222 @@ TEST ///
 
 ///
 
+-----------------------------------------
+-- Integer change of basis matrices -----
+-----------------------------------------
+makeGLRing = method(Options => {Variable => getSymbol "a"})
+makeGLRing Ring := Matrix => opts -> S -> (
+    -- we assume that S is a polynomial ring
+    n := numgens S;
+    R := (coefficientRing S)(monoid [a_1..a_(n^2), gens S]);
+    genericMatrix(R, n, n), genericMatrix(R, R_(n^2), 1, numgens S)
+    )
+
+///
+  RQ = QQ[b,c,d,e,f]
+  makeGLRing RQ
+///
+
+coeffs = (f) -> lift(diff(vars ring f, f), coefficientRing ring f)
+
+constraintsOnBasisChange = (A, L, R) -> (
+    -- A is the generic matrix (or at least involves the variables in its ring.
+    I1 := sum for x in L list ideal(x#0 * A - x#1);
+    I2 := sum for x in R list ideal(A * x#0 - x#1);
+    I := trim(I1 + I2);
+    (A % I, I)
+    )
+
+findIntegerBasisChange = method(Options => {
+        ExactHyperplanes => {},  -- list of e.g. {L => M}, where L, M are linear forms
+        Hyperplanes => {}, -- list of {L => M}, where L should map to \pm M.
+        Points => {} -- list of pairs of points {p,q}.  A^-1 p = \pm q
+        })
+
+findIntegerBasisChange Ring := List => opts -> RZ -> (
+    -- tries all sign changes
+    -- returns: ideal in GL(n) variables, a matrix (over either ZZ, or this ring), and a ring map
+    -- from RZ --> RZ.
+    -- We do the computations over QQ, then lift back if possible.
+    (A, xyz) := makeGLRing RZ; -- RZ can be over QQ too.
+    exactL := for hs in opts.ExactHyperplanes list coeffs hs#0 => coeffs hs#1;
+    exactR := for hs in opts.Points list hs#1 => hs#0;
+    (A1, I1) := constraintsOnBasisChange(A, exactL, exactR);
+    (map(ring A, ring A, (flatten entries (A % I1)) | flatten entries (A1 * transpose xyz)), A1, I1)
+    )
+
+changeOfBases = method()
+changeOfBases(Matrix, RingMap, List) := Sequence => (A, inc, L) -> (
+    -- A is an n x n matrix, over a ring over QQ.
+    -- inc : RQ = ZZ[x,y,z...] --> ring A, sending the variables to corresp indets of ring A.
+    -- L is a list of (lists of length 2): {L1 => L2, F1 => F2, ...}
+    -- this attempts to find an integer change of basis phi, given by A, which maps L1 to L2, F1 to F2, etc.
+    -- returns a sequence (reduced A, ideal in ring A, phi)
+    R := ring L#0#0;
+    if not all(L, p -> ring p#0 === R and ring p#1 === R) then 
+        error "expected all polynomials in a common ring";
+    xyz := inc vars R;
+    phi := map(ring A, ring A, (flatten entries A) | flatten entries(A * transpose xyz));
+    eqns := for p in L list phi inc(p#0) - inc(p#1);
+    (mons, cfs) := coefficients(matrix{eqns}, Variables => support xyz);
+    I := ideal gens gb ideal cfs;
+    A1 := A % I;
+    if det A1 % I != 1 and det A1 % I != -1 then (
+      I = ideal gens gb(I + ideal((det A1)^2 - 1));
+      A1 = A1 % I;
+      );
+    phi0 := map(ring A, ring A, (flatten entries A1) | flatten entries(A1 * transpose xyz));
+    (A1, phi0, I)
+    )  
+
+changeOfBases2 = method()
+changeOfBases2(Matrix, RingMap, List) := Sequence => (A, inc, L) -> (
+    -- returns the list of integer matrices which solve the equations (including det = \pm 1)
+    -- together with a list of rational matrices which are not integer which solve it,
+    -- together with
+    --     sequence (reduced A, phi, ideal in ring A)
+    --
+    -- A is an n x n matrix, over a ring over QQ.
+    -- inc : RQ = ZZ[x,y,z...] --> ring A, sending the variables to corresp indets of ring A.
+    -- L is a list of (lists of length 2): {L1 => L2, F1 => F2, ...}
+    -- this attempts to find an integer change of basis phi, given by A, which maps L1 to L2, F1 to F2, etc.
+    --
+    R := ring L#0#0;
+    if not all(L, p -> ring p#0 === R and ring p#1 === R) then 
+        error "expected all polynomials in a common ring";
+    xyz := inc vars R;
+    phi := map(ring A, ring A, (flatten entries A) | flatten entries(A * transpose xyz));
+    eqns := for p in L list phi inc(p#0) - inc(p#1);
+    (mons, cfs) := coefficients(matrix{eqns}, Variables => support xyz);
+    Ia := ideal cfs + ideal (det A - 1);
+    Ib := ideal cfs + ideal (det A + 1);
+    gbIa := ideal gens gb Ia;
+    gbIb := ideal gens gb Ib;
+    CA := decompose gbIa;
+    CB := decompose gbIb;
+    solsZZ := {};
+    solsQQ := {};
+    solsA := {};
+    mats := for c in CA | CB list (
+        A1 := A % c;
+        overQQ := try (lift(A1, QQ); true) else false;
+        overZZ := try (lift(A1, ZZ); true) else false;
+        if overZZ then (
+            A2 := lift(A1, ZZ);
+            phi2 := map(R, R, flatten entries(A2 * transpose vars R));
+            solsZZ = append(solsZZ, (A2, phi2));
+            )
+        else if overQQ then (
+            A2 = lift(A1, QQ);
+            phi2 = map(ring A, ring A, (flatten A2) | (flatten (A2 * transpose xyz)));
+            solsQQ = append(solsQQ, (A2, phi2));
+            )
+        else (
+            phi2 = map(ring A, ring A, (flatten A1) | (flatten (A1 * transpose xyz)));
+            solsA = append(solsA, (A1, phi2, c));
+            )
+        );
+    (solsZZ, solsQQ, solsA)
+    )  
+
+invariants = method()
+invariants List := (f) -> (
+    RQ := QQ[gens ring first f];
+    facs := select((factors f_1 )/toList/last, g -> support g != {});
+    l1 := sub(f_0, RQ);
+    f1 := sub(f_1, RQ);
+    d := dim saturate ideal jacobian f1;
+    nc := # decompose ideal(l1, f1);
+    singZ := flatten entries gens gb saturate(ideal(f_1) + ideal jacobian f_1);
+    badp := select(singZ, a -> support leadTerm a === {});
+    badp = if badp === {} then 0 else first badp;
+    {badp, (trim content f_0)_0, (trim content f_1)_0, #facs, d, nc, f_2, f_3}
+    )
+
+///
+  restart
+  load "WriteToricData.m2"
+  RZ = ZZ[x,y,z]
+  RQ = QQ[x,y,z]
+
+  use RZ
+  (L1, F1) = (16*x+40*y+48*z,-2*x^3-12*x^2*y-12*x*y^2-8*y^3-6*x^2*z+6*x*z^2+12*y*z^2+6*z^3)
+  (L2, F2) = (8*x+32*y+48*z,2*x^3-4*y^3-6*x^2*z+6*x*z^2+12*y*z^2+6*z^3)
+  
+  (A, xyz) = makeGLRing RQ
+  inc = map(ring A, RZ, xyz)
+  changeOfBases(A, inc, {L1 => L2, F1 => F2})
+  changeOfBases(A, inc, {L1 => L1, F1 => F1})
+  
+  -- map hyperplane {8*x + 24*y + 8*z => 16*x + 40*y + 48*z})
+  -- map points (0,1,0) (on first side) to/from (1,-1,1) or (-1,1,-1) on other side.
+  use RQ
+  findIntegerBasisChange(RQ, ExactHyperplanes => {8*x + 24*y + 8*z => 16*x + 40*y + 48*z}) 
+  findIntegerBasisChange(RZ, ExactHyperplanes => {x + 3*y + z => 2*x + 5*y + 6*z})
+
+  -- this shows that perhaps we should do this over QQ, but look for integer solutions.  
+  use RQ
+  (phi, A, I) = findIntegerBasisChange(RQ, 
+      ExactHyperplanes => {8*x + 24*y + 8*z => 16*x + 40*y + 48*z},
+      Points => {transpose matrix{{0,1,0}} => transpose matrix{{1,-1,1}}}
+      )
+  use source phi
+  phi 8*x + 24*y + 8*z
+  phi x
+  phi z
+///
+
+
 end--
+
+TEST ///
+-- XXX Working on this now.
+  -- Go through all h11 (torsion free) examples, compute intersection numbers (cubic and linear form)
+  -- and see which triangulations are possibly different CY3's.
+  restart
+  needs "WriteToricData.m2"
+
+  kk = ZZ/32003
+  RZ = ZZ[x,y,z]
+  topes = kreuzerSkarke(3, Limit => 10000); -- 244
+  assert(#topes == 244)
+  -*
+    elapsedTime Vs = topes / (P -> elapsedTime reflexiveToSimplicialToricVariety(convexHull matrix P, CoefficientRing => kk));
+    torsionFrees = positions(Vs, V -> classGroup V == ZZ^3);
+    nonTorsionFrees = positions(Vs, V -> classGroup V != ZZ^3);
+  *-
+  nonTorsionFrees = {0, 9, 10, 55, 62, 232}
+  torsionFrees = sort toList(set(0..#topes-1) - set nonTorsionFrees);
+  assert(#torsionFrees == 238)
+ 
+  -- now let's take each, compute its triangulations, linear+cubic forms, see how many there are... 
+  -- Let's try one first
+  P = reflexivePolytopeData matrix topes_57
+  Ts = findAllFRSTs P
+  netList Ts
+  topD = Ts/(X -> topologicalDataOfCY3(X, RZ));
+  forms = topD/(t -> {t#"c2", t#"cubic intersection form"})
+  netList unique oo
+
+  -- This returns the polytopes that might have different topologies of CY3's.
+  -- BUG: every now and then, the triangulations come out to be {}...
+  haveMultipleForms = select(torsionFrees, i -> (
+          P = reflexivePolytopeData matrix topes_i;
+          Ts = findAllFRSTs P;
+          << "i = " << i << " triangulations: " << netList Ts << endl;
+          topD = Ts/(X -> topologicalDataOfCY3(X, RZ));
+          forms = topD/(t -> {t#"c2", t#"cubic intersection form"});
+          forms = unique forms;
+          << "i = " << i << " forms: " << netList forms << endl;
+          #forms > 1
+          ))
+  -- bug?  sometimes no triangulations are found?
+  haveMultipleForms == {2, 6, 13, 15, 24, 31, 32, 34, 35, 36, 38, 39, 45, 48, 
+      49, 53, 63, 64, 72, 73, 74, 88, 89, 93, 94, 98, 104, 110, 111, 112, 
+      143, 144, 149, 150, 151, 152, 154, 156, 157, 163, 194, 197, 200, 201, 
+      208, 209, 211, 224, 243}
+///
+
 
 TEST ///
   -- example: mirror of (hypersurface in) P(1,1,6,9)
@@ -429,9 +685,11 @@ TEST ///
 
 restart
 load "WriteToricData.m2"
+
 kk = ZZ/32003
 RZ = ZZ[x,y,z,w]
-topes = kreuzerSkarke(4, Access => "wget", Limit => 10000); -- 1197
+--topes = kreuzerSkarke(4, Access => "wget", Limit => 10000); -- 1197
+topes = kreuzerSkarke(4, Limit => 10000); -- 1197
 assert(#topes == 1197)
 
 -*
@@ -445,8 +703,45 @@ assert(#torsionFrees == 1179) -- not 1197!! -- so 18 are torsion...
 
 -- By hand:    
 P = reflexivePolytopeData matrix topes_10
+P = reflexivePolytopeData matrix topes_9
 Ts = findAllFRSTs P
 netList Ts
+RZ = ZZ[a..d]
+
+V = normalToricVariety Ts_0
+transpose matrix degrees ring V
+gvInvariants(normalToricVariety Ts_0, Ts_0#"polytope"#"basis indices", DegreeLimit => 10, Precision => 150)
+
+-- XXX
+topD = Ts/(X -> topologicalDataOfCY3(X, RZ));
+forms = topD/(t -> {t#"c2", t#"cubic intersection form"})
+netList unique oo
+(L0, F0) = toSequence forms_0
+(L2, F2) = toSequence forms_2
+(L4, F4) = toSequence forms_4
+L2 - L4
+F2 - F4
+L2
+L4
+RQ = QQ[gens RZ]
+betti res ideal jacobian sub(F2, RQ)
+betti res ideal jacobian sub(F4, RQ)
+
+G = QQ[g_(0,0)..g_(3,3)]
+GM = genericMatrix(G, 4, 4)
+RG = QQ[gens RQ, gens G]
+GM = sub(GM, RG)
+X = sub(vars RQ, RG)
+XG = flatten entries(X * GM)
+subs = for i from 0 to 3 list X_(0,i) => XG_i
+use RG
+(mons,cfs) = coefficients(sub(sub(F2, RG), subs) - sub(F4, RG), Variables => {a,b,c,d})
+J = ideal cfs
+J = trim J
+for x in (-2,-2,-2,-2)..(2,2,2,2) list sub(F2, matrix{ toList x})
+tally for x in (-2,-2,-2,-2)..(2,2,2,2) list sub(F4, matrix{ toList x})
+for x in (-3,-3,-3,-3)..(3,3,3,3) list (val := sub(F2, matrix{toList x}); if val == 1 then x else continue)
+for x in (-3,-3,-3,-3)..(3,3,3,3) list (val := sub(F4, matrix{toList x}); if val == 1 then x else continue)
 
 V = normalToricVariety(P#"rays", Ts_0#"triangulation", WeilToClass => transpose matrix P#"glsm", CoefficientRing => kk)
 topologicalDataOfCY3(Ts_0, RZ)
