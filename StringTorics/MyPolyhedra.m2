@@ -153,7 +153,7 @@ interiorLatticePointList(Polyhedron, List) := (P,f) -> (
 genus(Polyhedron, List) := (P,f) -> # interiorLatticePointList(polar P, dualFace(P,f))
 
 annotatedFaces = method()
-annotatedFaces Polyhedron := (P1) -> (
+annotatedFaces Polyhedron := List => (P1) -> (
     P2 := polar P1;
     sort for f in faceList P1 list (
         {dim(P1,f), 
@@ -166,7 +166,7 @@ annotatedFaces Polyhedron := (P1) -> (
     )
 -- Returns a list for each face of P1 of dimension i:
 -- {faceIndices, all lattice pts, #interior lattice pts, #interior lattice pts in dual face of P2}
-annotatedFaces(ZZ,Polyhedron) := (i,P1) -> (
+annotatedFaces(ZZ,Polyhedron) := List => (i,P1) -> (
     P2 := polar P1;
     sort for f in faceList(i,P1) list (
         {f, 
