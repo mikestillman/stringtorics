@@ -1419,19 +1419,6 @@ topologyOfCY3(NormalToricVariety, List) := opts -> (V, basisIndices) -> (
 ---------------------------------------------
 -- ReflexivePolytope ------------------------
 ---------------------------------------------
-
-dim ReflexivePolytope := ZZ => P -> # P#"rays"#0 -- dimension of the polytope
-rays ReflexivePolytope := List => P -> P#"rays"
-degrees ReflexivePolytope := List => P -> P#"glsm"
-h11OfCY ReflexivePolytope := ZZ => P -> (
-    if not P.cache#?"h11" then P.cache#"h11" = h21OfCY convexHull transpose matrix rays P;
-    P.cache#"h11"
-    )
-h21OfCY ReflexivePolytope := ZZ => P -> (
-    if not P.cache#?"h21" then P.cache#"h21" = h11OfCY convexHull transpose matrix rays P;
-    P.cache#"h21"
-    )
-
 reflexivePolytope = method()
 
 -- The following is meant to be an internal method.
@@ -1445,6 +1432,8 @@ reflexivePolytope(List, List, List) := ReflexivePolytope => (latticePoints, GLSM
         }
     )
 
+-- TODO: this function needs TLC.  It is useful, but can't always find the 
+-- basis indices, or compute D_q^-1...
 reflexivePolytope Polyhedron := ReflexivePolytope => (P2) -> (
     LP := select(latticePointList P2, lp -> dim(P2, minimalFace(P2, lp)) <= 2);
     mLP := transpose matrix LP;
@@ -1456,44 +1445,118 @@ reflexivePolytope Polyhedron := ReflexivePolytope => (P2) -> (
     -- the rays of each triangulation should match LP.
     result := reflexivePolytope(LP, entries transpose GLSM, q);
     result.cache#"N polytope" = P2;
+    result.cache#"M polytope" = polar P2;
     result
     )
 
+-- TODO: the following function often fails, due to TODO on above function.
 reflexivePolytope Matrix := ReflexivePolytope => (A) -> (
     reflexivePolytope polar convexHull A
     )
 
-polytope ReflexivePolytope := Polyhedron => P -> (
-    if not P.cache#?"N polytope" then P.cache#"N polytope" = convexHull transpose matrix latticePoints;
-    P.cache#"N polytope"
+degrees ReflexivePolytope := List => P -> P#"glsm"
+rays ReflexivePolytope := List => P -> P#"rays" -- maybe call this something else?
+dim ReflexivePolytope := ZZ => P -> dim polytope P
+basisIndices = method()
+basisIndices ReflexivePolytope := List => P -> P#"basis indices" -- returns the indices into `rays P` 
+
+polar ReflexivePolytope := ReflexivePolytope => P -> reflexivePolytope polytope(P, "M")
+
+polytope ReflexivePolytope := Polyhedron => P -> polytope(P, "N")
+polytope(ReflexivePolytope, String) := Polyhedron => (P, which) -> (
+    -- which is either "M" or "N"
+    if which === "M" then P.cache#"M polytope"
+    else if which === "N" then P.cache#"N polytope"
+    else error "expected \"M\" or \"N\""
     )
 
-basisIndices = method()
+annotatedFaces ReflexivePolytope := (cacheValue symbol annotatedFaces)(P -> (
+    annotatedFaces polytope(P, "N")
+    ))
 
+annotatedFaces(ZZ, ReflexivePolytope) := (i,P) -> (
+    -- i is the dimension of the face on polytope on the N side...
+    A := annotatedFaces P;
+    for f in A list if f#0 == i then drop(f, 1) else continue
+    )
 
-basisIndices ReflexivePolytope := List => P -> P#"basis indices" -- returns the indices into `rays P` 
-degrees ReflexivePolytope := P -> P#"glsm"
-rays ReflexivePolytope := List => P -> P#"rays" -- maybe call this something else?
+-- internal function to set h11, h21 in P.cache.
+setH11H21 = P -> (
+    -- this version is only for CY 3-fold hypersurfaces...
+    -- P:ReflexivePolytope
+    A := annotatedFaces P; -- polytope on N side.
+    A0 := annotatedFaces(0, P);
+    A1 := annotatedFaces(1, P);
+    A2 := annotatedFaces(2, P);
+    A3 := annotatedFaces(3, P);
+    npM := A/(x -> x#4)//sum + 1;
+    npN := A/(x -> x#3)//sum; -- origin is included in the dim 4 face.
+    -- points in facets (on M side) -- this is part of h21
+    -- points in facets (on N side) -- this is part of h11
+    facetInteriorsM := A0/(v -> v#3)//sum;
+    facetInteriorsN := A3/(v -> v#2)//sum;
+    -- points interior to 2-faces (times their genus) (on M-side)
+    -- points interior to 2-faces (times their genus) (on N-side)
+    twoFacesM := A1/(v -> v#2 * v#3)//sum;
+    twoFacesN := A2/(v -> v#2 * v#3)//sum;
+    -- now set the h11, h21.
+    h11 := npN - 5 - facetInteriorsN + twoFacesN;
+    h21 := npM - 5 - facetInteriorsM + twoFacesM;
+    P.cache#"h11" = h11;
+    P.cache#"h21" = h21;
+    P.cache#"favorable" = (twoFacesN == 0);
+    (h11, h21)
+    )
 
--- whether the polytope has any 2-faces whose dual faces have interior lattice points.
-isFavorable ReflexivePolytope := Boolean => P -> isFavorable polar polytope P
-polar ReflexivePolytope := ReflexivePolytope => P -> reflexivePolytope polar polytope P
+h11OfCY ReflexivePolytope := ZZ => P -> (
+    if not P.cache#?"h11" then elapsedTime setH11H21 P;
+    P.cache#"h11"
+    )
 
+h21OfCY ReflexivePolytope := ZZ => P -> (
+    if not P.cache#?"h21" then elapsedTime setH11H21 P;
+    P.cache#"h21"
+    )
+
+isFavorable ReflexivePolytope := Boolean => P -> (
+    if not P.cache#?"favorable" then elapsedTime setH11H21 P;
+    P.cache#"favorable"
+    )
+
+-- TODO: test that the lattice points, vertices match up...
+-- i.e. annotatedFaces align with other aspects(?) of these polyhedra.
 TEST ///
   restart
   needsPackage "StringTorics"
   
   topes = kreuzerSkarke(3, Limit => 50);    
   A = matrix topes_30
-  P = reflexivePolytope A
+  convexHull A
+  elapsedTime h11OfCY oo
+  polar convexHull A
+  elapsedTime P = reflexivePolytope A
+  elapsedTime assert(h11OfCY P == 3)
+  elapsedTime assert(h21OfCY P == 69)
+  elapsedTime assert(isFavorable P)
+  netList elapsedTime annotatedFaces P
+  annotatedFaces(4, P)
+  annotatedFaces(3, P)
+  annotatedFaces(2, P)
+  annotatedFaces(1, P)
+  annotatedFaces(0, P)
+  
+  
+  annotatedFaces(0, polytope P)
+  elapsedTime latticePointList polytope P
   assert(dim P == dim polytope P)
   rays P
   latticePoints polytope P
-  transpose matrix rays P
+  elapsedTime transpose matrix latticePointList polytope P -- these should match annotatedFaces.  TEST THIS.
+  transpose matrix rays P -- this matches the non-zero lattice points of P.  Or maybe those not interior to 3-faces.
   annotatedFaces polytope P
-  assert(h11OfCY P == 3)
-  assert(h21OfCY P == 69)
-  assert isFavorable P
+  elapsedTime assert(h11OfCY P == 3)
+  elapsedTime assert(h21OfCY P == 69)
+  elapsedTime assert isFavorable P
   -- Q = polar P  -- doesn't work yet for this example.
 ///
 ----------------------------------------------------------------
