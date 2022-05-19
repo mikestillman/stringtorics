@@ -513,6 +513,32 @@ invariants List := (f) -> (
     {badp, (trim content f_0)_0, (trim content f_1)_0, #facs, d, nc, f_2, f_3}
     )
 
+separateTopologies = method()
+separateTopologies List := ts -> (
+    R := ring ts#0#0; -- also make sure that this ring is the ring of all f#0, f#1 for all f in tops.
+    RQ := QQ (monoid [gens R]);
+    (A, xyz) := makeGLRing RQ;
+    inc := map(ring A, RZ, xyz);
+    topIndices := new MutableHashTable;
+    -- keys: first index of distinct topologies.  values: all indices corresponding to this topology.
+    topIndices#0 = {};
+    for i from 1 to #ts - 1 do (
+        found := false;
+        for j in keys topIndices do (
+            if found then continue;
+            (solsZZ, solsQQ, solsA) = changeOfBases2(A, inc, {ts#j#0 => ts#i#0, ts#j#1 => ts#i#1});
+            << "doing indices " << i << " and " << j << endl;
+            << (solsZZ, solsQQ, solsA) << endl;
+            if #solsZZ > 0 then (
+                found = true;
+                topIndices#j = append(topIndices#j, {i, solsZZ#0#0})
+                )
+            );
+        if not found then topIndices#i = {};
+        );
+    new HashTable from topIndices
+    )
+
 ///
   restart
   load "WriteToricData.m2"

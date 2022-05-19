@@ -25,7 +25,7 @@ newPackage(
         DebuggingMode => true,
         AuxiliaryFiles => true,
         PackageExports => {
-            "FourTiTwo",
+            "FourTiTwo", -- where is this used?
             "SimplicialComplexes",
             "NormalToricVarieties",
             "Schubert2",
@@ -33,9 +33,10 @@ newPackage(
             "ReflexivePolytopesDB",
             "CohomCalg",
             "Topcom"
---            "AbstractToricVarieties"
             },
-        PackageImports => {"Graphs", "LLLBases"}
+        PackageImports => {
+            --"Graphs", 
+            "LLLBases"}
         )
 
 export {
@@ -1170,12 +1171,21 @@ exampleP111122'44 = () -> (value /// () -> (
  findAllFRSTs Matrix := List => (A) -> (
      A1 := A | map(target A, (ring source A)^1, 0);
      Ts := allTriangulations(A1, Fine => true, RegularOnly => true);
-     if #Ts === 0 then error "no triangulations!?";
-     << "Ts = (before selection): " << netList Ts << endl;
-     Ts = select(Ts, isStar_A1);
-     << "Ts = (after): " << netList Ts << endl;
-     assert all(Ts, tri -> all(tri, s -> s#-1 == numcols A));
-     Ts/(t -> (entries transpose A, t/(s -> drop(s, -1))))
+     if #Ts === 0 or #Ts#0 == 0 then (
+         count := 0;
+         while count < 10 and (#Ts === 0 or #Ts#0 == 0) do (
+             Ts = allTriangulations(A1, Fine => true, RegularOnly => true);
+             count = count + 1;
+             );
+         --if #Ts == 0 then error "no triangulation could be found";
+         << "WARNING: TOPCOM failed to find triangulations, then found them after " << 
+           count << " attempt(s)" << endl;
+         );
+     --<< "Ts = (before selection): " << netList Ts << endl;
+     Ts1 := select(Ts, isStar_A1);
+     --<< "Ts1 = (after): " << netList Ts1 << endl;
+     assert all(Ts1, tri -> all(tri, s -> s#-1 == numcols A));
+     Ts1/(t -> (entries transpose A, t/(s -> drop(s, -1))))
      )
  findAllFRSTs Polyhedron := List => (P) -> (
      L := latticePointList P;

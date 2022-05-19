@@ -51,15 +51,18 @@ subcomplex(SimplicialComplex, List) := (C,D) -> (
     J := monomialIdeal elems;
     simplicialComplex(J + monomialIdeal C)
     )
+
+-*
 decompose SimplicialComplex := C -> (
     -- return a list of sub-complexes corresponding to the 
     -- connected components of C
     S := ring C;
-    V := flatten entries SimplicialComplexes$faces(0,C);
-    G := graph(V, for e in flatten entries SimplicialComplexes$faces(1,C) list support e);
+    V := faces(0,C);
+    G := graph(V, for e in faces(1,C) list support e);
     comps := connectedComponents G;
     for comp in comps list subcomplex(C,comp)
     )
+*-
 
 ///
   S = QQ[x_0..x_6]
@@ -145,7 +148,7 @@ isFavorable Polyhedron := (P1) -> (
 complexWithInteriorEdgesRemoved = method()
 complexWithInteriorEdgesRemoved(SimplicialComplex,Polyhedron,ZZ) := (C,P2,facedim) -> (
     LPs := latticePointList P2;
-    edgeList := flatten entries SimplicialComplexes$faces(1,C);
+    edgeList := faces(1,C);
     badEdges := select(edgeList, e -> (
             f := (support e)/index; 
             fpts := f/(i -> LPs#i);
@@ -157,7 +160,7 @@ complexWithInteriorEdgesRemoved(SimplicialComplex,Polyhedron,ZZ) := (C,P2,facedi
 complexWithInteriorFacesRemoved = method()
 complexWithInteriorFacesRemoved(SimplicialComplex,Polyhedron,ZZ) := (C,P2,facedim) -> (
     LPs := latticePointList P2;
-    facelist := flatten for i from 0 to dim P2-1 list flatten entries SimplicialComplexes$faces(i,C);
+    facelist := flatten for i from 0 to dim P2-1 list faces(i,C);
     badfaces := select(facelist, e -> (
             f := (support e)/index;
             fpts := f/(i -> LPs#i);

@@ -1,9 +1,10 @@
 restart
 load "WriteToricData.m2"
 
-
 kk = ZZ/32003
-topes = kreuzerSkarke(3, Limit => 10000, Access => "wget"); -- 244
+topes = kreuzerSkarke(3, Limit => 10000); -- 244
+topes = kreuzerSkarke(10, Limit => 10000, Access => "wget"); -- 
+#topes
 assert(#topes == 244)
   -*
     elapsedTime Vs = topes / (P -> elapsedTime reflexiveToSimplicialToricVariety(convexHull matrix P, CoefficientRing => kk));
@@ -14,10 +15,66 @@ assert(#topes == 244)
   torsionFrees = sort toList(set(0..#topes-1) - set nonTorsionFrees);
   assert(#torsionFrees == 238)
 
+topes = topes_{100, 200, 300}
+    torsionFrees = positions(Vs, V -> classGroup V == ZZ^10);
+    torsionFrees = {0,1,2}
+    Vs/classGroup
+debugLevel = 1
 elapsedTime Ts = hashTable for i in torsionFrees list i => (print i; elapsedTime (
     P = reflexivePolytopeData matrix topes_i;
     findAllFRSTs P
     ));
+
+///
+A = matrix {{-1, -1, -1, -1, 1, 2, -1}, {-1, -1, -1, 3, -1, -1, 1}, {1, 1, 2, -2, 0, 0, 0}, {0, 1, 1, -1, 0, 0, 0}}
+A1 = A | map(target A, (ring source A)^1, 0);
+Ts = allTriangulations(A1, Fine => true, RegularOnly => true)
+///
+
+  -- Naomi gets: 518 total number of triangulations for these 238 polytopes.
+  sum for k in sort keys Ts list #Ts#k
+RZ = ZZ[x,y,z]
+elapsedTime tops = hashTable for i in keys Ts list i => (
+    ts := Ts#i;
+    for X in ts list elapsedTime (
+        t := topologicalDataOfCY3(X, RZ);
+        {t#"c2", t#"cubic intersection form", t#"h11", t#"h21"}
+        )
+    );
+
+sort keys tops
+
+-- create a list of all of the topologies of all the triangulations, adding in which polytope it comes from
+alltops = flatten for i in sort keys tops list (
+    count := -1;
+    for t in tops#i list (count = count+1; t | {i, count})
+    )
+
+byInvariants = partition(invariants, alltops)
+netList for k in sort keys byInvariants list {k, netList byInvariants#k}
+
+-- Now lets take each of the values of byInvariants, and see which topologies are equivalent.
+#sort keys byInvariants -- 16 sets
+ks = sort keys byInvariants
+
+RQ = QQ[x,y,z]
+(A, xyz) = makeGLRing RQ
+inc = map(ring A, RZ, xyz)
+
+positions(ks, k -> #byInvariants#k > 1) == {0, 1, 2, 4, 5, 6, 8, 9, 11, 13}
+
+
+
+
+for k in sort keys byInvariants list (
+    elapsedTime separateTopologies byInvariants#k
+    )
+sum for a in o19 list #keys a
+netList oo
+
+
+
+
 
 elapsedTime Ts = hashTable for i in torsionFrees list i => (print i; elapsedTime (
     h21OfCY reflexivePolytopeData matrix topes_i
@@ -290,3 +347,5 @@ netList for k in sort keys H1 list k => #H1#k
   decompose ideal jacobian sub(F2, RQ)
   decompose ideal jacobian sub(F3, RQ)
   
+/opt/homebrew/bin/points2finetriangs --regular --heights -v < /var/folders/wb/8v4mm0j52pq9pf5gkr8f23z40000gr/T/M2-48780-0/398.in
+

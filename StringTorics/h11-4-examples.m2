@@ -14,6 +14,8 @@ torsionFrees = sort toList(set(0..#topes-1) - set nonTorsionFrees);
 assert(#torsionFrees == 1179) -- not 1197!! -- so 18 are torsion...
 
 nonfavs = for i in torsionFrees list elapsedTime if isFavorable convexHull matrix topes_i then continue else (print i; i);
+  nonfavs = {} -- there are no non-favorable torsion free polytopes.
+
 -- Let's loop through all examples, write results to a file.
 -- For mat of the file:
 -*
