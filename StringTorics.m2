@@ -40,6 +40,11 @@ newPackage(
         )
 
 export {
+    -- Types defined here
+    "ReflexivePolytope",
+    "CalabiYauInToric",
+    "TopologicalDataOfCY3",
+    
     -- The following should be placed into ReflexivePolytopesDB:
 --    "matrixFromKSEntry", -- replace this with matrixFromKS.
 --    "matrixFromKS",
@@ -88,6 +93,22 @@ export {
     "sageTri",
     "Regular",
 
+    -- Reflexive polytope code
+    -- Uses ReflexivePolytope, a wrapper over Polyhedra package, and containing the info we want/need.
+    "reflexivePolytope",
+    "basisIndices",
+    "topologicalData",
+    "h11",
+    "h21",
+    
+    -- gvInvariants
+    "toricMoriCone",
+    "moriCone",
+    "moriConeByGV",
+    "intersectionNumbersOfCY", -- possibly not for export
+    "gvInvariants",
+    "invariants", -- really in the topology section...
+    
     -- CompleteIntersectionInToric's
     "completeIntersection",
     "CompleteIntersectionInToric",
@@ -140,7 +161,7 @@ export {
     "isFavorable",
     -- new formula
     "hodgeVectorViaTheorem", -- TODO: is likely not correct currently.
-    "tentativeHodgeVector" -- deprecated
+    "tentativeHodgeVector", -- deprecated
     
     -- Topology of a CY3-fold.
     -- input: reflexive poytope, and triangulation.
@@ -155,19 +176,38 @@ export {
     -- computed using Andres' computeGV code in C++
     
     -- Flop chains, Mori cones
-    
+
+    "FilePrefix",
+    "Executable",
+    "Mori"    
     }
 
+--- kludge to access parts of the 'Core'
+hasAttribute = value Core#"private dictionary"#"hasAttribute";
+getAttribute = value Core#"private dictionary"#"getAttribute";
+ReverseDictionary = value Core#"private dictionary"#"ReverseDictionary";
+
+------------------------------------
+-- New types -----------------------
+------------------------------------
+
+ReflexivePolytope = new Type of HashTable -- contains: data about a reflexive polytope.
+
+CalabiYauInToric = new Type of HashTable -- currently a hypersurface, eventually a CI.
+  -- contains ReflexivePolytope, and a triangulation.  
+
+-- deprecate this one
+ToricHypersurface = new Type of HashTable
+  -- contains ReflexivePolytope, and a triangulation.  
+  -- TODO: better name? perhaps TriangulatedReflexivePolytope?
+
+TopologicalDataOfCY3 = new Type of HashTable
+  -- contains h11, h21, c2, cubic intersection form
 
 
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2")
 load (currentFileDirectory | "StringTorics/triangulations-code.m2")
---<< "-------------------------------------------------------------------------" << endl;
---<< "-- WARNING: StringTorics is still experimental, and not complete.  The --" << endl;
---<< "--   interface might change, and it is not well documented yet.        --" << endl;
---<< "-------------------------------------------------------------------------" << endl;
-
 
 protect nextVar
 protect nextFinalVar
@@ -1376,6 +1416,409 @@ topologyOfCY3(NormalToricVariety, List) := opts -> (V, basisIndices) -> (
     (h11, h21, C, L)
     )
 
+---------------------------------------------
+-- ReflexivePolytope ------------------------
+---------------------------------------------
+
+dim ReflexivePolytope := ZZ => P -> # P#"rays"#0 -- dimension of the polytope
+rays ReflexivePolytope := List => P -> P#"rays"
+degrees ReflexivePolytope := List => P -> P#"glsm"
+h11OfCY ReflexivePolytope := ZZ => P -> (
+    if not P.cache#?"h11" then P.cache#"h11" = h21OfCY convexHull transpose matrix rays P;
+    P.cache#"h11"
+    )
+h21OfCY ReflexivePolytope := ZZ => P -> (
+    if not P.cache#?"h21" then P.cache#"h21" = h11OfCY convexHull transpose matrix rays P;
+    P.cache#"h21"
+    )
+
+reflexivePolytope = method()
+
+-- The following is meant to be an internal method.
+reflexivePolytope(List, List, List) := ReflexivePolytope => (latticePoints, GLSM, basisIndices) -> (
+    -- What should be checked here to validate the input data?
+    new ReflexivePolytope from {
+        symbol cache => new CacheTable,
+        "rays" => latticePoints,
+        "glsm" => GLSM,
+        "basis indices" => basisIndices
+        }
+    )
+
+reflexivePolytope Polyhedron := ReflexivePolytope => (P2) -> (
+    LP := select(latticePointList P2, lp -> dim(P2, minimalFace(P2, lp)) <= 2);
+    mLP := transpose matrix LP;
+    D := transpose syz mLP;
+    p := findFirstUnitVectors D; -- TODO: p,q computation can be slow!
+    q := findInvertibleSubmatrix(D, p);
+    if q === null then error ("oops, can't find a good GLSM matrix"); -- hasn't happened yet. HAS NOW!!
+    GLSM := (D_q)^-1 * D;
+    -- the rays of each triangulation should match LP.
+    result := reflexivePolytope(LP, entries transpose GLSM, q);
+    result.cache#"N polytope" = P2;
+    result
+    )
+
+reflexivePolytope Matrix := ReflexivePolytope => (A) -> (
+    reflexivePolytope polar convexHull A
+    )
+
+polytope ReflexivePolytope := Polyhedron => P -> (
+    if not P.cache#?"N polytope" then P.cache#"N polytope" = convexHull transpose matrix latticePoints;
+    P.cache#"N polytope"
+    )
+
+basisIndices = method()
+
+
+basisIndices ReflexivePolytope := List => P -> P#"basis indices" -- returns the indices into `rays P` 
+degrees ReflexivePolytope := P -> P#"glsm"
+rays ReflexivePolytope := List => P -> P#"rays" -- maybe call this something else?
+
+-- whether the polytope has any 2-faces whose dual faces have interior lattice points.
+isFavorable ReflexivePolytope := Boolean => P -> isFavorable polar polytope P
+polar ReflexivePolytope := ReflexivePolytope => P -> reflexivePolytope polar polytope P
+
+TEST ///
+  restart
+  needsPackage "StringTorics"
+  
+  topes = kreuzerSkarke(3, Limit => 50);    
+  A = matrix topes_30
+  P = reflexivePolytope A
+  assert(dim P == dim polytope P)
+  rays P
+  latticePoints polytope P
+  transpose matrix rays P
+  annotatedFaces polytope P
+  assert(h11OfCY P == 3)
+  assert(h21OfCY P == 69)
+  assert isFavorable P
+  -- Q = polar P  -- doesn't work yet for this example.
+///
+----------------------------------------------------------------
+
+
+----------------------------------------------------------------
+-- FRST Triangulations (Fine, regular, star triangulations) ----
+----------------------------------------------------------------
+-- 
+  -- Here, we only consider a triangulation of a reflexive polytope
+  
+CalabiYauInToric.synonym = "normal toric variety"
+CalabiYauInToric.GlobalAssignHook = globalAssignFunction
+CalabiYauInToric.GlobalReleaseHook = globalReleaseFunction
+expression CalabiYauInToric := X -> if hasAttribute (X, ReverseDictionary) 
+    then expression getAttribute (X, ReverseDictionary) else 
+    (describe X)#0
+describe CalabiYauInToric := X -> Describe (expression CalabiYauInToric) (
+      expression "a" , expression 3)
+--    expression rays X, expression max X)
+  
+makeCYInToric = (reflexivePolytope, FRSTtriangulation) -> (
+    -- TODO: consistency check for data.
+    new CalabiYauInToric from {
+        symbol cache => new CacheTable,
+        "polytope" => reflexivePolytope,
+        "triangulation" => FRSTtriangulation
+        }
+    )
+
+net CalabiYauInToric := X -> "a Calabi-Yau hypersurface in a simplicial toric variety of dimension " | dim polytope X
+
+-- net CalabiYauInToric := T -> net T#"triangulation"
+-- CalabiYauInToric#{Standard,AfterPrint} = X -> (
+--      << endl;				  -- double space
+--      << concatenate(interpreterDepth:"o") << lineNumber << " : "
+--      << "a Calabi-Yau hypersurface in a simplicial toric variety of dimension " << 4 << endl;
+--      )
+
+findAllFRSTs ReflexivePolytope := List => P -> (
+    T := findAllFRSTs transpose matrix rays P;
+    for t in T do if last t === {} then error "what?!"; -- this should not happen?
+    for t in T list makeCYInToric(P, last t) -- t is a pair: list of vertices, list of list of indices
+    )
+
+normalToricVariety CalabiYauInToric := opts -> X -> (
+    if not X.cache.?NormalToricVariety then X.cache.NormalToricVariety = (
+        P := X#"polytope";
+        T := X#"triangulation";
+        GLSM := transpose matrix P#"glsm";
+        normalToricVariety(rays P, T, opts, WeilToClass => matrix GLSM)
+        );
+    X.cache.NormalToricVariety
+    -- TODO: this fails if the class group is torsion! (Fails: later it gives an inscrutable error...)
+    )
+
+ambient CalabiYauInToric := X -> normalToricVariety X
+polytope CalabiYauInToric := X -> X#"polytope"
+
+topologicalData = method()
+topologicalData(CalabiYauInToric, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
+    V := ambient X;
+    P := polytope X;
+    data := elapsedTime topologyOfCY3(V, P#"basis indices");
+    -- this data above computes intersection numbers for all toric divisors. 
+    -- So we consider only the ones whose indices are contained in basis indices:
+    new TopologicalDataOfCY3 from {
+        "h11" => elapsedTime h11OfCY P,
+        "h21" => elapsedTime h21OfCY P,
+        "c2" => sub(data_3, vars RZ),
+        "cubic intersection form" => sub(data_2, vars RZ)
+        }
+    )
+
+c2 = method()
+cubicForm = method()
+
+hh(Sequence, TopologicalDataOfCY3) := (pq, T) -> (
+    (p,q) := pq;
+    if p > q then (p, q) = (q, p);
+    if p == 0 then (
+        if q == 3 or q == 0 then 1 else 0
+        )
+    else if p == 1 then (
+        if q == 1 then T#"h11"
+        else if q == 2 then T#"h21"
+        else 0
+        )
+    else if p == 2 then (
+        if q == 2 then T#"h11" else 0
+        )
+    else if p == 3 then (
+        if q == 3 then 1
+        else 0
+        )
+    )
+
+--h11 CalabiYauInToric := X -> h11OfCY polytope X
+--h21 CalabiYauInToric := X -> h21OfCY polytope X
+c2 TopologicalDataOfCY3 := T -> T#"c2"
+cubicForm TopologicalDataOfCY3 := T -> T#"cubic intersection form"
+
+TEST ///
+-- XXX
+  restart
+  needsPackage "StringTorics"
+  
+  topes = kreuzerSkarke(3, Limit => 50);    
+  A = matrix topes_30
+  P = reflexivePolytope A
+  findAllFRSTs P
+  X = first oo
+  h11OfCY polytope P
+  elapsedTime polar polytope P  
+  h21OfCY polytope P  
+  RZ = ZZ[x,y,z]
+  elapsedTime topologicalData(X, RZ) -- cache this result?
+  
+  dim X
+  ambient X -- give the normal toric variety.  Works now.
+  abstractVariety X -- give the abstract variety
+  abstractVariety(X, base(a,b,c)) -- give the abstract variety
+  inheritedMoriCone X
+  gvInvariants X
+  
+  -- TODO: line bundles on X, and their cohomology.
+  
+  topes = kreuzerSkarke(6, Limit => 50);    
+  A = matrix topes_30
+  P = reflexivePolytope A
+  assert(# findAllFRSTs P == 8)
+
+  A = matrix topes_40
+  P = reflexivePolytope A
+  elapsedTime findAllFRSTs P -- takes longer than I would like...
+  assert(#oo == 36) -- not sure if this is correct, but checking for possible change.
+
+  topes = kreuzerSkarke(8, Limit => 50);    
+  A = matrix topes_30
+  P = reflexivePolytope A
+  --elapsedTime findAllFRSTs P; -- takes some time...  How many are there?  Improve this time...
+
+///
+
+----------------------------------------------------------------  
+-- gvInvariants ------------------------------------------------
+-- Uses computeGV.cpp from CYtools -----------------------------
+----------------------------------------------------------------
+gvInvariants = method(Options => {
+    Mori => null, -- null means: compute rays of the Mori cone of V (in ZZ^(h11))
+    Heft => null, -- null means: compute it
+    DegreeLimit => infinity,
+    Precision => 150,
+    FilePrefix => "foo",
+--    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV-good/computeGV",
+    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV",
+    KeepFiles => true
+    })
+
+intersectionNumbersOfCY = method()
+intersectionNumbersOfCY(NormalToricVariety, List) := (V, basisIndices) -> (
+    X := completeIntersection(V, {-toricDivisor V});
+    Xa := abstractVariety(X, base());
+    IX := intersectionRing Xa;
+    intersectionNumbers(IX, basisIndices)
+    )
+
+-- The function to write the data needed by the computeGV program
+gvInput = (moriGenerators, heftval, GLSM, intersectionnums, degreelimit, prec) -> (
+    -- moriGenerators: list of lists
+    -- heftval: list of ints
+    -- GLSM: list of list of ints
+    -- intersectionnums: list of triples of ints
+    -- degreelimit: infinity or positive integer
+    -- prec: positive integer
+    str1 := toString moriGenerators;
+    str3 := toString heftval;
+    str4 := toString GLSM;
+    str5 := toString intersectionnums;
+    str6 := toString ({
+            if degreelimit === infinity then -1 else degreelimit, 
+            prec,
+            0,
+            300000
+            });
+    concatenate between("\n", {str1, toString {}, str3, str4, toString {}, str5, str6})
+    )
+
+moriCone = method()
+moriCone NormalToricVariety := List => (V) -> (
+    IV := intersectionRing (abstractVariety V);
+    Cs := matrix for x in orbits(V, 1) list (
+        c := product(x, i -> IV_i);
+        for d in gens IV list integral(c*d)
+        );
+    M := posHull transpose lift(Cs, QQ);
+    GLSM := matrix degrees ring V;
+    entries transpose((rays M) // GLSM)
+    )
+
+toricMoriCone = method()
+toricMoriCone CalabiYauInToric := Cone => X -> (
+    posHull transpose matrix moriCone X
+    )
+
+gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices) -> (
+    -- Compute intersection numbers for X in V (using this basis)
+    -- Compute mori cone (if needed) (?? requires basis too...)
+    -- Compute a vector which dots positively with all these generators.
+    -- Then write the file
+    -- Execute the command
+    -- Read the results, and return them
+    intersectionnums := for t in intersectionNumbersOfCY(V, basisIndices) list append(t#0, t#1);
+    -- X := completeIntersection(V, {-toricDivisor V});
+    -- Xa := abstractVariety(X, base());
+    -- IX := intersectionRing Xa;
+    -- intersectionnums := for x in pairs intersectionNumbers(IX, basisIndices) list append(x#0, x#1);
+    -- H := hashTable for i from 0 to #basisIndices-1 list basisIndices#i => i;
+    -- intersectionnums := for x in pairs CY3NonzeroMultiplicities V list (
+    --     if isSubset(x#0, basisIndices) then
+    --         append(sort for a in x#0 list H#a, x#1)
+    --     else 
+    --         continue
+    --     );
+    mori := if opts.Mori =!= null then opts.Mori else moriCone V;
+    heft := if opts.Heft =!= null then opts.Heft else (
+      sum entries transpose rays dualCone posHull transpose matrix mori
+      );
+    -- OK, now we have computed everything we need.  Write it to a file
+    infile := opts.FilePrefix | "-input";
+    outfile := opts.FilePrefix | "-output";
+    infile << gvInput(mori, heft, transpose degrees ring V, intersectionnums,
+        opts.DegreeLimit, opts.Precision) << close;
+    inputLine := opts.Executable | " <" | infile | " >" | outfile;
+    print inputLine;
+    run inputLine;
+    -- Get the output, package as a hash table
+    (lines get outfile)/value//hashTable
+    )
+
+gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
+    gvInvariants(ambient X, basisIndices polytope X, opts)
+    )
+
+TEST ///
+-- XXX
+  restart
+  needsPackage "StringTorics"
+  
+  topes = kreuzerSkarke(3, Limit => 50);    
+  A = matrix topes_30
+  A = matrix topes_31
+  P = reflexivePolytope A
+  findAllFRSTs P
+  X = first oo
+  polytope X
+
+  V = ambient X
+  intersectionNumbersOfCY(V, basisIndices polytope X)
+  elapsedTime T = topologicalData(X, ZZ[a,b,c])
+  hh^(1,1) T
+  hh^(1,2) T
+  hh^(1,1) X
+  hh^(1,2) X
+  hodgeDiamond X
+
+  gv = gvInvariants(X, DegreeLimit => 30);
+  C = posHull transpose matrix ((keys gv)/toList)
+  rays C
+  moriX = entries transpose rays C -- not exactly moriX..
+  partition(f -> gv#(toSequence f), moriX)
+
+  moriConeByGV(X, DegreeLimit => 30)
+  moriConeByGV(X, DegreeLimit => 20)
+  moriConeByGV(X, DegreeLimit => 10)
+  moriConeByGV(X, DegreeLimit => 5)
+///  
+----------------------------------------------------------------
+
+factors = method()
+factors RingElement := (F) -> (
+     facs := factor F;
+     facs//toList/toList/reverse
+     )
+
+invariants = method()
+invariants List := (f) -> (
+    RQ := QQ[gens ring first f];
+    facs := select((factors f_1 )/toList/last, g -> support g != {});
+    l1 := sub(f_0, RQ);
+    f1 := sub(f_1, RQ);
+    d := dim saturate ideal jacobian f1;
+    nc := # decompose ideal(l1, f1);
+    singZ := flatten entries gens gb saturate(ideal(f_1) + ideal jacobian f_1);
+    badp := select(singZ, a -> support leadTerm a === {});
+    badp = if badp === {} then 0 else first badp;
+    {badp, (trim content f_0)_0, (trim content f_1)_0, #facs, d, nc, f_2, f_3}
+    )
+
+moriConeByGV = method(Options => options gvInvariants)
+moriConeByGV CalabiYauInToric := HashTable => opts -> X -> (
+    gv := gvInvariants(X, opts);
+    C := posHull transpose matrix ((keys gv)/toList);
+    moriX := entries transpose rays C; -- not exactly moriX..
+    partition(f -> gv#(toSequence f), moriX)
+    )
+
+----------------------------------------------------------------
+
+beginDocumentation()
+
+-- Problems
+-- . how to determine favorable?
+-- . which toric variety do we want?
+-- . want a smooth one
+-- . want to compute h^11(X) using cohomcalg, but
+--   examples can be too big
+-- . triangulations can be too big
+-- . what else can be too big?
+
+
+load (currentFileDirectory | "StringTorics/doc.m2")
+load (currentFileDirectory | "StringTorics/test.m2")
+
+
 TEST ///
 -- Test of intersection number computations.
 -- This requires that V be favorable?
@@ -1431,21 +1874,6 @@ TEST ///
   netList {L, L', phi1 L, phi1 L'}
   
   ///
-----------------------------------------------------------------
-beginDocumentation()
-
--- Problems
--- . how to determine favorable?
--- . which toric variety do we want?
--- . want a smooth one
--- . want to compute h^11(X) using cohomcalg, but
---   examples can be too big
--- . triangulations can be too big
--- . what else can be too big?
-
-
-load (currentFileDirectory | "StringTorics/doc.m2")
-load (currentFileDirectory | "StringTorics/test.m2")
 
 end--
 
