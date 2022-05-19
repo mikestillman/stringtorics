@@ -117,13 +117,13 @@ hodgeOfCYToricDivisors Polyhedron := (P) -> (
 hodgeOfCYToricDivisor(Polyhedron,List) := (P,pt) -> hodgeCY(P, pt)
 
 h11OfCY Polyhedron := (P1) -> (
-    np := 1 + #(latticePointList polar P1) - 1;  -- -1 for the origin
-    A0 := annotatedFaces(0,P1);
-    A1 := annotatedFaces(1,P1);
+    elapsedTime np := 1 + #(latticePointList polar P1) - 1;  -- -1 for the origin
+    elapsedTime A0 := annotatedFaces(0,P1);
+    elapsedTime A1 := annotatedFaces(1,P1);
     t := A0/last//sum;
     t1 := A1/(v -> v#2 * v#3)//sum;
     np - dim P1 - 1 - t + t1
-    );
+    )
 
 h21OfCY Polyhedron := (P1) -> (
     np := 1 + #(latticePointList P1) - 1; -- -1 for the origin
@@ -132,7 +132,7 @@ h21OfCY Polyhedron := (P1) -> (
     t := A3/(v -> v#2)//sum;
     t1 := A2/(v -> v#2 * v#3)//sum;
     np - 5 - t + t1
-    );
+    )
 
 isFavorable = method();
 isFavorable Polyhedron := (P1) -> (

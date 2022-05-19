@@ -14,7 +14,7 @@ assert(#topes == 244)
   assert(#torsionFrees == 238)
 
 Ts = hashTable for i in torsionFrees list i => (print i; elapsedTime (
-    P = reflexivePolytopeData matrix topes_i;
+    P = reflexivePolytope matrix topes_i;
     findAllFRSTs P
     ))
 
@@ -26,7 +26,7 @@ for i in keys Ts list #Ts#i
 
 -- Organize all (torsion free) polyhedra via h21 of the CY3)
 elapsedTime h21s = partition(i -> (
-      P = reflexivePolytopeData matrix topes_i;
+      P = reflexivePolytope matrix topes_i;
       h21OfCY P
       ),
     torsionFrees) -- 121 seconds.
@@ -73,7 +73,7 @@ hashTable for h21 in keys h21s list h21 => (
 top3 = hashTable for h21 in keys h21s list h21 => (
     hashTable for i in h21s#h21 list i => (
         -- now we list all of the topological data for this polytope
-        P = reflexivePolytopeData matrix topes_i;
+        P = reflexivePolytope matrix topes_i;
         Ts = findAllFRSTs P;
         << "i = " << i << " triangulations: " << netList Ts << endl;
         topD = Ts/(X -> topologicalDataOfCY3(X, RZ));
@@ -84,7 +84,7 @@ top3 = hashTable for h21 in keys h21s list h21 => (
 
 findTopologies = (h21) -> (
   unique flatten for i in h21s#h21 list (
-    P = reflexivePolytopeData matrix topes_i;
+    P = reflexivePolytope matrix topes_i;
     Ts = findAllFRSTs P;
     << "i = " << i << " triangulations: " << netList Ts << endl;
     topD = Ts/(X -> topologicalDataOfCY3(X, RZ));
@@ -94,7 +94,7 @@ findTopologies = (h21) -> (
 
 findTopologies1 = (h21) -> (
   for i in h21s#h21 list (
-    P = reflexivePolytopeData matrix topes_i;
+    P = reflexivePolytope matrix topes_i;
     Ts = findAllFRSTs P;
     << "i = " << i << " triangulations: " << netList Ts << endl;
     topD = Ts/(X -> topologicalDataOfCY3(X, RZ));
@@ -276,7 +276,7 @@ for k in keys alltopes list #alltopes#k
 topes = kreuzerSkarke(3);
 
 for k in sort keys alltopes list (
-    P = reflexivePolytopeData matrix topes_i;
+    P = reflexivePolytope matrix topes_i;
     Ts = findAllFRSTs P;
     << "i = " << i << " triangulations: " << netList Ts << endl;
     topD = Ts/(X -> topologicalDataOfCY3(X, RZ));

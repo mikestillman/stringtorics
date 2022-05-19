@@ -9,57 +9,58 @@ PolytopeData = new Type of HashTable -- contains: data about a reflexive polytop
   -- in cache: h11, h21, triangulations?
   --           annotated faces, perhaps?
 
-ReflexivePolytopeData = new Type of HashTable -- contains: data about a reflexive polytope.
-  -- TODO: better name?  perhaps ReflexivePolytope
+-- The following block has been copied to StirngTorics.m2
+-- ReflexivePolytope = new Type of HashTable -- contains: data about a reflexive polytope.
 
-ToricHypersurface = new Type of HashTable
-  -- contains PolytopeData, and a triangulation.  TODO: better name? perhaps TriangulatedReflexivePolytope?
+-- ToricHypersurface = new Type of HashTable
+--   -- contains PolytopeData, and a triangulation.  TODO: better name? perhaps TriangulatedReflexivePolytope?
 
-TopologicalDataOfCY3 = new Type of HashTable
-  -- contains h11, h21, c2, cubic intersection form
+-- TopologicalDataOfCY3 = new Type of HashTable
+--   -- contains h11, h21, c2, cubic intersection form
 
-dim ReflexivePolytopeData := ZZ => P -> # P#"rays"#0 -- dimension of the polytope
-rays ReflexivePolytopeData := List => P -> P#"rays"
-degrees ReflexivePolytopeData := List => P -> P#"glsm"
-h11OfCY ReflexivePolytopeData := ZZ => P -> (
-    if not P.cache#?"h11" then P.cache#"h11" = h21OfCY convexHull transpose matrix rays P;
-    P.cache#"h11"
-    )
-h21OfCY ReflexivePolytopeData := ZZ => P -> (
-    if not P.cache#?"h21" then P.cache#"h21" = h11OfCY convexHull transpose matrix rays P;
-    P.cache#"h21"
-    )
+-- The following block has been copied to StirngTorics.m2
+-- dim ReflexivePolytope := ZZ => P -> # P#"rays"#0 -- dimension of the polytope
+-- rays ReflexivePolytope := List => P -> P#"rays"
+-- degrees ReflexivePolytope := List => P -> P#"glsm"
+-- h11OfCY ReflexivePolytope := ZZ => P -> (
+--     if not P.cache#?"h11" then P.cache#"h11" = h21OfCY convexHull transpose matrix rays P;
+--     P.cache#"h11"
+--     )
+-- h21OfCY ReflexivePolytope := ZZ => P -> (
+--     if not P.cache#?"h21" then P.cache#"h21" = h11OfCY convexHull transpose matrix rays P;
+--     P.cache#"h21"
+--     )
 
-reflexivePolytopeData = method()
-reflexivePolytopeData(List, List, List) := ReflexivePolytopeData => (latticePoints, GLSM, basisIndices) -> (
-    -- What should be checked here to validate the input data?
-    new ReflexivePolytopeData from {
-        symbol cache => new CacheTable,
-        "rays" => latticePoints,
-        "glsm" => GLSM,
-        "basis indices" => basisIndices
-        }
-    )
+-- reflexivePolytope = method()
+-- reflexivePolytope(List, List, List) := ReflexivePolytope => (latticePoints, GLSM, basisIndices) -> (
+--     -- What should be checked here to validate the input data?
+--     new ReflexivePolytope from {
+--         symbol cache => new CacheTable,
+--         "rays" => latticePoints,
+--         "glsm" => GLSM,
+--         "basis indices" => basisIndices
+--         }
+--     )
 
-reflexivePolytopeData Matrix := ReflexivePolytopeData => (A) -> (
-    P2 := polar convexHull A;
-    LP = select(latticePointList P2, lp -> dim(P2, minimalFace(P2, lp)) <= 2);
-    mLP = transpose matrix LP;
-    D := transpose syz mLP;
-    p := findFirstUnitVectors D;
-    q := findInvertibleSubmatrix(D, p);
-    if q === null then error ("oops, can't find a good GLSM matrix"); -- hasn't happened yet
-    GLSM := (D_q)^-1 * D;
-    -- the rays of each triangulation should match LP.
-    reflexivePolytopeData(LP, entries transpose GLSM, q)
-    )
+-- reflexivePolytope Matrix := ReflexivePolytope => (A) -> (
+--     P2 := polar convexHull A;
+--     LP = select(latticePointList P2, lp -> dim(P2, minimalFace(P2, lp)) <= 2);
+--     mLP = transpose matrix LP;
+--     D := transpose syz mLP;
+--     p := findFirstUnitVectors D;
+--     q := findInvertibleSubmatrix(D, p);
+--     if q === null then error ("oops, can't find a good GLSM matrix"); -- hasn't happened yet
+--     GLSM := (D_q)^-1 * D;
+--     -- the rays of each triangulation should match LP.
+--     reflexivePolytope(LP, entries transpose GLSM, q)
+--     )
 
 
 -- TODO: allow options, e.g. limit the number.
 -- TODO: Another routine: find a random one?
 -- TODO: Another routine: start with one, then do bistellar flip.
 toricHypersurface = method()
-toricHypersurface(ReflexivePolytopeData, List) := ToricHypersurface => (P, triang) -> (
+toricHypersurface(ReflexivePolytope, List) := ToricHypersurface => (P, triang) -> (
     -- TODO: do some basic checking:
     --   triang should be a list of lists of indices from the rays of P,
     --   each of length dim P.
@@ -71,9 +72,9 @@ toricHypersurface(ReflexivePolytopeData, List) := ToricHypersurface => (P, trian
         }
     )
 
--- Input: ReflexivePolytopeData
+-- Input: ReflexivePolytope
 -- Output: List of ToricHypersurface's.
-findAllFRSTs ReflexivePolytopeData := List => P -> (
+findAllFRSTs ReflexivePolytope := List => P -> (
     T := findAllFRSTs transpose matrix rays P;
     for t in T do if last t === {} then error "what?!"; -- this should not happen?
     for t in T list toricHypersurface(P, last t) -- t is a pair: list of vertices, list of list of indices
@@ -317,7 +318,7 @@ TEST ///
   needs "WriteToricData.m2"
 --
   topes = kreuzerSkarke 3;
-  P = reflexivePolytopeData matrix topes_12
+  P = reflexivePolytope matrix topes_12
   V = reflexiveToSimplicialToricVariety convexHull matrix topes_12
   -- check consistency:
   transpose matrix rays P
@@ -597,7 +598,7 @@ TEST ///
  
   -- now let's take each, compute its triangulations, linear+cubic forms, see how many there are... 
   -- Let's try one first
-  P = reflexivePolytopeData matrix topes_57
+  P = reflexivePolytope matrix topes_57
   Ts = findAllFRSTs P
   netList Ts
   topD = Ts/(X -> topologicalDataOfCY3(X, RZ));
@@ -607,7 +608,7 @@ TEST ///
   -- This returns the polytopes that might have different topologies of CY3's.
   -- BUG: every now and then, the triangulations come out to be {}...
   haveMultipleForms = select(torsionFrees, i -> (
-          P = reflexivePolytopeData matrix topes_i;
+          P = reflexivePolytope matrix topes_i;
           Ts = findAllFRSTs P;
           << "i = " << i << " triangulations: " << netList Ts << endl;
           topD = Ts/(X -> topologicalDataOfCY3(X, RZ));
@@ -698,7 +699,7 @@ TEST ///
   assert(h11OfCY P === 2)
   assert(h21OfCY P === 272)
   
-  P = reflexivePolytopeData matrix topes_10
+  P = reflexivePolytope matrix topes_10
   Ts = findAllFRSTs P
   netList Ts
 
@@ -728,8 +729,8 @@ torsionFrees = sort toList(set(0..#topes-1) - set nonTorsionFrees);
 assert(#torsionFrees == 1179) -- not 1197!! -- so 18 are torsion...
 
 -- By hand:    
-P = reflexivePolytopeData matrix topes_10
-P = reflexivePolytopeData matrix topes_9
+P = reflexivePolytope matrix topes_10
+P = reflexivePolytope matrix topes_9
 Ts = findAllFRSTs P
 netList Ts
 RZ = ZZ[a..d]

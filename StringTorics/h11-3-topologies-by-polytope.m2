@@ -1,10 +1,10 @@
 restart
-load "WriteToricData.m2"
+needsPackage "StringTorics"
+
+--load "WriteToricData.m2"
 
 kk = ZZ/32003
 topes = kreuzerSkarke(3, Limit => 10000); -- 244
-topes = kreuzerSkarke(10, Limit => 10000, Access => "wget"); -- 
-#topes
 assert(#topes == 244)
   -*
     elapsedTime Vs = topes / (P -> elapsedTime reflexiveToSimplicialToricVariety(convexHull matrix P, CoefficientRing => kk));
@@ -15,13 +15,9 @@ assert(#topes == 244)
   torsionFrees = sort toList(set(0..#topes-1) - set nonTorsionFrees);
   assert(#torsionFrees == 238)
 
-topes = topes_{100, 200, 300}
-    torsionFrees = positions(Vs, V -> classGroup V == ZZ^10);
-    torsionFrees = {0,1,2}
-    Vs/classGroup
 debugLevel = 1
 elapsedTime Ts = hashTable for i in torsionFrees list i => (print i; elapsedTime (
-    P = reflexivePolytopeData matrix topes_i;
+    P = reflexivePolytope matrix topes_i;
     findAllFRSTs P
     ));
 
@@ -33,11 +29,13 @@ Ts = allTriangulations(A1, Fine => true, RegularOnly => true)
 
   -- Naomi gets: 518 total number of triangulations for these 238 polytopes.
   sum for k in sort keys Ts list #Ts#k
+
+-- This function is the longest one...  It takes 552 seconds...
 RZ = ZZ[x,y,z]
 elapsedTime tops = hashTable for i in keys Ts list i => (
     ts := Ts#i;
     for X in ts list elapsedTime (
-        t := topologicalDataOfCY3(X, RZ);
+        t := topologicalData(X, RZ);
         {t#"c2", t#"cubic intersection form", t#"h11", t#"h21"}
         )
     );
@@ -47,15 +45,45 @@ sort keys tops
 -- create a list of all of the topologies of all the triangulations, adding in which polytope it comes from
 alltops = flatten for i in sort keys tops list (
     count := -1;
-    for t in tops#i list (count = count+1; t | {i, count})
+    for t in tops#i list (count = count+1; {t, {i, count}})
     )
 
-byInvariants = partition(invariants, alltops)
+elapsedTime byInvariants = partition(x -> invariants first x, alltops)
 netList for k in sort keys byInvariants list {k, netList byInvariants#k}
 
+X1 = Ts#67#0
+X2 = Ts#73#0
+gvInvariants(X1, DegreeLimit => 20)
+
+
 -- Now lets take each of the values of byInvariants, and see which topologies are equivalent.
-#sort keys byInvariants -- 16 sets
+#sort keys byInvariants -- 16 sets ??
 ks = sort keys byInvariants
+
+moriByGV = for k in ks list k => (
+    << "---- doing invariants " << k << " -------------------------" << endl;
+    if #byInvariants#k === 1 then (
+        << "---- only one with this set of invariants ---" << endl;
+        );
+    for f in byInvariants#k list (
+        << "CY " << f#1 << flush;
+        X := Ts#(f#1#0)#(f#1#1);
+        C := moriConeByGV X;
+        << " GV = " << C << endl;
+        C
+        )
+    )
+
+-- This one seems to give an error
+
+X = Ts#156#3
+moriCone ambient X -- is this correct?  This is the most likely culprit...
+gvInvariants(X,
+    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV",
+    DegreeLimit => 30,
+    Precision => 500,
+    Heft => {1,2,2}
+    )
 
 RQ = QQ[x,y,z]
 (A, xyz) = makeGLRing RQ
@@ -77,7 +105,7 @@ netList oo
 
 
 elapsedTime Ts = hashTable for i in torsionFrees list i => (print i; elapsedTime (
-    h21OfCY reflexivePolytopeData matrix topes_i
+    h21OfCY reflexivePolytope matrix topes_i
     ));
 
 tally for i in keys Ts list #Ts#i
