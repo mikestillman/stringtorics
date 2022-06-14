@@ -92,7 +92,6 @@ fineRegularStarTriangulation A
       sort apply (F, f -> sort apply(f#0, v -> LPH#(vertsP#v)))
       )
 
-
 -- TODO/BUG: this ASSUMES (A, tri) is a triangulation.
 isFine = method()
 isFine(Matrix, List) := (A, tri) -> (
@@ -117,7 +116,7 @@ delaunaySubdivision Matrix := A -> elapsedTime regularSubdivision(A, elapsedTime
 
 -- isRegularTriangulation is defined in Topcom.
 
-isWellDefinedTriangulation = method() -- WRITE THIS!
+isWellDefinedTriangulation = method() -- WRITE THIS! -- perhaps this is in Topcom.m2...
 
 -- TODO: why codim2 and codim2s?
 codim2 = (tri) -> (

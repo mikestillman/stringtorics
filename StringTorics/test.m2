@@ -126,7 +126,26 @@ needsPackage "StringTorics"
   for f in faceList P do assert (2^(dim(P,f)) === #f)
   assert(faceList(0,P) == for i from 0 to 7 list {i})
 
-  tri = regularFineTriangulation transpose matrix LP
+  Amat = transpose matrix LP
+  tri = regularFineTriangulation Amat
+  naiveIsTriangulation(Amat, tri)
+  topcomIsTriangulation(Amat, tri)
+  
+  -- check what happens if Amat is homoogenized:
+  AmatH = Amat || matrix{{8:1}}
+  naiveIsTriangulation(AmatH, tri) -- this should be false...?
+  assert not topcomIsTriangulation(AmatH, tri) -- good! it complains that the index sets are not full dimensional (I think that is good?)
+  
+  affineCircuits(Amat, tri)
+  for x in affineCircuits(Amat, tri) list flip(tri, x)
+  flips(Amat, tri)
+  
+  generateTriangulations(Amat, tri)
+  allTriangulations(Amat, RegularOnly => false, ConnectedToRegular => false, Fine => false)
+  
+  generateTriangulations(Amat, tri, Regular => true)
+  allTriangulations Amat
+  
   -- let's check that this is a triangulation.
   -- part of what we are checking: calls relative to homogenization are correct, and types make sense.
   -- part 1: for each oriented circuit
@@ -159,6 +178,18 @@ needsPackage "StringTorics"
   for w in walls#2 list (
       # select(facs, f -> isSubset(w, f))
       )
+  
+  walls#2 -- 6 walls here.  Compute the vector for each.
+  matrix {for w in walls#2 list (
+      --w = {2,3,4} -- a wall
+      circ := select(tri, t -> isSubset(w, t));
+      others := circ/(c -> toList(set c - set w));
+      elems := (flatten others) | w;
+      print elems;
+      id_(ZZ^8)_elems * syz AmatH_elems
+      )}
+      --id_(ZZ^8)_{1,6,2,3,4} * syz AmatH_{1,6,2,3,4} 
+  
 ///
 
 TEST /// 
@@ -220,6 +251,44 @@ TEST ///
 ///
 
 TEST ///
+  -- Test of triangulation code
+-*
+  restart
+  needsPackage "StringTorics"
+*-  
+  -- XXX
+  topes = kreuzerSkarke 3;
+  A = matrix topes_30
+  A
+  P = reflexivePolytope A
+  Amat = transpose matrix latticePointList polytope P
+  regularSubdivision(Amat, matrix{{0,0,1,3,6,9,20,30}}) -- seems incorrect.
+  TRI = regularFineTriangulation Amat -- is this including the origin automatically?
+  wts = regularTriangulationWeights(Amat, TRI)
+  -- check that this is a triangulation!
+  TRI2 = regularSubdivision(Amat, matrix{{2, 4, 2, 0, 0, 0, 0, 0}}) -- good!
+  assert(sortTriangulation TRI === sortTriangulation TRI2) -- works!
+
+  -- let's check 'affineCircuits'
+  C = affineCircuits(Amat, TRI)  
+  4! * volumeVector(Amat, TRI)
+  flip(TRI, C_0) === null
+  flip(TRI, C_1) === null
+  TRI2 = flip(TRI, C_2)
+  wts2 = regularTriangulationWeights(Amat, TRI2)
+  wts2 == {-2, 6, 4, 0, 0, 0, 0, 0}    
+  TRI2' = regularSubdivision(Amat, matrix{{-2, 6, 4, 0, 0, 0, 0, 0}}) -- good!
+  assert(TRI2' == TRI2)
+  flip(TRI, C_3) === null
+  4! * volumeVector(Amat, flip(TRI, C_4))
+  flip(TRI, C_5) === null
+  flip(TRI, C_6)
+  4! * volumeVector(Amat, flip(TRI, C_6))
+  
+  findAllFRSTs P
+///
+
+TEST ///
   -- Test functionality of triangulations, part 2. reflexive polytope in 4D
   -- We try one with h11=3
   needsPackage "StringTorics"
@@ -273,7 +342,7 @@ TEST ///
   --  this one has a number of triangulations.
   -- How do we create Amat?  This is the way:
   --      4 11  M:58 11 N:10 8 H:5,51 [-92]
-  -- XXXXXXXXXX
+  -- XXXXXXXXXX This test is failing May 2022.
 -*
   restart
 *-
@@ -305,7 +374,7 @@ TEST ///
   applyPermutation(fromM2, allTRIS)
 
   -- the following are all in this list
-  time TRI = regularFineStarTriangulation Amat
+  time TRI = regularFineStarTriangulation Amat -- this appears to not be returning regular triangulations?
 
   -- make a toric variety from one of the triangulations:
   elapsedTime assert({(true, true, true)} === 
@@ -333,7 +402,7 @@ TEST ///
   A = matrixFromString mat
   P1 = convexHull A -- (extremal) vertices in RR^4
   P2 = polar P1
-  LP = Polyhedra$latticePoints P2 -- these will be the origin, the extremal vertices of P2 and possibly some more.
+  LP = latticePoints P2 -- these will be the origin, the extremal vertices of P2 and possibly some more.
   Amat = matrix {select(LP, x -> x != 0)}
 
   elapsedTime regularStarTriangulation P2;
@@ -351,7 +420,7 @@ TEST ///
   A = matrixFromString mat
   P1 = convexHull A -- (extremal) vertices in RR^4
   P2 = polar P1
-  LP = Polyhedra$latticePoints P2 -- these will be the origin, the extremal vertices of P2 and possibly some more.
+  LP = latticePoints P2 -- these will be the origin, the extremal vertices of P2 and possibly some more.
   Amat = matrix {select(LP, x -> x != 0)}
 
   elapsedTime   TRI = regularFineStarTriangulation Amat;
@@ -1029,4 +1098,64 @@ TEST /// -- medium size (h^11 = 15) example
       {5, 7, 13, 15}, {5, 7, 14, 16}, {6, 8, 12, 13}, {6, 8, 12, 14}, {6, 8, 13, 14}, 
       {7, 8, 12, 13}, {7, 8, 12, 16}, {7, 8, 13, 14}, {7, 8, 14, 16}}
   assert(ans == regularFineStarTriangulation A)
+///
+
+TEST ///
+-- This test is failing: May 2022.  It isn't a complete test anyway...
+-- Test of intersection number computations.
+-- This requires that V be favorable?
+-*
+  restart
+  needsPackage "StringTorics"
+*-
+  debug StringTorics
+
+  topes = kreuzerSkarke(3, Limit => 50);    
+  A = matrix topes_30
+  P = convexHull A
+  (V, basisElems) = reflexiveToSimplicialToricVarietyCleanDegrees(P, CoefficientRing => ZZ/32003)
+  basisElems -- for the moment, we ignore this, and write down all of the elements...
+  GLSM = transpose matrix degrees ring V
+  X = completeIntersection(V, {-toricDivisor V})
+  Xa = abstractVariety(X, base())
+  IX = intersectionRing Xa
+  elemsToConsider = toList(0..numcols GLSM-1);
+  triples = (subsets(elemsToConsider, 3))/sort//sort;
+  Htriples = hashTable for a in triples list (
+      (i,j,k) := toSequence a;
+      val := integral(IX_i * IX_j * IX_k);
+      if val == 0 then continue else {i,j,k} => val
+    )
+
+
+  -- Now we try the code above
+  (singles, doubles, triples) = toSequence possibleNonZeros V
+
+  Htriples = hashTable for a in join(singles, doubles, triples) list (
+      (i,j,k) := toSequence a;
+      val := integral(IX_i * IX_j * IX_k);
+      if val == 0 then continue else {i,j,k} => val
+    )
+
+  assert(triples === (keys Htriples)/sort//sort) -- failing.
+  
+  elapsedTime tripleProductsCY V
+  elapsedTime CY3NonzeroMultiplicities V -- much slower for small h11...
+  
+  ans = toSequence topologyOfCY3(V, basisElems)
+  (h11, h21, H3, C, L) = ans
+  hashTable for x in keys H3 list (
+      if isSubset(x, basisElems) then x => H3#x else continue
+      )
+
+
+  (h11, h21, C, L) = toSequence topologyOfCY3(V, basisElems)  
+  (h11', h21', C', L') = toSequence topologyOfCY3(V, {0,1,2}, Ring => ring C)  
+  A = ring C;
+  M = GLSM_{0,1,2}  
+  phi1 = map(A, A, flatten entries((M) * transpose vars A))
+  L' == phi1 L
+  C' == phi1 C
+  netList {L, L', phi1 L, phi1 L'}
+  
 ///

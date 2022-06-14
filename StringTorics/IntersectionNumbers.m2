@@ -1,0 +1,417 @@
+-- Intersection numbers for Calabi-Yau 3-folds
+
+-----------------------------------------------
+-- Utility functions --------------------------
+-- Used to translate between data formats -----
+-----------------------------------------------
+exponentToProduct = exp -> (
+    -- exp is a list of integers, e.g. {0,3,1}
+    -- result is expanded to a product, e.g. {1,1,1,2}
+    -- the result includes integers in 0..#exp - 1, in ascending order.
+    -- e.g.
+    --   exponentToProduct {0,3,1} == {1,1,1,2}
+    flatten for i from 0 to #exp-1 list toList(exp#i : i)
+    )
+
+productToExponents = (prod, nvars) -> (
+    -- prod is a list of ascending integers, in range 0..nvars-1
+    -- e.g. {0,1,1,2,4}
+    -- this is translated to an exponent vector,
+    -- e.g. 
+    --   productToExponents({0,1,1,2,4}, 6) == {1,2,1,0,1,0}
+    -- this could be faster if needed
+    T := tally prod;
+    for i from 0 to nvars - 1 list if T#?i then T#i else 0
+    )
+
+multinomial = exp -> (
+    -- exp is an exponent vector
+    -- returns an integer
+    -- e.g. 
+    --   multinomial {1,0,2} == 3
+    --   multinomial {1, 1, 1} == 6
+    n := sum exp;
+    den := product for i from 0 to #exp - 1 list (exp#i)!;
+    n! // den
+    )
+
+toCOO = method()
+toCOO RingElement := (F) -> (
+    for f1 in listForm F list (
+        e := first f1; -- exponents
+        c := last f1; -- coeff
+        d := multinomial e;
+        e' := exponentToProduct e;
+        e' => if c % d ==0 then c//d else c/d -- TODO: not the exponent vector!!
+        )
+    )
+
+toRingElement = method()
+toRingElement(List, Ring) := (f, RZ) -> (
+    if #f == 0 then return 0_RZ;
+    n := sum f#0#0;
+    sum for f1 in f list (
+        e' := f1#0; -- list of variable products, e.g. {0,1,1,2}
+        c := f1#1; -- coeff (an integer, currently envisioned)
+        e := productToExponents(e', numgens RZ);
+        d := multinomial e;
+        d * c * RZ_e
+        )
+    )
+
+TEST ///
+-- test of the (currently internal) routines: exponentsToProduct,
+-- productToExponents, multinomial, toCOO, toRingElement.
+  debug StringTorics
+  assert(exponentToProduct {} == {})
+  assert(exponentToProduct {3} == {0, 0, 0})
+  assert(exponentToProduct {0, 3, 1} == {1, 1, 1, 2})
+  assert(exponentToProduct {1, 2, 1, 0, 1, 0, 0, 0} == {0, 1, 1, 2, 4})
+  assert(exponentToProduct {1, 1, 1, 1, 1} == {0, 1, 2, 3, 4})
+
+  assert(productToExponents({}, 0) == {})
+  assert(productToExponents({}, 3) == {0, 0, 0})
+  assert(productToExponents({0, 0, 0}, 1) == {3})
+  assert(productToExponents({1, 1, 1, 2}, 3) == {0, 3, 1})
+  assert(productToExponents({0, 1, 2, 3, 4}, 5) == {1, 1, 1, 1, 1})  
+  assert(productToExponents({0, 1, 1, 2, 4}, 8) == {1, 2, 1, 0, 1, 0, 0, 0})
+
+  assert(multinomial {3, 0, 0} == 1)  
+  assert(multinomial {1,0,2} == 3)
+  assert(multinomial {1, 1, 1} == 6)
+
+  RZ = ZZ[a,b,c]
+  F = (a+2*b+3*c)^3 
+  G = toCOO F  
+  F' = toRingElement(G, RZ)
+  assert(F == F')
+  G' = toCOO F'
+  assert(G === G')
+
+  L = 3*a+c
+  toCOO L
+  assert(toRingElement(toCOO L, RZ) == L)
+
+  L = 1_RZ
+  toCOO L
+  assert(toRingElement(toCOO L, RZ) == L)
+
+  L = 0_RZ
+  toCOO L
+  assert(toRingElement(toCOO L, RZ) == L)
+///
+
+-- Simple subroutine for finding the list of indices for possible intersections.
+-- e.g. if in the resulting list, {0,1,1} appears, then this will represent the
+-- product H_0 . H_1 . H_1 (which is an integer)
+monoms = (deg, lo, hi) -> (
+    -- input: deg, lo, hi: all integers
+    -- output: a list of lists of integers all of length 'deg',
+    --   sorted in ascending order.
+    if deg == 0 then {{}}
+    else if lo === hi then {splice{deg:lo}}
+    else
+    flatten for i from lo to hi list (
+        L1 := monoms(deg-1, i, hi);
+        for t in L1 list prepend(i, t)
+        )
+    )
+
+TEST ///
+-- As it turns out, 'monoms' is much faster than first creating the basis,
+-- and applying exponentToProduct to (the exponent vector of) every monomial
+-- e.g. on MES's Apple M1 Max, 2022, doing nv = 81 the latter way gives .32 + 1.6 seconds
+-- instead of .25 seconds.
+  debug StringTorics
+  elapsedTime assert(# monoms(3, 0, 10) == binomial(13,3))
+  elapsedTime assert(# monoms(3, 0, 12) == binomial(15,3))
+  elapsedTime assert(# monoms(3, 0, 20) == binomial(23,3))
+  elapsedTime assert(# monoms(3, 0, 50) == binomial(53,3))
+  elapsedTime assert(# monoms(3, 0, 80) == binomial(83,3)) -- .25 seconds
+  elapsedTime assert(# monoms(3, 0, 200) == binomial(203,3)) -- 1.5 seconds
+
+  -- commented out so 'check' doesn't take too long
+  --elapsedTime assert(# monoms(3, 0, 300) == binomial(303,3)) -- 5.2 seconds
+  --elapsedTime assert(# monoms(3, 0, 400) == binomial(403,3)) -- 14.2 seconds
+  --elapsedTime assert(# monoms(3, 0, 495) == binomial(498,3)) -- 31 seconds
+  --elapsedTime assert(# monoms(3, 0, 490) == binomial(493,3)) -- 36 seconds, why longer?
+  
+  RZ = ZZ[t_1..t_20]
+  elapsedTime B = flatten entries basis(3, RZ);
+  #B
+  mons1 = B/(b -> exponentToProduct first exponents b)
+  mons2 = monoms(3, 0, 19)
+  mons1 === mons2 -- in the same order
+
+  -- nv = 81 gives the timing above.
+  -- the order should be the same,  For testing, we use a smaller value of nv.
+  nv = 10
+  RZ = ZZ[t_1..t_nv]
+  elapsedTime B = flatten entries basis(3, RZ);
+  assert(#B == binomial(nv+2, 3))
+  elapsedTime mons1 = B/(b -> exponentToProduct first exponents b);
+  elapsedTime mons2 = monoms(3, 0, nv-1);
+  assert(mons1 === mons2) -- in the same order
+///
+
+--------------------------------------
+-- Intersection numbers for CY3's which are hypersurfaces in simplicial res of 4d reflexive torics.
+-- This is used to debug the more involved algorithm for these.
+--------------------------------------
+-- This code is in progress Sep 2021.  It is older code that I want to use now.
+-- It had been in the file: rigid-divisors/m2-example/intersection-rings.m2
+-- TODO: make sure it is correct.
+--       would be nice if it worked for other dimensions of CY's too...
+-- ALLOW
+--       pare down the list to generators only.  Can we compute directly from generators? (I think not...)
+-- WISHLIST
+--       would really be nice to work for non-favorables.
+--       would really be nice to work for CI in torics? (still CY's?)
+
+-- Simple code, which expects that we can compute the intersection ring of X.
+intersectionNumbers = method()
+
+-- Remove this version?
+intersectionNumbers(Ring, List) := HashTable => (IX, basisIndices) -> (
+    -- IX: should be a ring produced for Schubert2, having 'integral' function for top degree elements.
+    -- basisIndices is a subList of {0, ..., numgens IX - 1}.
+    -- WARNING: this is cubic in number of generators of IX.  This can be improved,
+    -- using the toric structure of X as a hypersurface in a toric V.
+    -- TODO WARNING: the 3 in here is for 3-folds...!
+    mons := monoms(3, 0, #basisIndices-1);
+    bas := for i in basisIndices list IX_i;
+    for t in mons list (
+        m := integral product(t, i -> bas_i);
+        a := lift(integral product(t, i -> bas_i), ZZ);
+        if a === 0 then continue else t => a
+        )
+    )
+
+-- This is the naive version.  We will use this to check correctness
+-- of more involved but hopefully faster algorithms
+intersectionNumbers CalabiYauInToric := List => X -> (
+    ind := basisIndices X;
+    elapsedTime IX := intersectionRing abstractVariety X;
+    -- IX: should be a ring produced for Schubert2, having 'integral' function for top degree elements.
+    -- basisIndices is a subList of {0, ..., numgens IX - 1}.
+    -- WARNING: this is cubic in number of generators of IX.  This can be improved,
+    -- using the toric structure of X as a hypersurface in a toric V.
+    -- TODO WARNING: the 3 in here is for 3-folds...!
+    mons := monoms(3, 0, #ind-1);
+    bas := for i in ind list IX_i;
+    for t in mons list (
+        m := integral product(t, i -> bas_i);
+        a := lift(integral product(t, i -> bas_i), ZZ);
+        if a === 0 then continue else t => a
+        )
+    )
+    
+TEST ///
+  -- Let's test the basis intersection numbers code at slightly higher h11...
+  restart
+  needsPackage "StringTorics"
+  
+  topes = kreuzerSkarke(7, Limit => 50);    
+  assert(#topes == 50)
+  topes_30
+  -- Here it is:
+  ks = KSEntry "4 10  M:33 10 N:12 8 H:7,29 [-44] id:30
+   1   0   0   1  -1   1  -1  -1  -2   0
+   0   1   1   0  -2   0  -2   2  -1   1
+   0   0   2   0  -4   2  -2   2  -2   2
+   0   0   0   2  -2   2  -2   0  -2   2
+   "
+  A = matrix ks   
+  P = reflexivePolytope A
+  -- need a way to get one FRST, or perhaps a smaller number than "all".
+  elapsedTime Xs = findAllFRSTs P
+  X = first Xs
+  peek X
+  V = ambient X
+  assert isWellDefined V
+  assert isProjective V
+  assert isSimplicial V
+
+  debug StringTorics  
+  coo = intersectionNumbers X
+  RZ = ZZ[t_0..t_6]
+  F = toRingElement(coo, RZ)
+  assert(sort coo === sort toCOO F)
+
+  X = findOneFRST P    
+  V = ambient X
+  isWellDefined V
+  
+  coo = intersectionNumbers X
+  RZ = ZZ[t_0..t_6]
+  F = toRingElement(coo, RZ)
+  assert(sort coo === sort toCOO F)
+///   
+
+TEST ///
+  -- Let's see how high we can go with this simplistic routine.
+  restart
+  debug needsPackage "StringTorics"
+
+  h11 = 20
+  topes = kreuzerSkarke(h11, Limit => 50);    
+  assert(#topes == 50)
+
+  -- BUG: this is not giving h11=20... reason: topes_30 not favorable!
+  A = matrix topes_25
+  P1 = convexHull A
+  P2 = polar P1
+  annotatedFaces P2
+  elapsedTime P = reflexivePolytope A
+  isFavorable P
+  h11OfCY P
+  h21OfCY P
+
+  elapsedTime X = findOneCY P
+  elapsedTime coo = intersectionNumbers X; -- 4 seconds at h11=20.  3.2 seconds of this is computing the intersection ring.
+  assert(#coo == 175)
+
+  RZ = ZZ[t_0..t_(h11-1)]
+  F = toRingElement(coo, RZ)
+  assert(sort coo === sort toCOO F)
+///
+
+
+-- Simpler code, used to debug the algorithm/implementation above.
+tripleProductsCY = method()
+tripleProductsCY NormalToricVariety := (V) -> (
+    elapsedTime AV := abstractVariety(V, point);
+    IV := intersectionRing AV; 
+    h := sum gens IV; -- Calabi-Yau hyperplane class in V.
+    J := ideal select((ideal IV)_*, f -> size f == 1);
+    forceGB gens J;
+    gens gb J;
+    A := (ring J)/J;
+    monoms := ideal basis(3, A);
+    elapsedTime JV := sub(monoms,IV);
+    elapsedTime (JVh := h ** (gens JV));
+    flatJVh := flatten entries JVh;
+    hashTable for i from 0 to numgens monoms - 1 list (
+        m := monoms_i;
+        d := integral(flatJVh#i);
+        if d > 0 then m => d else continue
+        )
+    )
+
+
+possibleNonZeros = (V) -> (
+    -- assumption currently: V has dim 4, is reflexive, and X is the anti-canonical CY3 divisor.
+    -- returns a list of lists of 3 integers (0 <= i1 <= i2 <= i3 <= N-1)
+    --  where N = #rays V.
+    -- and all triples other than those on this list must have triple intersection
+    -- on X being zero.
+    P2 := convexHull transpose matrix rays V;
+    F := annotatedFaces P2;
+    faces2 := select(F, f -> f#0 == 2);
+    faces2 = faces2/(x -> x#2); -- this is a list of all 2-faces in the polytope,
+    -- with which rays are on each face.
+    -- any triple not supported on a 2-face will have triple intersection zero.
+    triangles := (max V)/(t -> subsets(t,3))//flatten//unique;
+    edges := (max V)/(t -> subsets(t,2))//flatten//unique//sort;
+    triples := sort flatten for f in faces2 list select(triangles, t -> isSubset(t,f));
+    singles := for i from 0 to # rays V - 1 list {i,i,i};
+    doubles := sort flatten for f in faces2 list select(edges, t -> isSubset(t,f));
+    doubles = unique flatten for x in doubles list {{x#0,x#0,x#1},{x#0,x#1,x#1}};
+    {singles,doubles,triples}
+    )
+
+  CY3NonzeroMultiplicities = method()
+  CY3NonzeroMultiplicities NormalToricVariety := (V) -> (
+      RAYS := transpose matrix rays V;
+      P2 := convexHull RAYS;
+      (singles,doubles,triples) := toSequence possibleNonZeros V;
+      doubles = doubles/unique/sort//unique;
+      singles = singles/unique/sort//unique;
+      mult3 := new MutableHashTable from for x in triples list (
+           x => 1 + genus(P2, minimalFace(P2, (rays V)_x))
+           );
+      multvec := ij -> (
+          for ell from 0 to #rays V-1 list (
+              if member(ell,ij) then 0 
+              else (
+                  s := sort append(ij,ell);
+                  if mult3#?s then mult3#s else 0
+                  ))
+          );
+      for d in doubles do (
+          RHS := - RAYS *  transpose (matrix{multvec d});
+          vals := flatten entries solve(RAYS_d, RHS);
+          d1 := prepend(d#0,d);
+          d2 := append(d,d#1);
+          if vals#0 != 0 then mult3#d1 = vals#0;
+          if vals#1 != 0 then mult3#d2 = vals#1;
+          );
+      for d in singles do (
+          s := {d#0,d#0};
+          RHS := - RAYS *  transpose (matrix{multvec s});
+          vals := flatten entries solve(RAYS_d, RHS);
+          if vals#0 != 0 then mult3#{d#0,d#0,d#0} = vals#0;
+          );
+      new HashTable from mult3
+      )
+
+
+CY3Intersections = method()
+CY3Intersections(NormalToricVariety, List) := (V, indexOfDs) -> (
+    H := CY3NonzeroMultiplicities V;
+    loc := new HashTable from for i from 0 to #indexOfDs-1 list indexOfDs#i => i;
+    tr := k -> sort for k1 in k list loc#k1;
+    new Array from for kv in pairs H list (
+      if not isSubset(kv#0, indexOfDs) then continue;
+      new Array from append(tr kv#0, kv#1)
+      )
+  )
+
+
+topologyOfCY3 = method(Options => {
+        Variable => "x",
+        Ring => null
+        })
+topologyOfCY3(NormalToricVariety, List) := opts -> (V, basisIndices) -> (
+    -- input: 
+    --   V: a simplicial resolution of a Fano toric 4-fold
+    --      X is a (general) anti-canonical section of V.
+    --   basisIndices: list of integer indicesas to which V_i will be in the 
+    --      basis of Pic X that you choose.
+    -- output: a hash table containing:
+    --  a. triple intersection numbers (a hash table, H#{a,b,c}, with 0 <= a <= b <= c < h11(X))
+    --  b. the h11 numbers: c2(X) . D_i, 0 <= i < h11
+    --  c. the integers h11, h12
+    --  d. the cubic form C(x,y,z) in a polynomial ring ZZ[x_0, ..., x_(h11-1)]
+    --  e. a linear form L(x,y,z) in the same ring, representing c2(X).D_i
+    --
+    P := convexHull transpose matrix rays V;
+    h11 := h21OfCY P; -- we want h11 of `polar P`.
+    h21 := h11OfCY P;
+    if #basisIndices != h11 then error("expected "|h11|" indices");
+    H := CY3NonzeroMultiplicities V;
+    -- basisInv := new MutableHashTable;
+    -- for i from 0 to #basisIndices-1 do basisInv#(basisIndices#i) = i;
+    -- H3 := hashTable for x in keys H list (
+    --     if isSubset(x, basisIndices) then (
+    --         x' := apply(x, i -> basisInv#i);
+    --         x' => H#x 
+    --         ) else continue
+    --     );
+    -- Now let's get the cubic form and the linear form directly from the intersection theory.
+    -- For larger h11, this method will need to change.
+    x := getSymbol opts.Variable;
+    pt := base(x_0..x_(h11-1));
+    A := intersectionRing pt; -- over QQ
+    R := if opts#Ring =!= null then opts#Ring else ZZ (monoid A);
+    if numgens R =!= h11 then error("expected a ring with "|toString h11|" variables");
+
+    X := completeIntersection(V, {-toricDivisor V});
+    Xa := abstractVariety(X, pt);
+    IX := intersectionRing Xa;
+    h := sum(h11, i -> A_i * IX_(basisIndices#i));
+    C := sub(integral(h^3), vars R);
+    L := integral((chern_2 tangentBundle Xa) * h);
+    L = sub(L, vars R);
+    (h11, h21, C, L)
+    )

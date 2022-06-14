@@ -1,8 +1,6 @@
 restart
 needsPackage "StringTorics"
 
---load "WriteToricData.m2"
-
 kk = ZZ/32003
 topes = kreuzerSkarke(3, Limit => 10000); -- 244
 assert(#topes == 244)
@@ -15,12 +13,19 @@ assert(#topes == 244)
   torsionFrees = sort toList(set(0..#topes-1) - set nonTorsionFrees);
   assert(#torsionFrees == 238)
 
-debugLevel = 1
-elapsedTime Ts = hashTable for i in torsionFrees list i => (print i; elapsedTime (
-    P = reflexivePolytope matrix topes_i;
-    findAllFRSTs P
-    ));
+elapsedTime Ps = hashTable for i from 0 to #topes-1 list 
+    i => (print i; elapsedTime (
+        P = reflexivePolytope matrix topes_i
+        )); -- currently 26 seconds to compute these
 
+elapsedTime for k in sort keys Ps list isFavorable Ps#k -- about 34 seconds
+
+debugLevel = 1
+elapsedTime Ts = hashTable for i in sort keys Ps list i => (print i; elapsedTime (
+    findAllFRSTs Ps#i
+    )); -- about 5 seconds
+
+elapsedTime Vs = for k in sort keys Ps list normalToricVariety Ps#k#0
 ///
 A = matrix {{-1, -1, -1, -1, 1, 2, -1}, {-1, -1, -1, 3, -1, -1, 1}, {1, 1, 2, -2, 0, 0, 0}, {0, 1, 1, -1, 0, 0, 0}}
 A1 = A | map(target A, (ring source A)^1, 0);
@@ -28,12 +33,14 @@ Ts = allTriangulations(A1, Fine => true, RegularOnly => true)
 ///
 
   -- Naomi gets: 518 total number of triangulations for these 238 polytopes.
-  sum for k in sort keys Ts list #Ts#k
+  sum for k in sort keys Ts list #Ts#k -- 526 total for all 244 polytopes
 
 -- This function is the longest one...  It takes 552 seconds...
 RZ = ZZ[x,y,z]
 elapsedTime tops = hashTable for i in keys Ts list i => (
     ts := Ts#i;
+    if member(i, nonTorsionFrees) then continue;
+    print i;
     for X in ts list elapsedTime (
         t := topologicalData(X, RZ);
         {t#"c2", t#"cubic intersection form", t#"h11", t#"h21"}
