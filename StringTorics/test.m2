@@ -1,3 +1,31 @@
+///
+  -- Checking on the interface of the package.
+-*
+  restart
+  needsPackage "StringTorics"
+*-
+  debug needsPackage "StringTorics"
+  topes = kreuzerSkarke(5, Limit => 10000);
+  #topes == 4990
+  A = matrix topes_40 -- this will be vertices of a polytope in the M lattice 
+  -- We need to get to a triangulation of the dual polytope...
+  P = reflexivePolytope A
+  -- dual oo -- needs to be available.
+  X = makeCY P
+  -- X = calabiYau(A, Lattice => "M") -- A must define a reflexive polytope.
+
+  V = ambient X
+  aX = abstractVariety(X, base(a,b,c,d,e))
+  intersectionRing aX -- defines integral.
+  intersectionRing V -- defines integral.
+  RZ = ZZ[s_1..s_5]
+  topX = topologicalData(X, RZ)
+  cubicForm topX
+  -- isFavorable X -- and also allow a Polyhedron? Or a ReflexivePolytope?
+  
+  regularFineStarTriangulation what?
+///
+
 TEST ///
 -*
   restart
@@ -1158,4 +1186,107 @@ TEST ///
   C' == phi1 C
   netList {L, L', phi1 L, phi1 L'}
   
+///
+
+
+TEST ///
+  -- Favorable h11=5 polytope.
+-*
+  restart
+*-  
+  needsPackage "StringTorics"
+  topes = kreuzerSkarke(5, Limit => 50);
+  
+  A = matrix topes_3
+  P = convexHull A  
+  assert isReflexive P
+  h11OfCY P == 5
+  h11OfCY polar P == 29
+  h21OfCY P == 29
+  assert isFavorable P
+  assert not isFavorable polar P
+
+  P2 = polar P
+  vertices P2
+  transpose matrix latticePointList P2
+  netList annotatedFaces P2  
+
+  V = reflexiveToSimplicialToricVariety P
+  classGroup V
+  transpose matrix degrees ring V
+  elapsedTime Qs = for tope in topes list reflexivePolytope matrix tope;
+  Qs/isFavorable -- takes .1 - .2 seconds per polytope.  Why so long?
+  favorables = positions(Qs, isFavorable)
+
+  -- also, for Qs#3, it seems like there is an interior point to a 2-face with genus > 0 ??
+  Q = Qs#3
+  X = makeCY Q
+  Xs = findAllFRSTs Q
+  RZ = ZZ[a,b,c,d,e]
+  elapsedTime   Xs/(X -> topologicalData(X, RZ))
+  unique oo
+  for L in o48 list L#0 => unique L#1
+  for L in oo list # L#1
+  
+  elapsedTime Xs = for i in favorables list i => findAllFRSTs Qs#i
+  for L in Xs list L#0 => for X in L#1 list topologicalData(X, RZ)
+  
+  elapsedTime labelledXs = flatten for i in favorables list (
+      Xs = findAllFRSTs Qs#i;
+      for j from 0 to #Xs - 1 list (i,j) => Xs#j
+  
+  -- compute all of the topological data.      
+  
+  RQ = QQ (monoid RZ)  
+  for x in o59 list elapsedTime betti res ideal jacobian sub(x, RQ)
+///
+
+TEST ///
+  -- Non favorable example.
+  -- Either implement functionality for this situation, or give reasonable error messages!
+  -- XXX start here Aug 2022.
+  -- this is an h11=5 polytope.  Let's make sure everything seems ok with it 
+  -- reason: it is seemingly becoming an h11=4 polytope?
+  -- Actually: it is a torsion grading.
+-*
+  restart
+*-  
+  needsPackage "StringTorics"
+  topes = kreuzerSkarke(5, Limit => 50);
+  A = matrix topes_1
+  P = convexHull A  
+  assert isReflexive P
+  h11OfCY P == 5
+  h11OfCY polar P == 29
+  h21OfCY P == 29
+
+  P2 = polar P
+  vertices P2
+  latticePoints P2
+  netList annotatedFaces P2  
+  methods reflexivePolytope
+
+  V = reflexiveToSimplicialToricVariety P
+  degrees ring V
+  classGroup V
+  picardGroup V
+  h11OfCY P
+
+  Q = reflexivePolytope A -- really the dual of A.
+  vertices polytope Q
+  netList annotatedFaces Q -- annotated faces of the dual of A.
+  peek Q.cache
+  assert(h11OfCY Q == 5)
+  assert(h21OfCY Q == 29)
+  assert(dim Q == 4)
+  assert not isFavorable Q -- i.e. whether the dual has any points interior to a 2-face, whose dual does too.
+  isFavorable polar Q
+  X = makeCY Q -- BUG/TODO: should allow CoefficientRing at least...
+  V = ambient X -- TODO: need a way to make this directly from Q...
+  Xs = findAllFRSTs Q -- only one here, not surprisingly...
+  ring V -- BUG: get inscrutable error.  Probably due to a placed GLSM charge matrix...
+  
+  RZ = ZZ[a,b,c,d]
+  topologicalData(X, RZ) -- fails with bad error message.
+  abstractVariety X -- fails for similar reason... (bad glsm matrix added...?)
 ///

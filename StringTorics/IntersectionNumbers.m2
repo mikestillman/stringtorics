@@ -267,7 +267,7 @@ TEST ///
   h11OfCY P
   h21OfCY P
 
-  elapsedTime X = findOneCY P
+  elapsedTime X = makeCY P
   elapsedTime coo = intersectionNumbers X; -- 4 seconds at h11=20.  3.2 seconds of this is computing the intersection ring.
   assert(#coo == 175)
 

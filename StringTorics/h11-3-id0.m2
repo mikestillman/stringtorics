@@ -23,7 +23,7 @@ isSimplicial P
 -- Triangulate it
 (LP,tri) = regularStarTriangulation(3,P2)
 (LP,tri) = regularStarTriangulation(2,P2)
-
+regularStarTriangulation P2
 -- Basics of the normal toric variety
 V = normalToricVariety(LP, tri)
 debugLevel = 2

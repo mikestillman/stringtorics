@@ -1,3 +1,23 @@
+-- TODO (Aug 2022)
+-- some notes:
+--  KSEntry --> Matrix
+--  Matrix --> LP's matrix
+--  LP matrix --> Triangulation (regular, fine, star)
+--  Triangulation --> NormalToricVarity
+--                --> CalabiYauInToric
+--  Matrix --> CalabiYauInToric (same options as NormalToricVarity)
+--  Matrix --> Triangulation
+--             List of Triangulation's
+--             a single FRST
+-- compute cubic and linear forms without h11, h12?  Or are those fast now so it doesn't matter?
+-- rename: findAllFRSTs ReflexivePolytope.
+--   there shoould be a function: `allCYs P` ? This returns a list of CalabiYauInToric's
+
+-- TODO Aug 2022:
+--   - construct the intersection ring in the non-favorable case.
+--   - Given X CalabiYauInToric (or a reflexive polytope Q), find H^2(X, ZZ), H^3(X, ZZ) (i.e. find the torsion).
+--   - For now, require a polytope to be favorable to get the topology...
+
 -- TODO (Nov 2019)
 -- 1. documentation
 -- 2. Extra polyhedral functions (do we still need these?  Probably...)
@@ -32,7 +52,8 @@ newPackage(
             "Polyhedra",
             "ReflexivePolytopesDB",
             "CohomCalg",
-            "Topcom"
+            "Topcom",
+            "Triangulations"
             },
         PackageImports => {
             --"Graphs", 
@@ -44,11 +65,8 @@ export {
     "ReflexivePolytope",
     "CalabiYauInToric",
     "TopologicalDataOfCY3",
-    
-    -- The following should be placed into ReflexivePolytopesDB:
---    "matrixFromKSEntry", -- replace this with matrixFromKS.
---    "matrixFromKS",
 
+    "makeCY",    
     -- Extra polyhedral facilities, for lattice points and faces of a Polyhedron
     -- how much of this shoiuld be exported??
     "vertexMatrix",
@@ -66,12 +84,6 @@ export {
     "Origin",
     "pointConfiguration",
     "regularStarTriangulation",
-    "generateTriangulations",
-    "isFine",
-    "isStar",
-    "volumeVector",
-    "delaunaySubdivision",
-    "delaunayWeights",
     "findAllFRSTs",
     
     -- This set maybe should be included in NormalToricVarieties?
@@ -88,10 +100,9 @@ export {
     "sortTriangulation",
     "matchNonZero",
     "applyPermutation",
-    "affineCircuits",
     "checkFan",
     "sageTri",
-    "Regular",
+--    "Regular",
 
     -- Reflexive polytope code
     -- Uses ReflexivePolytope, a wrapper over Polyhedra package, and containing the info we want/need.
@@ -849,7 +860,7 @@ TEST ///
 -- 
   -- Here, we only consider a triangulation of a reflexive polytope
   
-CalabiYauInToric.synonym = "normal toric variety"
+CalabiYauInToric.synonym = "Calabi-Yau in a normal toric variety"
 CalabiYauInToric.GlobalAssignHook = globalAssignFunction
 CalabiYauInToric.GlobalReleaseHook = globalReleaseFunction
 expression CalabiYauInToric := X -> if hasAttribute (X, ReverseDictionary) 
@@ -883,14 +894,14 @@ findAllFRSTs ReflexivePolytope := List => P -> (
     for t in T list makeCYInToric(P, last t) -- t is a pair: list of vertices, list of list of indices
     )
 
-findOneCY = method()
-findOneCY ReflexivePolytope := CalabiYauInToric => P -> (
+makeCY = method()
+makeCY ReflexivePolytope := CalabiYauInToric => P -> (
     P2 := polytope P;
     (LP,tri) := regularStarTriangulation(dim P2-2,P2);
     if rays P =!= LP then error "I have a lattice point mismatch";
     makeCYInToric(P, tri)
-    )
-    
+    )    
+
 reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
     -- P1 is a reflexive polytope in the M lattice.
     -- Creates a simplicial toric variety via a triangulation
@@ -911,6 +922,21 @@ normalToricVariety CalabiYauInToric := opts -> X -> (
         );
     X.cache.NormalToricVariety
     -- TODO: this fails if the class group is torsion! (Fails: later it gives an inscrutable error...)
+    )
+
+-- TODO: triangulation is used with 2 different pieces of data:
+--  with, without cone point!  Change this to use only one point.
+-- Also: there are 4 matrices one can imagine: A, A0 (A with origin), Ah, A0h...
+-- We need to be consistent about these!
+triangulation CalabiYauInToric := Triangulation => opts -> X -> (
+    if not opts.Homogenize then error "Homogenize flag is not used in this method";
+    if not X.cache#?"triangulation" then (
+        rys := X#"polytope"#"rays";
+        d := #rys#0;
+        B := (transpose matrix rys) | matrix{d:{0}};
+        X.cache#"triangulation" = triangulation(B, for t in X#"triangulation" list append(t, #rys));
+        );
+    X.cache#"triangulation"
     )
 
 ambient CalabiYauInToric := X -> normalToricVariety X
@@ -981,6 +1007,7 @@ TEST ///
   topes = kreuzerSkarke(3, Limit => 50);    
   A = matrix topes_30
   P = reflexivePolytope A
+  X = makeCY P
   findAllFRSTs P
   X = first oo
   
@@ -990,12 +1017,12 @@ TEST ///
   RZ = ZZ[x,y,z]
   elapsedTime topologicalData(X, RZ) -- cache this result?
   
-  dim X
+  dim X -- TODO: not there??
   ambient X -- give the normal toric variety.  Works now.
   abstractVariety X -- give the abstract variety
   abstractVariety(X, base(a,b,c)) -- give the abstract variety
-  inheritedMoriCone X
-  gvInvariants X
+  inheritedMoriCone X -- NOT WRITTEN?
+  gvInvariants(X, DegreeLimit => 10)
 
   aX = abstractVariety X -- TODO: should stash the value...
   IX = intersectionRing aX
@@ -1003,8 +1030,33 @@ TEST ///
   debug StringTorics
   intersectionNumbers X  
 
-  
   -- TODO: line bundles on X, and their cohomology.
+
+  topes = kreuzerSkarke(5, Limit => 50);    
+  for tope in topes list isFavorable convexHull matrix tope
+  A = matrix topes_30
+  P = reflexivePolytope A
+  allfrsts = elapsedTime findAllFRSTs P;
+  assert(# findAllFRSTs P == 6)
+  V = ambient allfrsts#0 
+  isSimplicial V
+  RZ = ZZ[a,b,c,d,e]
+  topologicalData(allfrsts#0, RZ)
+
+  CYs = elapsedTime for tope in topes list (
+      A = matrix tope;
+      P = reflexivePolytope A;
+      elapsedTime findAllFRSTs P
+      )
+
+  allCYs = flatten CYs;
+  RZ = ZZ[a,b,c,d,e]
+  tops0 = for X in allCYs list topologicalData(X, RZ);
+  #tops0 == 142
+  # unique tops0 -- 2 only!!
+  topologicalData(CYs#0#0, RZ)
+
+  -- The following don't work if we are offline...
   
   topes = kreuzerSkarke(6, Limit => 50);    
   A = matrix topes_30
@@ -1021,6 +1073,8 @@ TEST ///
   P = reflexivePolytope A
   --elapsedTime findAllFRSTs P; -- takes some time...  How many are there?  Improve this time...
 
+  -- check polytopes on our list of 50 topes
+  for cy from 0 to #CYs-1 list polytope CYs_cy_0
 ///
 
 ----------------------------------------------------------------  

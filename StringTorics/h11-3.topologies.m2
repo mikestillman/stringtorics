@@ -19,6 +19,7 @@ Ts = hashTable for i in torsionFrees list i => (print i; elapsedTime (
     ))
 
 for i in keys Ts list #Ts#i
+
 {45, 51, 57, 59, 63, 65, 66, 67, 69, 71, 72, 73, 75, 76, 
     77, 78, 79, 81, 83, 84, 85, 87, 89, 91, 93, 95, 99, 
     103, 105, 107, 111, 115, 119, 123, 127, 131, 141, 

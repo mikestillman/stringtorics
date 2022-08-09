@@ -354,6 +354,8 @@ doc ///
                     {-1, 1, -1, 1, 0, -1, 1, 0, 0}}
       naiveIsTriangulation(notSq9, starT)
       topcomIsTriangulation(notSq9, starT)
+      debug Triangulations
+      isTriangulation(notSq9, starT)
     Text
       All regular triangulations fit into a polytope, whose vertices are the 
       GKZ volume vectors (for each lattice point, consider the sum of the volumes
@@ -375,36 +377,12 @@ doc ///
     Example
       T4 = generateTriangulations(sq9, Limit => 100);
       T3 = select(Ts, t -> isFine(sq9,t));
-      assert(set T4 === set T3)
+      assert(set (T4/max) === set T3)
   SeeAlso
     generateTriangulations
     "Topcom::allTriangulations"
 ///
 
-doc ///
-  Key
-    (generateTriangulations, Matrix)
-    [generateTriangulations, Limit]
-    [generateTriangulations, Regular]
-  Headline
-    generate all triangulations with certain properties
-  Usage
-    Ts = generateTriangulations A
-    generateTriangulations(A, Limit => n)
-  Inputs
-    A:Matrix
-        over the integers (or rationals?), whose columns are the
-        points to use
-    Limit => ZZ
-    Regular => Boolean
-  Outputs
-    Ts:List
-        of lists of integers, each such list represents a triangulation
-  Description
-    Text
-  SeeAlso
-    "Topcom::allTriangulations"
-///
 
 ///
   Key
