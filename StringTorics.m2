@@ -741,6 +741,238 @@ reflexivePolytope Polyhedron := ReflexivePolytope => (P2) -> (
     result
     )
 
+---------------------------------------
+-- CYPolytopeData ---------------------
+---------------------------------------
+-- This type can be written to disk, and tries to retain computations computed already.
+-- It does not retain Polyhedron objects, but hopefully it recreates these quickly.
+-- 
+CYPolytopeData = new Type of MutableHashTable
+
+cyPolytopeData = method()
+cyPolytopeData List := CYPolytopeData => vertices -> (
+    P2 := convexHull transpose matrix vertices;
+    cyPolytopeData P2
+    )
+
+-- cyPolytopeData Polyhedron := P2 -> (    
+--     << "----" << endl;
+--     LP := latticePointList P2;
+--     elapsedTime LPdim := for lp in LP list dim(P2, minimalFace(P2, lp));
+--     -- now remove the ones that are in facets (or the origin):
+--     LP = for i from 0 to #LP-1 list if LPdim#i <= 2 then LP#i else continue;
+--     LPdim = for i from 0 to #LP-1 list if LPdim#i <= 2 then LPdim#i else continue;
+--     mLP := transpose matrix LP;
+--     elapsedTime D := transpose syz mLP;
+--     elapsedTime p := findFirstUnitVectors D; -- TODO: p,q computation can be slow!
+--     elapsedTime q := findInvertibleSubmatrix(D, p);
+--     if q === null then error ("oops, can't find a good GLSM matrix"); -- hasn't happened yet. HAS NOW!!
+--     elapsedTime GLSM := (D_q)^-1 * D;
+--     -- the rays of each triangulation should match LP.
+--     new CYPolytopeData from {
+--         "rays" => LP,
+--         "face dimensions" => LPdim,
+--         "glsm" => entries transpose GLSM,
+--         "basis indices" => q,
+--         "N polytope" => P2,
+--         elapsedTime "M polytope" => polar P2
+--         }
+--     )
+
+cyPolytopeData Polyhedron := P2 -> (    
+    LP := latticePointList P2;
+    elapsedTime LPdim := for lp in LP list dim(P2, minimalFace(P2, lp));
+    -- now remove the ones that are in facets (or the origin):
+    LP = for i from 0 to #LP-1 list if LPdim#i <= 2 then LP#i else continue;
+    LPdim = for i from 0 to #LP-1 list if LPdim#i <= 2 then LPdim#i else continue;
+    cyData := new CYPolytopeData from {
+        "rays" => LP,
+        "face dimensions" => LPdim
+        };
+    cyData
+    )
+
+-- todo: translation function: {1, 2, 3, 6} ==> "1 2 3 6" (and viceversa)
+-- todo: translation function: {{1,3},{4,7},{6,7,8}} ==> "1 3;4 7;6 7 8;" or "1 3;4 7;6 7 8" (white space is not relevant after or before a ;)
+-- Format
+-- CYPolytopeData
+--   id: 12
+--   rays: 1 0 0; 1 0 -1; 1 1 1
+--   face dimensions: 0 0 0
+--   glsm: 1 1 1; 1 2 3
+--   basis indices: 0 1 2 3
+--   h11: 5
+--   h21: 20
+--   favorable: true
+
+-- Then need to be able to set fields
+--
+-- Need a isWellFormed function.  Checks that the correct fields are
+-- present, and the lengths of the various integer vectors and lists
+-- are compatible.
+
+
+CYPolytopeDataFields = {
+    "id" => {value, toString, ZZ},
+    "rays" => {value, toString, List},
+    "face dimensions" => {value, toString, List},
+    "favorable" => {value, toString, Boolean},
+    "h11" => {value, toString, ZZ},
+    "h21" => {value, toString, ZZ},
+    "basis indices" => {value, toString, List},
+    "glsm" => {value, toString, List},
+    "annotated faces" => {value, toString, List}
+    }
+CYPolytopeDataFieldsHash = hashTable CYPolytopeDataFields
+CYDataFields = CYPolytopeDataFields/first
+
+writeCYPolytopeData = method()
+-- Older:
+-- writeCYPolytopeData CYPolytopeData := String => (Q) -> (
+--     s1 := "CYPolytopeData\n";
+--     strs := for k in keys Q list (
+--         if not CYPolytopeDataFieldsHash#?k then (
+--             << "ignoring field " << k << endl;
+--             continue; -- should silently ignore this field eventually?
+--             );
+--         writerFunction := CYPolytopeDataFieldsHash#k#1;
+--         "  " | k | ":" | writerFunction(Q#k) | "\n"
+--         );
+--     strs = prepend(s1, strs);
+--     concatenate strs
+--     )
+
+writeCYPolytopeData CYPolytopeData := String => (Q) -> (
+    s1 := "CYPolytopeData\n";
+    strs := for k in CYDataFields list (
+        if not Q#?k then continue;
+        writerFunction := CYPolytopeDataFieldsHash#k#1;
+        "  " | k | ":" | writerFunction(Q#k) | "\n"
+        );
+    strs = prepend(s1, strs);
+    concatenate strs
+    )
+
+getKeyPair = method()
+getKeyPair String := Sequence => str -> (
+    -- first remove leading space
+    -- now separate via :
+    str1 := replace("^ *", "", str);
+    result := separate(":", str1);
+    if #result != 2 then error("expected a key and a value for "|str);
+    toSequence result
+    )
+
+readCYPolytopeData = method()
+readCYPolytopeData String := CYPolytopeData => str -> (
+    L := lines str;
+    if L#0 != "CYPolytopeData" then error "string is not in proper format";
+    fields := for i from 1 to #L-1 list (
+        (k, rest) := getKeyPair L#i;
+        if not CYPolytopeDataFieldsHash#?k then error("unexpected field "|k);
+        keyfcns := CYPolytopeDataFieldsHash#k;
+        val := keyfcns#0 rest;
+        if not instance(val, keyfcns#2) then error("expected type "|toString keyfcns#2);
+        k => val
+        );
+    new CYPolytopeData from fields
+    )
+
+cySetGLSM = method()
+cySetGLSM CYPolytopeData := (cyData) -> (
+    if cyData#?"glsm" then return;
+    mLP := transpose matrix cyData#"rays";
+    elapsedTime D := transpose syz mLP;
+    elapsedTime p := findFirstUnitVectors D; -- TODO: p,q computation can be slow!
+    elapsedTime q := findInvertibleSubmatrix(D, p);
+    if q === null then error ("oops, can't find a good GLSM matrix"); -- hasn't happened yet. HAS NOW!!
+    elapsedTime GLSM := (D_q)^-1 * D;
+    cyData#"glsm" = entries transpose GLSM;
+    cyData#"basis indices" = q
+    )
+
+cySetH11H21 = cyData -> (
+    -- this version is only for CY 3-fold hypersurfaces...
+    -- P:ReflexivePolytope
+    P := polytope cyData;
+    A := annotatedFaces P; -- polytope on N side.
+    A0 := annotatedFaces(0, P);
+    A1 := annotatedFaces(1, P);
+    A2 := annotatedFaces(2, P);
+    A3 := annotatedFaces(3, P);
+    npM := A/(x -> x#4)//sum + 1;
+    npN := A/(x -> x#3)//sum; -- origin is included in the dim 4 face.
+    -- points in facets (on M side) -- this is part of h21
+    -- points in facets (on N side) -- this is part of h11
+    facetInteriorsM := A0/(v -> v#3)//sum;
+    facetInteriorsN := A3/(v -> v#2)//sum;
+    -- points interior to 2-faces (times their genus) (on M-side)
+    -- points interior to 2-faces (times their genus) (on N-side)
+    twoFacesM := A1/(v -> v#2 * v#3)//sum;
+    twoFacesN := A2/(v -> v#2 * v#3)//sum;
+    -- now set the h11, h21.
+    h11 := npN - 5 - facetInteriorsN + twoFacesN;
+    h21 := npM - 5 - facetInteriorsM + twoFacesM;
+    cyData#"h11" = h11;
+    cyData#"h21" = h21;
+    cyData#"favorable" = (twoFacesN == 0);
+    (h11, h21)
+    )
+
+rays CYPolytopeData := List => cyData -> cyData#"rays"
+dim CYPolytopeData := List => cyData -> dim polytope(cyData, "N")
+degrees CYPolytopeData := List => cyData -> (
+    if not cyData#?"glsm" then elapsedTime cySetGLSM cyData;
+    cyData#"glsm"
+    )
+basisIndices = method()
+basisIndices CYPolytopeData := List => cyData -> (
+    if not cyData#?"basis indices" then elapsedTime cySetGLSM cyData;
+    cyData#"basis indices"
+    )
+h11OfCY CYPolytopeData := ZZ => cyData -> (
+    if not cyData#?"h11" then elapsedTime cySetH11H21 cyData;
+    cyData#"h11"
+    )
+h21OfCY CYPolytopeData := ZZ => cyData -> (
+    if not cyData#?"h21" then elapsedTime cySetH11H21 cyData;
+    cyData#"h21"
+    )
+isFavorable CYPolytopeData := Boolean => cyData -> (
+    if not cyData#?"favorable" then elapsedTime cySetH11H21 cyData;
+    cyData#"favorable"
+    )
+annotatedFaces CYPolytopeData := cyData -> (
+    if not cyData#?"annotated faces" then
+      cyData#"annotated faces" = annotatedFaces polytope(cyData, "N")
+    )
+polytope CYPolytopeData := Polyhedron => cyData -> polytope(cyData, "N")
+polytope(CYPolytopeData, String) := Polyhedron => (cyData, which) -> (
+    if which === "N" then (
+        if not cyData#?"N polytope" then (
+            LP := cyData#"rays";
+            LPdim := cyData#"face dimensions";
+            verts := for i from 0 to #LP - 1 list if LPdim#0 == 0 then LP#i else continue;
+            cyData#"N polytope" = convexHull transpose matrix verts
+            );
+        cyData#"N polytope"
+        )
+    else if which === "M" then (
+        if not cyData#?"M polytope" then (
+            cyData#"M polytope" = polar polytope(cyData, "N");
+            );
+        cyData#"M polytope"
+        )
+    else
+      error "expected second argument to be either \"M\" or \"N\""
+    )
+polar CYPolytopeData := cyData -> cyPolytopeData polytope(cyData, "M")
+
+findAllFRSTs CYPolytopeData := List => cyData -> (findAllFRSTs(transpose matrix rays cyData))/last
+
+CYData = new Type of HashTable
+
+------- Remove ReflexivePolytope type and functions --------------------------------
 -- TODO: the following function often fails, due to TODO on above function.
 reflexivePolytope Matrix := ReflexivePolytope => (A) -> (
     reflexivePolytope polar convexHull A
@@ -749,7 +981,6 @@ reflexivePolytope Matrix := ReflexivePolytope => (A) -> (
 degrees ReflexivePolytope := List => P -> P#"glsm"
 rays ReflexivePolytope := List => P -> P#"rays" -- maybe call this something else?
 dim ReflexivePolytope := ZZ => P -> dim polytope P
-basisIndices = method()
 basisIndices ReflexivePolytope := List => P -> P#"basis indices" -- returns the indices into `rays P` 
 
 polar ReflexivePolytope := ReflexivePolytope => P -> reflexivePolytope polytope(P, "M")
@@ -758,7 +989,12 @@ polytope ReflexivePolytope := Polyhedron => P -> polytope(P, "N")
 polytope(ReflexivePolytope, String) := Polyhedron => (P, which) -> (
     -- which is either "M" or "N"
     if which === "M" then P.cache#"M polytope"
-    else if which === "N" then P.cache#"N polytope"
+    else if which === "N" then (
+        if not P.cache#?"N polytope" then (
+            P.cache#"N polytope" = convexHull P#"vertices"
+            );
+        P.cache#"N polytope" 
+        )
     else error "expected \"M\" or \"N\""
     )
 
