@@ -3,7 +3,7 @@
 --  index each as {polytope#, triangulation#}
 --  construct the list of such polytopes.
 
-debug needsPackage "StringTorics"
+needsPackage "StringTorics"
 
 -- Function: write out all polytopes.
 --           read in all polytopes.
@@ -19,15 +19,13 @@ createPolytopeDatabase(String, List) := (dbfilename, topes) -> (
     -- loop through topes, create CYPolytopeData, populate it, write it to data base.
     elapsedTime for i from 0 to #topes - 1 do elapsedTime (
         << "computing for polytope " << i << endl;
-        A := matrix topes#i;
-        P := convexHull A;
-        P2 := polar P;
-        X := cyPolytopeData P2;
+        V := cyPolytopeData(topes#i, ID => i); -- NOT correct!!! gives the dual...
         -- now fill it with data we want
-        cySetGLSM X;
-        cySetH11H21 X;
-        annotatedFaces X;
-        F#(toString i) = writeCYPolytopeData X;
+        basisIndices V; -- compute them
+        isFavorable V; -- compute h11, h21, favorability.
+        annotatedFaces V; -- compute annotated faces
+        -- now write it
+        F#(toString i) = dump V;
         );
     close F;
     )
@@ -42,6 +40,30 @@ topes = kreuzerSkarke(5, Limit => 10000);
 assert(#topes == 4990)
 createPolytopeDatabase("polytopes-h11-5.dbm", topes)
 
+topes = kreuzerSkarke(5, Limit => 20);
+elapsedTime V = cyPolytopeData(topes_4, ID => 4)
+str = dump V
+V = cyPolytopeData(str, ID => 4)
+assert(h11OfCY V == 5)
+assert(h21OfCY V == 29)
+assert isFavorable V
+V1 = cyPolytopeData(dump V, ID => 4)
+assert(V === V1) -- note that the cache's differ.
+dump V
+
+Ts = findAllFRSTs V
+X = cyData(V, Ts_0, ID => 0)
+dump X
+cyData(dump X, i -> V)
+
+X#"polytope data"
+dump X#"polytope data"
+createPolytopeDatabase("test-polytopes-h11-5.dbm", topes)
+F = openDatabase "test-polytopes-h11-5.dbm" -- or also open it for writing?
+F#"10"
+peek cyPolytopeData F#"10"
+close F
+
 F = openDatabase "polytopes-h11-5.dbm" -- or also open it for writing?
 F#"10"
 close F
@@ -53,7 +75,7 @@ findAllFRSTs Q
 close F
 
 F = openDatabase "polytopes-h11-5.dbm" -- or also open it for writing?
-elapsedTime Qs = for i from 0 to 4989 list readCYPolytopeData F#(toString i); -- 8 sec to read them all...
+elapsedTime Qs = for i from 0 to 4989 list cyPolytopeData F#(toString i); -- 8 sec to read them all... now 3.25 secon...
 close F
 Ts = Qs/(Q -> elapsedTime findAllFRSTs Q);
 
