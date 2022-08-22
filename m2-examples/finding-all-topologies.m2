@@ -3,7 +3,8 @@
 --  index each as {polytope#, triangulation#}
 --  construct the list of such polytopes.
 
-needsPackage "StringTorics"
+debug needsPackage "StringTorics"
+
 
 -- Function: write out all polytopes.
 --           read in all polytopes.
@@ -51,10 +52,13 @@ V1 = cyPolytopeData(dump V, ID => 4)
 assert(V === V1) -- note that the cache's differ.
 dump V
 
+makeCY V
+
 Ts = findAllFRSTs V
 X = cyData(V, Ts_0, ID => 0)
 dump X
 cyData(dump X, i -> V)
+
 
 X#"polytope data"
 dump X#"polytope data"
@@ -76,12 +80,35 @@ close F
 
 F = openDatabase "polytopes-h11-5.dbm" -- or also open it for writing?
 elapsedTime Qs = for i from 0 to 4989 list cyPolytopeData F#(toString i); -- 8 sec to read them all... now 3.25 secon...
+tally for Q in Qs list (h11OfCY Q, h21OfCY Q)
 close F
 Ts = Qs/(Q -> elapsedTime findAllFRSTs Q);
 
+-- Analyze one set of triangulations
+F = openDatabase "polytopes-h11-5.dbm"
+elapsedTime Qs = for i from 0 to 4989 list cyPolytopeData F#(toString i); -- 8 sec to read them all... now 3.25 secon...
+close F
+Q = first select(Qs, Q -> h21OfCY Q == 20)
+Ts = findAllFRSTs Q;
+Xs = for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i);
+assert(#Xs == 142)
 
-F#"3000"
-
+X = Xs_0
+RZ = ZZ[a,b,c,d,e]
+isFavorable Q
+topologicalData (X, RZ)
+cubicForm oo
+elapsedTime topXs = unique for X in Xs list topologicalData(X, RZ);
+H = partition(X -> topologicalData(X, RZ), Xs);
+F1 = cubicForm topXs#0
+F2 = cubicForm topXs#1
+ideal gens gb saturate(ideal jacobian F1, ideal(a,b,c,d,e))
+ideal gens gb saturate(ideal jacobian F2, ideal(a,b,c,d,e))
+RQ = QQ(monoid RZ)
+saturate ideal jacobian sub(F1, RQ) -- smooth
+saturate ideal jacobian sub(F2, RQ) -- smooth
+minimalBetti inverseSystem sub(F1, RQ)
+minimalBetti inverseSystem sub(F2, RQ)
 -- use the following one to get everything working
 topes = kreuzerSkarke(5, Limit => 30);
 
