@@ -205,6 +205,11 @@ intersectionNumbers CalabiYauInToric := List => X -> (
         if a === 0 then continue else t => a
         )
     )
+
+intersectionNumbers CYData := X -> (
+    intersectionNumbersOfCY(ambient X, basisIndices X)
+    )
+
     
 TEST ///
   -- Let's test the basis intersection numbers code at slightly higher h11...

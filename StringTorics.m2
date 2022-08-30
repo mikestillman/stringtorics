@@ -72,6 +72,7 @@ export {
     "ID",
     "cyPolytopeData",
     "dump",
+    "label",
     
     "cyData",
     "makeCY",
@@ -94,6 +95,10 @@ export {
     "pointConfiguration",
     "regularStarTriangulation",
     "findAllFRSTs",
+    "findAllCYs",
+    "findAllConnectedStarFine",
+    "findStarFineGraph",
+    "restrictTriangulation", -- restrict triangulation to each 2-face
     
     -- This set maybe should be included in NormalToricVarieties?
     "singularCones",
@@ -128,6 +133,7 @@ export {
     "gvInvariants",
     "gvCone",
     "partitionGVConeByGV",
+    "findLinearMaps",
 
     "invariants", -- really in the topology section...
     
@@ -234,6 +240,86 @@ load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2")
 load (currentFileDirectory | "StringTorics/triangulations-code.m2")
 
+  findAllConnectedStarFine = method()
+  findAllConnectedStarFine Triangulation := (T) -> (
+      stars := new MutableHashTable;
+      stars#T = 0;
+      starcount := 1;
+      oldTODO := {T};
+      radius := 0;
+      while #oldTODO > 0 do (
+          radius = radius + 1;
+          newTODO := flatten for t1 in oldTODO list for n in neighbors t1 list (
+              oldone := stars#t1;
+              t := n#1;
+              if isStar t and not stars#?t and isRegularTriangulation t then(
+                  << "adding new triangulation " << starcount << " at radius " << radius << " with circuit " << n#0 << " from " << oldone << endl;
+                  stars#t = starcount;
+                  starcount = starcount + 1;
+                  t
+                  )
+              else continue
+              );
+          oldTODO = newTODO;
+          );
+      keys stars
+      )
+
+  findStarFineGraph = method()
+  findStarFineGraph Triangulation := (T) -> (
+      -- this version returns the determined graph of the FRST's.
+      -- 3 things are returned:
+      --   1. a list of triangulations
+      --   2. a hash table: for each triangulation index: key is a list of {tri#, affine circuit used to get to that}
+      stars := new MutableHashTable;
+      edges := new MutableList;      
+      stars#T = 0;
+      starcount := 1;
+      oldTODO := {T};
+      radius := 0;
+      while #oldTODO > 0 do (
+          radius = radius + 1;
+          newTODO := flatten for t1 in oldTODO list for n in neighbors t1 list (
+              newOneIsNew := false;
+              oldone := stars#t1;
+              t := n#1;
+              alreadyThere := stars#?t;
+              if not alreadyThere then (
+                  if isStar t and isRegularTriangulation t then (
+                      stars#t = starcount;
+                      starcount = starcount + 1; 
+                      newOneIsNew = true;
+                      )
+                  else continue
+                  ); -- this is the case when we don't need to add an edge, nor place tri onto the newTODO list.
+              -- at this point both t and oldone are good. So let's add an edge.
+              edges#(#edges) = {oldone, stars#t, n#0};
+              if newOneIsNew then t else continue
+              );
+          oldTODO = newTODO;
+          );
+      starsInv := hashTable for k in keys stars list stars#k => k;
+      starsList := for i from 0 to starcount-1 list starsInv#i;
+      (starsList, new List from edges)
+      )
+
+restrictTriangulation = method()
+restrictTriangulation CYData := HashTable => (X) -> (
+    -- given X, we use its annotated faces and its triangulation, to write down the triangulations of the 2-faces
+    -- of the corresponding reflexive polytope in the N lattice side.
+    Q := cyPolytopeData X;
+    F := annotatedFaces Q;
+    twofaces := for x in F list if x#0 =!= 2 then continue else {x#1, x#2};
+    T := X#"triangulation"; -- FIXME: should be a method to get this.  triangulation X diesn't work...
+    for t2 in twofaces list (
+        a := set t2#1; -- these are the indices we want.
+        atri := sort unique for t in T list (
+            b := sort toList(a * set t);
+            if #b == 3 then b else continue
+            );
+        append(t2, atri)
+        )
+    )
 -------------------------------------------------
 -- Intersection numbers for Calabi-Yau 3-folds --
 -------------------------------------------------
@@ -980,6 +1066,12 @@ polar CYPolytopeData := cyData -> cyPolytopeData polytope(cyData, "M")
 
 findAllFRSTs CYPolytopeData := List => cyData -> (findAllFRSTs(transpose matrix rays cyData))/last
 
+findAllCYs = method()
+findAllCYs CYPolytopeData := List => Q -> (
+    Ts := findAllFRSTs Q;
+    for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i)
+    )
+
 --------------------------------------------------------------
 -- CYData (soon to change back to CalabiYauInToric? ----------
 --------------------------------------------------------------
@@ -1099,10 +1191,15 @@ triangulation CYData := Triangulation => opts -> X -> (
 
 cyPolytopeData CYData := opts -> X -> X#"polytope data"
 ambient CYData := X -> normalToricVariety X
+dim CYData := X -> dim ambient X - 1
 polytope CYData := X -> polytope cyPolytopeData X
 polytope(CYData, String) := (X, which) -> polytope(cyPolytopeData X, which)
 basisIndices CYData := List => X -> basisIndices cyPolytopeData X
 degrees CYData := List => X -> degrees cyPolytopeData X
+
+label = method()
+label CYPolytopeData := Q -> if Q.cache#?"id" then Q.cache#"id" else ""
+label CYData := X -> (label cyPolytopeData X, if X.cache#?"id" then X.cache#"id" else "")
 
 abstractVariety CYData := opts -> X -> (
     -- Store this with X.
@@ -1433,96 +1530,15 @@ hh(Sequence, CYPolytopeData) := (pq, Q) -> (
 
 hh(Sequence, CYData) := (pq, X) -> hh^pq cyPolytopeData X
 
---h11 CalabiYauInToric := X -> h11OfCY polytope X
---h21 CalabiYauInToric := X -> h21OfCY polytope X
 c2 TopologicalDataOfCY3 := T -> T#"c2"
 cubicForm TopologicalDataOfCY3 := T -> T#"cubic intersection form"
 
 TEST ///
--- XXX
 -*
   restart
   needsPackage "StringTorics"
 *-  
-  topes = kreuzerSkarke(3, Limit => 50);    
-  A = matrix topes_30
-  P = reflexivePolytope A
-  X = makeCY P
-  findAllFRSTs P
-  X = first oo
-  
-  h11OfCY polytope P
-  elapsedTime polar polytope P  
-  h21OfCY polytope P  
-  RZ = ZZ[x,y,z]
-  elapsedTime topologicalData(X, RZ) -- cache this result?
-  
-  dim X -- TODO: not there??
-  ambient X -- give the normal toric variety.  Works now.
-  abstractVariety X -- give the abstract variety
-  abstractVariety(X, base(a,b,c)) -- give the abstract variety
-  toricMoriCone X 
-  gvInvariants(X, DegreeLimit => 10)
-
-  aX = abstractVariety X -- TODO: should stash the value...
-  IX = intersectionRing aX
-  
-  debug StringTorics
-  intersectionNumbers X  
-
-  -- TODO: line bundles on X, and their cohomology.
-
-  topes = kreuzerSkarke(5, Limit => 50);    
-  for tope in topes list isFavorable convexHull matrix tope
-  A = matrix topes_30
-  P = reflexivePolytope A
-  allfrsts = elapsedTime findAllFRSTs P;
-  assert(# findAllFRSTs P == 6)
-  V = ambient allfrsts#0 
-  isSimplicial V
-  RZ = ZZ[a,b,c,d,e]
-  topologicalData(allfrsts#0, RZ)
-
-  CYs = elapsedTime for tope in topes list (
-      A = matrix tope;
-      P = reflexivePolytope A;
-      elapsedTime findAllFRSTs P
-      )
-
-  allCYs = flatten CYs;
-  RZ = ZZ[a,b,c,d,e]
-  tops0 = for X in allCYs list topologicalData(X, RZ);
-  #tops0 == 142
-  # unique tops0 -- 2 only!!
-  topologicalData(CYs#0#0, RZ)
-
-  -- The following don't work if we are offline...
-  
-  topes = kreuzerSkarke(6, Limit => 50);    
-  A = matrix topes_30
-  P = reflexivePolytope A
-  assert(# findAllFRSTs P == 8)
-
-  A = matrix topes_40
-  P = reflexivePolytope A
-  elapsedTime findAllFRSTs P -- takes longer than I would like...
-  assert(#oo == 36) -- not sure if this is correct, but checking for possible change.
-
-  topes = kreuzerSkarke(8, Limit => 50);    
-  A = matrix topes_30
-  P = reflexivePolytope A
-  --elapsedTime findAllFRSTs P; -- takes some time...  How many are there?  Improve this time...
-
-  -- check polytopes on our list of 50 topes
-  for cy from 0 to #CYs-1 list polytope CYs_cy_0
-///
-
-TEST ///
--- YYY
--*
-  restart
-  needsPackage "StringTorics"
-*-  
+  -- Test the routines of this package on the example X given here (h11=3, h12=69)
   topes = kreuzerSkarke(3, Limit => 50);    
   A = matrix topes_30
   P = cyPolytopeData topes_30
@@ -1531,72 +1547,49 @@ TEST ///
   X = makeCY P
   findAllFRSTs P
   X = cyData(P, first oo, ID => 0)
+ 
+  assert(hh^(1,1) X == 3)
+  assert(hh^(1,2) X == 69)
+  assert(dim X == 3)
+
+  elapsedTime topologicalData(X, RZ = ZZ[x,y,z]) -- cache this result?
   
-  h11OfCY polytope P
-  elapsedTime polar polytope P  
-  h21OfCY polytope P  
-  RZ = ZZ[x,y,z]
-  elapsedTime topologicalData(X, RZ) -- cache this result?
-  
-  dim X -- TODO: not there??
   ambient X -- give the normal toric variety.  Works now.
-  abstractVariety X -- give the abstract variety
+  aX = abstractVariety X -- give the abstract variety.  -- TODO: should stash the value...?
   abstractVariety(X, base(a,b,c)) -- give the abstract variety
-  toricMoriCone X 
+  rays toricMoriCone X
+  hilbertBasis toricMoriCone X
   gvInvariants(X, DegreeLimit => 10)
 
-  aX = abstractVariety X -- TODO: should stash the value...
   IX = intersectionRing aX
   
-  debug StringTorics
   intersectionNumbers X  
 
-  -- TODO: line bundles on X, and their cohomology.
-
-  topes = kreuzerSkarke(5, Limit => 50);    
-  for tope in topes list isFavorable convexHull matrix tope
-  A = matrix topes_30
-  P = reflexivePolytope A
-  allfrsts = elapsedTime findAllFRSTs P;
-  assert(# findAllFRSTs P == 6)
-  V = ambient allfrsts#0 
-  isSimplicial V
-  RZ = ZZ[a,b,c,d,e]
-  topologicalData(allfrsts#0, RZ)
-
-  CYs = elapsedTime for tope in topes list (
-      A = matrix tope;
-      P = reflexivePolytope A;
-      elapsedTime findAllFRSTs P
-      )
-
-  allCYs = flatten CYs;
-  RZ = ZZ[a,b,c,d,e]
-  tops0 = for X in allCYs list topologicalData(X, RZ);
-  #tops0 == 142
-  # unique tops0 -- 2 only!!
-  topologicalData(CYs#0#0, RZ)
-
-  -- The following don't work if we are offline...
-  
-  topes = kreuzerSkarke(6, Limit => 50);    
-  A = matrix topes_30
-  P = reflexivePolytope A
-  assert(# findAllFRSTs P == 8)
-
-  A = matrix topes_40
-  P = reflexivePolytope A
-  elapsedTime findAllFRSTs P -- takes longer than I would like...
-  assert(#oo == 36) -- not sure if this is correct, but checking for possible change.
-
-  topes = kreuzerSkarke(8, Limit => 50);    
-  A = matrix topes_30
-  P = reflexivePolytope A
-  --elapsedTime findAllFRSTs P; -- takes some time...  How many are there?  Improve this time...
-
-  -- check polytopes on our list of 50 topes
-  for cy from 0 to #CYs-1 list polytope CYs_cy_0
+  -- TODO: add tests for line bundles on X, and their cohomology.
 ///
+
+TEST ///
+-*
+  restart
+  needsPackage "StringTorics"
+*-  
+  topes = kreuzerSkarke(5, Limit => 10);
+  Qs = for i from 0 to #topes-1 list cyPolytopeData(topes#i, ID => i)
+  for tope in topes list isFavorable convexHull matrix tope
+  Q = cyPolytopeData(topes_8, ID => 8)
+  Ts = findAllFRSTs Q  
+  Xs = findAllCYs Q
+
+  for X in Xs list (X#"polytope data".cache#"id", X.cache#"id") -- id of each example.
+  for X in Xs list intersectionNumbers X
+
+  RZ = ZZ[a,b,c,d,e]
+  for X in Xs list topologicalData(X, RZ)
+  assert(# unique oo == 1)
+
+  Vs = Xs/ambient
+  assert all(Vs, isSimplicial)
+///  
 
 ----------------------------------------------------------------  
 -- gvInvariants ------------------------------------------------
@@ -1738,6 +1731,35 @@ partitionGVConeByGV CYData := HashTable => opts -> X -> (
     partition(f -> gv#(toSequence f), gvX)
     )
 
+findLinearMaps = method()
+findLinearMaps(HashTable, HashTable) := List => (gv1, gv2) -> (
+    if sort keys gv1 =!= sort keys gv2 then return {};
+    for k in keys gv1 do if #gv1#k =!= #gv2#k then return {};
+    n := # (first values gv1)_0; -- we should check if all the values are lists of integers of this size.
+    t := symbol t;
+    T := QQ[t_(1,1)..t_(n,n)];
+    M := genericMatrix(T, n, n);
+    -- now we make the ideals for each key, and each permutation.
+    ids := for k in keys gv1 list (
+        perms := permutations(#gv1#k);
+        mat1 := transpose matrix gv1#k;
+        mat2 := transpose matrix gv2#k;
+        for p in perms list (
+            I := trim ideal (M * mat1 - mat2_p); 
+            if I == 1 then continue else I
+            )
+        );
+    topval := ids/(x -> #x - 1);
+    zeroval := ids/(x -> 0);
+    fullIdeals := for a in zeroval .. topval list (
+        J := trim sum for i from 0 to #ids-1 list ids#i#(a#i);
+        if J == 1 then continue else J
+        );
+    Ms := for i in fullIdeals list M % i;
+    --newMs := select(Ms, m -> (d := det m; d == 1 or d == -1));
+    --if any(newMs, m -> support m =!= {}) then << "some M is not reduced to a constant" << endl;
+    Ms
+    )
 TEST ///
 -- XXX
 -*
@@ -1745,10 +1767,12 @@ TEST ///
   needsPackage "StringTorics"
 *-  
   topes = kreuzerSkarke(3, Limit => 50);    
-  Q = cyPolytopeData topes_30
+  Q = cyPolytopeData(topes_30, ID => 30)
   Ts = findAllFRSTs Q
   Xs = for i from 0 to #Ts-1 list cyData(Q, Ts#i, ID => i)
   vertices polytope Q
+  label Q
+  assert((for X in Xs list label X) === {(30, 0), (30, 1)})
   X = Xs#0
   V = ambient X
   assert isSimplicial V
@@ -1823,7 +1847,7 @@ installPackage "StringTorics"
 
 restart
 needsPackage "StringTorics"
-check oo -- currently, tests #8, 10, 12, 15, 16, 17, 25, 27, 28, 29, 30, 31, 32  fail!!
+check oo -- currently, tests #30, 31, 32 fail!! 31 is not really a test, 32 has unimplemented behavior.
 
 -- Generation of some examples
 L = kreuzerSkarke(20, Limit => 100, Access=>"wget")
