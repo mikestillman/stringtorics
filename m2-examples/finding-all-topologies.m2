@@ -5,41 +5,60 @@
 
 debug needsPackage "StringTorics"
 
-
--- Function: write out all polytopes.
---           read in all polytopes.
---           write out all triangulations
---           read in all triangulations.
-
-createPolytopeDatabase = method()
-createPolytopeDatabase(String, List) := (dbfilename, topes) -> (
-    -- open data base file
-    F := openDatabaseOut dbfilename;
-    -- F["info"] = "4990 reflexive polytopes of h11=5"
-    -- F["topes"] = toString topes;
-    -- loop through topes, create CYPolytopeData, populate it, write it to data base.
-    elapsedTime for i from 0 to #topes - 1 do elapsedTime (
-        << "computing for polytope " << i << endl;
-        V := cyPolytopeData(topes#i, ID => i); -- NOT correct!!! gives the dual...
-        -- now fill it with data we want
-        basisIndices V; -- compute them
-        isFavorable V; -- compute h11, h21, favorability.
-        annotatedFaces V; -- compute annotated faces
-        -- now write it
-        F#(toString i) = dump V;
-        );
-    close F;
-    )
 end--
 
 restart
 uninstallAllPackages()
 
+///
+-- Create the h11=3 database.
 restart
 needs "./finding-all-topologies.m2"
-topes = kreuzerSkarke(5, Limit => 10000);
-assert(#topes == 4990)
-createPolytopeDatabase("polytopes-h11-5.dbm", topes)
+topes = kreuzerSkarke(3, Limit => 10000);
+assert(#topes == 244)
+createPolytopeDatabase("polytopes-h11-3.dbm", topes)
+///
+
+///
+  -- Create the h11=4 database.
+  restart
+  needsPackage "StringTorics"
+  topes = kreuzerSkarke(4, Limit => 10000);
+  assert(#topes == 1197)
+  elapsedTime createPolytopeDatabase("polytopes-h11-4.dbm", topes) -- 730 sec
+///
+
+///
+  restart
+  needsPackage "StringTorics"
+  topes = kreuzerSkarke(5, Limit => 10000);
+  assert(#topes == 4990)
+  elapsedTime createPolytopeDatabase("polytopes-h11-5.dbm", topes)
+///
+
+
+
+///
+-- check that it is working: find all the (3,h21) pairs in the table.
+restart
+needsPackage "StringTorics"
+F = openDatabase "polytopes-h11-3.dbm"
+F#"1"
+Qs = for i from 0 to 243 list cyPolytopeData F#(toString i);
+tally for Q in Qs list hh^(2,1) Q -- 42 different h12's...
+///
+
+
+-- check that it is working: find all the (4,h21) pairs in the table.
+restart
+needsPackage "StringTorics"
+F = openDatabase "polytopes-h11-4.dbm"
+Qs = for i from 0 to 1196 list cyPolytopeData F#(toString i);
+tally for Q in Qs list hh^(2,1) Q -- 87 different h12's...
+///
+
+
+
 
 topes = kreuzerSkarke(5, Limit => 20);
 elapsedTime V = cyPolytopeData(topes_4, ID => 4)
@@ -74,7 +93,7 @@ close F
 
 F = openDatabase "polytopes-h11-5.dbm" -- or also open it for writing?
 F#"3000"
-Q = readCYPolytopeData F#"3000"
+Q = cyPolytopeData F#"3000"
 findAllFRSTs Q
 close F
 

@@ -76,6 +76,10 @@ export {
     
     "cyData",
     "makeCY",
+
+    -- Creating databases of polytopes (with precomputed data).
+    
+    "createPolytopeDatabase",
     
     -- Extra polyhedral facilities, for lattice points and faces of a Polyhedron
     -- how much of this shoiuld be exported??
@@ -127,6 +131,8 @@ export {
     -- Topological information 
     "intersectionNumbers",
     "intersectionNumbersOfCY", -- possibly not for export
+    "cubicForm",
+    "c2",
     
     -- gvInvariants
     "toricMoriCone",
@@ -1070,6 +1076,26 @@ findAllCYs = method()
 findAllCYs CYPolytopeData := List => Q -> (
     Ts := findAllFRSTs Q;
     for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i)
+    )
+
+createPolytopeDatabase = method()
+createPolytopeDatabase(String, List) := (dbfilename, topes) -> (
+    -- open data base file
+    F := openDatabaseOut dbfilename;
+    -- F#"info" = "4990 reflexive polytopes of h11=5"
+    -- F#"topes" = toString topes;
+    -- loop through topes, create CYPolytopeData, populate it, write it to data base.
+    elapsedTime for i from 0 to #topes - 1 do elapsedTime (
+        << "computing for polytope " << i << endl;
+        V := cyPolytopeData(topes#i, ID => i); -- NOT correct!!! gives the dual...
+        -- now fill it with data we want
+        basisIndices V; -- compute them
+        isFavorable V; -- compute h11, h21, favorability.
+        annotatedFaces V; -- compute annotated faces
+        -- now write it
+        F#(toString i) = dump V;
+        );
+    close F;
     )
 
 --------------------------------------------------------------

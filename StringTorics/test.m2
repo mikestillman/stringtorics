@@ -1216,6 +1216,54 @@ TEST ///
   needsPackage "StringTorics"
 *-
   topes = kreuzerSkarke(6, Limit => 10)  
+  Q = cyPolytopeData(topes_7, ID => 7)
+  X = makeCY Q
+  assert isFavorable Q
+  elapsedTime Xs = findAllCYs Q;
+  assert(#Xs == 21)
+  PXs = partition(X -> restrictTriangulation X, Xs)
+  assert(#keys PXs == 4) -- at most 4 different topologies
+
+  sampleXs = for k in keys PXs list PXs#k#0; -- a list of 4 CY's that have the 4 different topologies.
+  sampleXsGV = for X in sampleXs list partitionGVConeByGV(X, DegreeLimit => 20)  
+  for p in subsets({0,1,2,3}, 2) list p => findLinearMaps(sampleXsGV#(p#0), sampleXsGV#(p#1))
+
+  -- this shows that 2 of the 4 are likely the same.  We next compute the topology of these 4 X's
+  -- and see if that is in fact the case.
+  
+  -- So now we compute the topologies of the 4 potentially different CY's.
+  RZ = ZZ[x_1..x_6]
+  elapsedTime topOfXs = sampleXs/(X -> topologicalData(X, RZ));
+  debug StringTorics -- FIXME: this should not be needed
+  cubics = topOfXs/cubicForm
+  c2s = topOfXs/c2
+
+  -- each matrix in Ms determines a topological isomrphism of sampleXs#0 and sampleXs#2:
+  Ms = findLinearMaps(sampleXsGV#0, sampleXsGV#2)
+  Ms = Ms/(m -> lift(m, ZZ))
+  assert all(Ms, m -> det m == 1 or det m == -1)
+  phis = for m in Ms list map(RZ, RZ, m)
+  for phi in phis do assert(phi(cubics_0) ==  cubics_2 and phi(c2s_0) == c2s_2)
+
+  -- the others appear that they might be different.
+  -- in fact, we can show that these are not the same, by looking at
+  -- the jacobian locus of each cubic.
+  RQ = QQ[gens RZ]
+  for f in cubics list (fQ = sub(f, RQ); decompose saturate ideal jacobian fQ)
+  netList oo -- shows that 0, 1, 3 are all unique (not related by invertible integral change of basis).
+
+
+
+
+  
+  Qs = for i from 0 to #topes-1 list cyPolytopeData(topes_i, ID => i)
+  Qs/isFavorable
+  -- here we consider one of these only
+  Q = Qs_7  
+  X = cyData(Q, max t1)
+  
+  
+
 
   topes = kreuzerSkarke(7, Limit => 10)  
   topes = kreuzerSkarke(8, Limit => 10)
@@ -1236,35 +1284,6 @@ TEST ///
   gkzVector t1
   volume convexHull A
 
-  -- basically, choose triangulations that increase gkz vector at the origin (the actual volume, eventually).
-  -- keep choosing one that increases this amount the most, until one gets a star triangulation.
-  -- At that point, keep   
-  nb = neighbors t0
-  for i from 0 to #nb-1 list 
-    4! * (gkzVector nb_i_1 - gkzVector t0)
-
-  for i from 0 to #nb-1 list 
-    isRegularTriangulation nb_i_1
-  for x in nb list isRegularTriangulation x#1
-  for x in nb list isFine x#1
-  for x in nb list isStar x#1
-
-
-  4! * (gkzVector nb_0_1 - gkzVector t0)
-  t0 = regFineTriangulation ((transpose (matrix rays Qs_0)) | transpose matrix{{0,0,0,0}})
-  --t0 = regularFineStarTriangulation transpose matrix rays Qs_0
-  --t0 = triangulation(transpose matrix rays Qs_0, t0)
-  isWellDefined t0
-  T = triangulation(A, regularFineStarTriangulation(A, ConeIndex => numcols A - 1))
-  isWellDefined T
-  isStar T
-  isFine T
-  isRegularTriangulation T
-  gkzVector T
-  volume convexHull matrix T == last gkzVector T
-  netList neighbors T
-  matrix for n in neighbors T list gkzVector  n#1
-  
   elapsedTime Ts = allTriangulations(A, Fine => true); -- 387 triangulations this takes quite a while.  Which example has 387?
   elapsedTime aaTs = allTriangulations(A, RegularOnly => false); -- 1278 triangulations
   Ts = Ts/(t -> triangulation(A, t))
@@ -1273,91 +1292,6 @@ TEST ///
   # (Ts/isFine)
   elapsedTime Xs = findAllCYs Qs_7;
   
-  netList neighbors t1
-  netList select(neighbors t1, n -> isStar n#1)
-  stars = new MutableHashTable
-  stars#t1 = 0
-  starcount = 1
-  oldTODO = {t1}  
-  newTODO = flatten for t1 in oldTODO list for n in neighbors t1 list (
-      t := n#1;
-      if isStar t and not stars#?t then(
-          << "adding new triangulation " << starcount << endl;
-          stars#t = starcount;
-          starcount = starcount + 1;
-          t
-          )
-      else continue
-      )
-  starcount
-  oldTODO = newTODO
-
-  oldTODO
-  newTODO
-  
-  findAllConnectedStarFine = method()
-  findAllConnectedStarFine Triangulation := (T) -> (
-      stars := new MutableHashTable;
-      stars#T = 0;
-      starcount := 1;
-      oldTODO := {T};
-      radius := 0;
-      while #oldTODO > 0 do (
-          radius = radius + 1;
-          newTODO := flatten for t1 in oldTODO list for n in neighbors t1 list (
-              oldone := stars#t1;
-              t := n#1;
-              if isStar t and not stars#?t and isRegularTriangulation t then(
-                  << "adding new triangulation " << starcount << " at radius " << radius << " with circuit " << n#0 << " from " << oldone << endl;
-                  stars#t = starcount;
-                  starcount = starcount + 1;
-                  t
-                  )
-              else continue
-              );
-          oldTODO = newTODO;
-          );
-      keys stars
-p      )
-
-  findAllConnectedStarFine = method()
-  findAllConnectedStarFine Triangulation := (T) -> (
-      -- this version returns the determined graph of the FRST's.
-      -- 3 things are returned:
-      --   1. a list of triangulations
-      --   2. a hash table: for each triangulation index: key is a list of {tri#, affine circuit used to get to that}
-      stars := new MutableHashTable;
-      edges := new MutableList;      
-      stars#T = 0;
-      starcount := 1;
-      oldTODO := {T};
-      radius := 0;
-      while #oldTODO > 0 do (
-          radius = radius + 1;
-          newTODO := flatten for t1 in oldTODO list for n in neighbors t1 list (
-              newOneOK := false;
-              oldone := stars#t1;
-              t := n#1;
-              alreadyThere := stars#?t;
-              if not alreadyThere then (
-                  if isStar t and isRegularTriangulation t then (
-                      stars#t = starcount;
-                      starcount = starcount + 1; 
-                      newOneOK = true;
-                      )
-                  else continue
-                  ); -- this is the case when we don't need to add an edge, nor place tri onto the newTODO list.
-              -- at this point both t and oldone are good. So let's add an edge.
-              edges#(#edges) = {oldone, stars#t, n#0};
-              if newOneIsNew then t else continue
-              );
-          oldTODO = newTODO;
-          );
-      starsInv := hashTable for k in keys stars list stars#k => k;
-      starsList := for i from 0 to starcount-1 list starsInv#i;
-      (starsList, new List from edges)
-      )
-
   RZ = ZZ[x_1..x_6]
   Q = Qs_7  
   X = cyData(Q, max t1)
