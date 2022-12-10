@@ -187,25 +187,6 @@ intersectionNumbers(Ring, List) := HashTable => (IX, basisIndices) -> (
         )
     )
 
--- This is the naive version.  We will use this to check correctness
--- of more involved but hopefully faster algorithms
-intersectionNumbers CalabiYauInToric := List => X -> (
-    ind := basisIndices X;
-    elapsedTime IX := intersectionRing abstractVariety X;
-    -- IX: should be a ring produced for Schubert2, having 'integral' function for top degree elements.
-    -- basisIndices is a subList of {0, ..., numgens IX - 1}.
-    -- WARNING: this is cubic in number of generators of IX.  This can be improved,
-    -- using the toric structure of X as a hypersurface in a toric V.
-    -- TODO WARNING: the 3 in here is for 3-folds...!
-    mons := monoms(3, 0, #ind-1);
-    bas := for i in ind list IX_i;
-    for t in mons list (
-        m := integral product(t, i -> bas_i);
-        a := lift(integral product(t, i -> bas_i), ZZ);
-        if a === 0 then continue else t => a
-        )
-    )
-
 intersectionNumbers CYData := X -> (
     intersectionNumbersOfCY(ambient X, basisIndices X)
     )

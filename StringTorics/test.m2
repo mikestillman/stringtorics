@@ -9,9 +9,8 @@
   #topes == 4990
   A = matrix topes_40 -- this will be vertices of a polytope in the M lattice 
   -- We need to get to a triangulation of the dual polytope...
-  P = reflexivePolytope A
-  -- dual oo -- needs to be available.
-  X = makeCY P
+  X0 = cyPolytopeData topes_40
+  X = makeCY X0
   -- X = calabiYau(A, Lattice => "M") -- A must define a reflexive polytope.
 
   V = ambient X
@@ -21,9 +20,7 @@
   RZ = ZZ[s_1..s_5]
   topX = topologicalData(X, RZ)
   cubicForm topX
-  -- isFavorable X -- and also allow a Polyhedron? Or a ReflexivePolytope?
-  
-  regularFineStarTriangulation what?
+  isFavorable cyPolytopeData X
 ///
 
 TEST ///
@@ -156,25 +153,24 @@ needsPackage "StringTorics"
 
   Amat = transpose matrix LP
   tri = regularFineTriangulation Amat
-  naiveIsTriangulation(Amat, tri)
-  topcomIsTriangulation(Amat, tri)
+  assert naiveIsTriangulation tri
+  assert topcomIsTriangulation(Amat, max tri)
   
   -- check what happens if Amat is homoogenized:
   AmatH = Amat || matrix{{8:1}}
-  naiveIsTriangulation(AmatH, tri) -- this should be false...?
-  assert not topcomIsTriangulation(AmatH, tri) -- good! it complains that the index sets are not full dimensional (I think that is good?)
+  naiveIsTriangulation(AmatH, max tri) -- this should be false...? TODO: this is a bug!!
+  assert not topcomIsTriangulation(AmatH, max tri) -- good! it complains that the index sets are not full dimensional (I think that is good?)
   
-  affineCircuits(Amat, tri)
-  T = triangulation(Amat, tri)
-  for x in affineCircuits(Amat, tri) list bistellarFlip(T, x)
-  neighbors T
+  assert(affineCircuits tri == affineCircuits(Amat, max tri))
+  for x in affineCircuits tri list bistellarFlip(tri, x)
+  neighbors tri
   
-  generateTriangulations T
+  generateTriangulations tri
   allTriangulations(Amat, RegularOnly => false, ConnectedToRegular => false, Fine => false)
   
-  generateTriangulations(T, RegularOnly => true)
+  generateTriangulations(tri, RegularOnly => true)
   assert(# allTriangulations Amat == 74)
-  assert(# generateTriangulations(T, RegularOnly => true) == 74)
+  assert(# generateTriangulations(tri, RegularOnly => true) == 74)
 
   -- let's check that this is a triangulation.
   -- part of what we are checking: calls relative to homogenization are correct, and types make sense.
@@ -188,21 +184,21 @@ needsPackage "StringTorics"
           {{1, 7}, {4, 5}}, {{2, 5}, {3, 4}}, {{2, 7}, {4, 6}}, {{3, 7}, {5, 6}}
           }
       )
-  Ts = generateTriangulations(T, RegularOnly => true)
+  Ts = generateTriangulations(tri, RegularOnly => true)
   assert(Ts/isWellDefined//unique == {true})
 
   -- it is possible that another triangulation would be output.
   -- the following is more like possible code to decide if a subset is a triangulation.
   -- It works currently, so I'll keep it...
-  assert(tri == {{0, 1, 2, 3}, {1, 2, 3, 4}, {1, 3, 4, 5}, {2, 3, 4, 6}, {3, 4, 5, 6}, {4, 5, 6, 7}})
+  assert(max tri == {{0, 1, 2, 3}, {1, 2, 3, 4}, {1, 3, 4, 5}, {2, 3, 4, 6}, {3, 4, 5, 6}, {4, 5, 6, 7}})
   for c in circs list (
-      n1 := # select(tri, t -> isSubset(c#0, t));
-      n2 := # select(tri, t -> isSubset(c#1, t));
-      ok := n1 == 0 or n2 == 0 or n1 == #tri or n2 == #tri;
+      n1 := # select(max tri, t -> isSubset(c#0, t));
+      n2 := # select(max tri, t -> isSubset(c#1, t));
+      ok := n1 == 0 or n2 == 0 or n1 == #(max tri) or n2 == #(max tri);
       (n1,n2,ok)
       )
 
-  walls = tri/(x -> subsets(x, #x-1))//flatten
+  walls = tri//max/(x -> subsets(x, #x-1))//flatten
   nfacets = tally walls
   facs = (faces(1,P))/first
   walls = partition(k -> nfacets#k, keys nfacets)
@@ -217,7 +213,7 @@ needsPackage "StringTorics"
   walls#2 -- 6 walls here.  Compute the vector for each.
   matrix {for w in walls#2 list (
       --w = {2,3,4} -- a wall
-      circ := select(tri, t -> isSubset(w, t));
+      circ := select(max tri, t -> isSubset(w, t));
       others := circ/(c -> toList(set c - set w));
       elems := (flatten others) | w;
       print elems;
@@ -293,17 +289,15 @@ TEST ///
   -- XXX
   topes = kreuzerSkarke 3;
   A = matrix topes_30
-  A
-  P = reflexivePolytope A
   Q = cyPolytopeData topes_30
   hh^(1,1) Q
   P1 = polytope(Q, "M")
   P2 = polytope(Q, "N")
   vertices P1
   vertices P2
-  P2 == polytope P
-  findAllFRSTs P
-  Amat = transpose matrix latticePointList polytope P
+  P2 == polytope Q
+  findAllFRSTs P2
+  Amat = transpose matrix latticePointList polytope Q
   assert(Amat == transpose matrix {{-1, -1, 0, 0}, {-1, -1, 0, 1}, {-1, -1, 2, 0}, {-1, 0, 0, 0}, {1, -1, -1, 1}, {1, 2, -1, -1}, {-1, -1, 1, 0}, {0, 0, 0, 0}})
 ///
 
@@ -316,10 +310,10 @@ TEST ///
   Amat = transpose matrix {{-1, -1, 0, 0}, {-1, -1, 0, 1}, {-1, -1, 2, 0}, {-1, 0, 0, 0}, {1, -1, -1, 1}, {1, 2, -1, -1}, {-1, -1, 1, 0}, {0, 0, 0, 0}}
   regularSubdivision(Amat, matrix{{0,0,1,3,6,9,20,30}}) -- seems incorrect.
   TRI = regularFineTriangulation Amat -- is this including the origin automatically?
-  wts = regularTriangulationWeights(Amat, TRI)
+  wts = regularTriangulationWeights TRI
   -- check that this is a triangulation!
   TRI2 = regularSubdivision(Amat, matrix{{2, 4, 2, 0, 0, 0, 0, 0}}) -- good!
-  TRI = TRI/sort//sort
+  TRI = TRI//max/sort//sort
   TRI2 = TRI2/sort//sort
   assert(TRI === TRI2) -- works!
   assert topcomIsTriangulation(Amat, TRI)
@@ -923,15 +917,15 @@ TEST ///
   debug needsPackage "StringTorics"
   A = transpose matrix {{-1,-1,2},{-1,0,1},{-1,1,1},{0,-1,2},{0,1,1},{1,-1,3},{1,0,-1},{1,1,-2}}
   tri = regularFineTriangulation A
-  volumeVector(augmentWithOrigin A,tri)
+  volumeVector(augmentWithOrigin A, max tri)
   P = convexHull A
 
   A = transpose matrix {{-1, 0, -1, -1}, {-1, 0, 0, -1}, {-1, 1, 2, -1}, {-1, 1, 2, 0}, {1, -1, -1, -1}, {1, -1, -1, 1}, {1, 0, -1, 2}, {1, 0, 1, 2}}
   C = transpose matrix latticePointList polar convexHull A
   tri = regularFineTriangulation C
 
-  elapsedTime delaunaySubdivision C -- takes 20 seconds?!
-  isRegularTriangulation(C, tri)
+  elapsedTime delaunaySubdivision C -- takes 20 seconds?! (now 8 seconds)
+  isRegularTriangulation tri
   P2 = polar convexHull A
   regularStarTriangulation P2
   volume P2
@@ -946,11 +940,11 @@ TEST ///
   -- triangulations
   A1 = transpose matrix latticePointList P
   tri = regularFineTriangulation A1
-  isRegularTriangulation(A1,tri)
+  isRegularTriangulation tri
 
   debugLevel = 3
   tri = regularStarTriangulation P
-  normalToricVariety(drop(latticePointList P,-1), tri_1)
+  normalToricVariety(drop(latticePointList P,-1), max tri)
   -- elapsedTime isWellDefined oo -- ouch, pretty long (4/27/20) (96 sec)
 
   -- vertices
@@ -1090,10 +1084,11 @@ TEST ///
   
   ans = toSequence topologyOfCY3(V, basisElems)
   (h11, h21, C, L) = ans
-  hashTable for x in keys H3 list (
-      if isSubset(x, basisElems) then x => H3#x else continue
-      )
 
+  -- What was this supposed to do?
+  -- hashTable for x in keys H3 list (
+  --     if isSubset(x, basisElems) then x => H3#x else continue
+  --     )
 
   (h11, h21, C, L) = toSequence topologyOfCY3(V, basisElems)  
   (h11', h21', C', L') = toSequence topologyOfCY3(V, {0,1,2}, Ring => ring C)  
@@ -1149,7 +1144,7 @@ TEST ///
 
 ///
 
-TEST ///
+///
   -- THIS TEST CURRENTLY FAILS (Aug 2022).
   -- Non favorable example.
   -- Either implement functionality for this situation, or give reasonable error messages!
@@ -1201,7 +1196,7 @@ TEST ///
   abstractVariety X -- fails for similar reason... (bad glsm matrix added...?)
 ///
 
-TEST ///
+///
   -- analyzing the triangulations related to one via bistellar flip.
   -- CURRENT WORK: grabbing all FRST's starting with one.  This test isn't really a test, and currently FAILS.
   -- The method below using bistellar flips seems to work better than topcom.
@@ -1239,11 +1234,11 @@ TEST ///
   c2s = topOfXs/c2
 
   -- each matrix in Ms determines a topological isomrphism of sampleXs#0 and sampleXs#2:
-  Ms = findLinearMaps(sampleXsGV#0, sampleXsGV#2)
+  Ms = findLinearMaps(sampleXsGV#1, sampleXsGV#3)
   Ms = Ms/(m -> lift(m, ZZ))
   assert all(Ms, m -> det m == 1 or det m == -1)
   phis = for m in Ms list map(RZ, RZ, m)
-  for phi in phis do assert(phi(cubics_0) ==  cubics_2 and phi(c2s_0) == c2s_2)
+  for phi in phis do assert(phi(cubics_1) ==  cubics_3 and phi(c2s_1) == c2s_3)
 
   -- the others appear that they might be different.
   -- in fact, we can show that these are not the same, by looking at
@@ -1258,12 +1253,6 @@ TEST ///
   
   Qs = for i from 0 to #topes-1 list cyPolytopeData(topes_i, ID => i)
   Qs/isFavorable
-  -- here we consider one of these only
-  Q = Qs_7  
-  X = cyData(Q, max t1)
-  
-  
-
 
   topes = kreuzerSkarke(7, Limit => 10)  
   topes = kreuzerSkarke(8, Limit => 10)
@@ -1274,7 +1263,7 @@ TEST ///
   A = transpose matrix rays Qs_7
   --A = transpose matrix rays Qs_6
   A = A | transpose matrix{{0,0,0,0}}
-  t0 = regFineTriangulation A
+  t0 = regularFineTriangulation A
   t1 = triangulation(A, fineStarTriangulation(A, max t0, ConeIndex => numcols A - 1))
   isWellDefined t0
   gkzVector t0

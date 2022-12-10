@@ -315,8 +315,8 @@ doc ///
       We first show some functions from Topcom that are useful.
     Example
       t1 = regularFineTriangulation sq9
-      regularTriangulationWeights(sq9, t1)
-      fineStarTriangulation(sq9, t1) -- has central element removed.  Don't do that?
+      regularTriangulationWeights t1
+      fineStarTriangulation(sq9, max t1)
       delaunaySubdivision sq9 -- not a triangulation (4 squares).
       orientedCircuits sq9 -- many of these are not useful when considering only fine triangulations.
     Text
@@ -327,6 +327,7 @@ doc ///
       regularFineStarTriangulation sq9 -- leaves out 8, the index of the origin in sq9.
       Ts = allTriangulations sq9;
       #Ts
+      Ts = Ts/max;
       # select(Ts, t -> isFine(sq9,t))
       # select(Ts, t -> isStar(sq9,t))
       # select(Ts, t -> isStar(sq9,t) and isFine(sq9,t))

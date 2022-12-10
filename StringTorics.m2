@@ -11,7 +11,7 @@
 --             a single FRST
 -- compute cubic and linear forms without h11, h12?  Or are those fast now so it doesn't matter?
 -- rename: findAllFRSTs ReflexivePolytope.
---   there shoould be a function: `allCYs P` ? This returns a list of CalabiYauInToric's
+--   there should be a function: `allCYs P` ? This returns a list of CalabiYauInToric's
 
 -- TODO Aug 2022:
 --   - construct the intersectionNumbers ring in the non-favorable case.
@@ -64,8 +64,8 @@ export {
     -- Types defined here
     "CYPolytopeData",
     "CYData",
-    "ReflexivePolytope",
-    "CalabiYauInToric",
+--    "ReflexivePolytope",
+--    "CalabiYauInToric",
     "TopologicalDataOfCY3",
 
     -- CYPolytopeData, CYData
@@ -80,6 +80,7 @@ export {
     -- Creating databases of polytopes (with precomputed data).
     
     "createPolytopeDatabase",
+    "addToCYDatabase",
     
     -- Extra polyhedral facilities, for lattice points and faces of a Polyhedron
     -- how much of this shoiuld be exported??
@@ -124,7 +125,7 @@ export {
 
     -- Reflexive polytope code
     -- Uses ReflexivePolytope, a wrapper over Polyhedra package, and containing the info we want/need.
-    "reflexivePolytope",
+--    "reflexivePolytope", -- NOT NEEDED ANYMORE?
     "basisIndices",
     "topologicalData",
 
@@ -213,7 +214,10 @@ export {
 
     "FilePrefix",
     "Executable",
-    "Mori"    
+    "Mori",
+    "Count",
+    "Hodge",
+    "NTFE"
     }
 
 --- kludge to access parts of the 'Core'
@@ -225,17 +229,6 @@ ReverseDictionary = value Core#"private dictionary"#"ReverseDictionary";
 -- New types -----------------------
 ------------------------------------
 
-ReflexivePolytope = new Type of HashTable -- contains: data about a reflexive polytope.
-
--- deprecate (or rename CYData --> CalabiYauInToric?
-CalabiYauInToric = new Type of HashTable -- currently a hypersurface, eventually a CI.
-  -- contains ReflexivePolytope, and a triangulation.  
-
--- deprecate this one
-ToricHypersurface = new Type of HashTable
-  -- contains ReflexivePolytope, and a triangulation.  
-  -- TODO: better name? perhaps TriangulatedReflexivePolytope?
-
 TopologicalDataOfCY3 = new Type of HashTable
   -- contains h11, h21, c2, cubic intersection form
 
@@ -243,8 +236,8 @@ CYPolytopeData = new Type of HashTable
 CYData = new Type of HashTable
 
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
-load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2")
-load (currentFileDirectory | "StringTorics/triangulations-code.m2")
+load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- has some util code, but not much.  TODO: clean that up.
+load (currentFileDirectory | "StringTorics/triangulations-code.m2") -- has almost no code any longer, as Triangulations has most of it.
 
   findAllConnectedStarFine = method()
   findAllConnectedStarFine Triangulation := (T) -> (
@@ -315,15 +308,15 @@ restrictTriangulation CYData := HashTable => (X) -> (
     -- of the corresponding reflexive polytope in the N lattice side.
     Q := cyPolytopeData X;
     F := annotatedFaces Q;
-    twofaces := for x in F list if x#0 =!= 2 then continue else {x#1, x#2};
-    T := X#"triangulation"; -- FIXME: should be a method to get this.  triangulation X diesn't work...
+    twofaces := for x in F list if x#0 =!= 2 then continue else {x#1, x#2, x#4};
+    T := X#"triangulation"; -- FIXME: should be a method to get this.  triangulation X doesn't work...
     for t2 in twofaces list (
         a := set t2#1; -- these are the indices we want.
         atri := sort unique for t in T list (
             b := sort toList(a * set t);
             if #b == 3 then b else continue
             );
-        append(t2, atri)
+        {t2#0, t2#1, atri, t2#2}
         )
     )
 -------------------------------------------------
@@ -589,12 +582,14 @@ applyPermutation(List, List) := (P, L) -> sort for f in L list applyPermutation(
         A = A || matrix {for i from 1 to numColumns A list 0};
       A
       )
-  
+
+-- TODO: what should this be returning??  Probably a Triangulation object.
+-- But with or without the cone vertex??
 regularStarTriangulation = method()
 regularStarTriangulation Polyhedron := (P2) -> (
     LP := drop(latticePointList P2, -1);
     A := transpose matrix LP;
-    tri := regularFineTriangulation A;
+    tri := max regularFineTriangulation A;
     -- Now, this is not a star triangulation...  But we think we can make it so in the
     -- following way.
     facetlist := (faceList(dim P2-1, P2))/(f -> latticePointList(P2,f));
@@ -609,7 +604,7 @@ regularStarTriangulation(ZZ,Polyhedron) := (maxdim, P2) -> (
     LP := select(latticePointList P2, lp -> dim(P2, minimalFace(P2, lp)) <= maxdim);
     A := transpose matrix LP;
     A = A | matrix for i from 1 to numRows A list {0};
-    tri := regularFineTriangulation A;
+    tri := topcomRegularFineTriangulation A;
     -- Now, this is not a star triangulation...  But we think we can make it so in the
     -- following way.
     H := latticePointHash P2;
@@ -802,10 +797,10 @@ exampleP111122'44 = () -> (value /// () -> (
            count << " attempt(s)" << endl;
          );
      --<< "Ts = (before selection): " << netList Ts << endl;
-     Ts1 := select(Ts, isStar_A1);
+     Ts1 := select(Ts, isStar);
      --<< "Ts1 = (after): " << netList Ts1 << endl;
-     assert all(Ts1, tri -> all(tri, s -> s#-1 == numcols A));
-     Ts1/(t -> (entries transpose A, t/(s -> drop(s, -1))))
+     assert all(Ts1, tri -> all(max tri, s -> s#-1 == numcols A));
+     Ts1/(t -> (entries transpose A, (max t)/(s -> drop(s, -1))))
      )
  findAllFRSTs Polyhedron := List => (P) -> (
      L := latticePointList P;
@@ -814,41 +809,6 @@ exampleP111122'44 = () -> (value /// () -> (
      A := transpose matrix L;
      findAllFRSTs A
      )
-
-
-
----------------------------------------------
--- ReflexivePolytope ------------------------
----------------------------------------------
-reflexivePolytope = method()
-
--- The following is meant to be an internal method.
-reflexivePolytope(List, List, List) := ReflexivePolytope => (latticePoints, GLSM, basisIndices) -> (
-    -- What should be checked here to validate the input data?
-    new ReflexivePolytope from {
-        symbol cache => new CacheTable,
-        "rays" => latticePoints,
-        "glsm" => GLSM,
-        "basis indices" => basisIndices
-        }
-    )
-
--- TODO: this function needs TLC.  It is useful, but can't always find the 
--- basis indices, or compute D_q^-1...
-reflexivePolytope Polyhedron := ReflexivePolytope => (P2) -> (
-    LP := select(latticePointList P2, lp -> dim(P2, minimalFace(P2, lp)) <= 2);
-    mLP := transpose matrix LP;
-    D := transpose syz mLP;
-    p := findFirstUnitVectors D; -- TODO: p,q computation can be slow!
-    q := findInvertibleSubmatrix(D, p);
-    if q === null then error ("oops, can't find a good GLSM matrix"); -- hasn't happened yet. HAS NOW!!
-    GLSM := (D_q)^-1 * D;
-    -- the rays of each triangulation should match LP.
-    result := reflexivePolytope(LP, entries transpose GLSM, q);
-    result.cache#"N polytope" = P2;
-    result.cache#"M polytope" = polar P2;
-    result
-    )
 
 ---------------------------------------
 -- CYPolytopeData ---------------------
@@ -1078,8 +1038,13 @@ findAllCYs CYPolytopeData := List => Q -> (
     for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i)
     )
 
-createPolytopeDatabase = method()
-createPolytopeDatabase(String, List) := (dbfilename, topes) -> (
+createPolytopeDatabase = method(
+    Options => {
+        "Hodge" => null, -- TODO: not used yet
+        "Count" => null  -- TODO: not used yet
+        })
+
+createPolytopeDatabase(String, List) := opts -> (dbfilename, topes) -> (
     -- open data base file
     F := openDatabaseOut dbfilename;
     -- F#"info" = "4990 reflexive polytopes of h11=5"
@@ -1087,7 +1052,7 @@ createPolytopeDatabase(String, List) := (dbfilename, topes) -> (
     -- loop through topes, create CYPolytopeData, populate it, write it to data base.
     elapsedTime for i from 0 to #topes - 1 do elapsedTime (
         << "computing for polytope " << i << endl;
-        V := cyPolytopeData(topes#i, ID => i); -- NOT correct!!! gives the dual...
+        V := cyPolytopeData(topes#i, ID => i); -- note that the polytope data is really that of the dual to topes#i.
         -- now fill it with data we want
         basisIndices V; -- compute them
         isFavorable V; -- compute h11, h21, favorability.
@@ -1095,7 +1060,31 @@ createPolytopeDatabase(String, List) := (dbfilename, topes) -> (
         -- now write it
         F#(toString i) = dump V;
         );
+    --if opts#"Hodge" =!= null then F#"hodge" = toString(opts.Hodge);
+    --if opts#"Count" =!= null then F#"count" = #topes;
     close F;
+    )
+
+addToCYDatabase = method(Options => {NTFE => false})
+
+addToCYDatabase(String, CYPolytopeData) := opts -> (dbfilename, Q) -> (
+    elapsedTime Xs := findAllCYs Q;
+    << "  " << #Xs << " triangulations total" << endl;
+    if opts.NTFE then (
+        elapsedTime H := partition(restrictTriangulation, Xs);
+        << "  " << #(keys H) << " NTFE triangulations" << endl;
+        Xs = (keys H)/(k -> H#k#0);
+        );
+    F := openDatabaseOut dbfilename;
+    for X in Xs do (
+        F#(toString label X) = dump X;
+        );
+    close F;    
+    )
+addToCYDatabase(String, Database, ZZ) := opts -> (dbfilename, topesDB, i) -> (
+    <<  "-- doing polytope " << i << endl;
+    Q := cyPolytopeData(topesDB#(toString i), ID => i);
+    addToCYDatabase(dbfilename, Q, opts);
     )
 
 --------------------------------------------------------------
@@ -1275,123 +1264,6 @@ topologicalData(CYData, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
 --    gv invariants?
 
 
-
-------- Remove ReflexivePolytope type and functions --------------------------------
--- TODO: the following function often fails, due to TODO on above function.
-reflexivePolytope Matrix := ReflexivePolytope => (A) -> (
-    reflexivePolytope polar convexHull A
-    )
-
-degrees ReflexivePolytope := List => P -> P#"glsm"
-rays ReflexivePolytope := List => P -> P#"rays" -- maybe call this something else?
-dim ReflexivePolytope := ZZ => P -> dim polytope P
-basisIndices ReflexivePolytope := List => P -> P#"basis indices" -- returns the indices into `rays P` 
-
-polar ReflexivePolytope := ReflexivePolytope => P -> reflexivePolytope polytope(P, "M")
-
-polytope ReflexivePolytope := Polyhedron => P -> polytope(P, "N")
-polytope(ReflexivePolytope, String) := Polyhedron => (P, which) -> (
-    -- which is either "M" or "N"
-    if which === "M" then P.cache#"M polytope"
-    else if which === "N" then (
-        if not P.cache#?"N polytope" then (
-            P.cache#"N polytope" = convexHull P#"vertices"
-            );
-        P.cache#"N polytope" 
-        )
-    else error "expected \"M\" or \"N\""
-    )
-
-annotatedFaces ReflexivePolytope := (cacheValue symbol annotatedFaces)(P -> (
-    annotatedFaces polytope(P, "N")
-    ))
-
-annotatedFaces(ZZ, ReflexivePolytope) := (i,P) -> (
-    -- i is the dimension of the face on polytope on the N side...
-    A := annotatedFaces P;
-    for f in A list if f#0 == i then drop(f, 1) else continue
-    )
-
--- internal function to set h11, h21 in P.cache.
-setH11H21 = P -> (
-    -- this version is only for CY 3-fold hypersurfaces...
-    -- P:ReflexivePolytope
-    A := annotatedFaces P; -- polytope on N side.
-    A0 := annotatedFaces(0, P);
-    A1 := annotatedFaces(1, P);
-    A2 := annotatedFaces(2, P);
-    A3 := annotatedFaces(3, P);
-    npM := A/(x -> x#4)//sum + 1;
-    npN := A/(x -> x#3)//sum; -- origin is included in the dim 4 face.
-    -- points in facets (on M side) -- this is part of h21
-    -- points in facets (on N side) -- this is part of h11
-    facetInteriorsM := A0/(v -> v#3)//sum;
-    facetInteriorsN := A3/(v -> v#2)//sum;
-    -- points interior to 2-faces (times their genus) (on M-side)
-    -- points interior to 2-faces (times their genus) (on N-side)
-    twoFacesM := A1/(v -> v#2 * v#3)//sum;
-    twoFacesN := A2/(v -> v#2 * v#3)//sum;
-    -- now set the h11, h21.
-    h11 := npN - 5 - facetInteriorsN + twoFacesN;
-    h21 := npM - 5 - facetInteriorsM + twoFacesM;
-    P.cache#"h11" = h11;
-    P.cache#"h21" = h21;
-    P.cache#"favorable" = (twoFacesN == 0);
-    (h11, h21)
-    )
-
-h11OfCY ReflexivePolytope := ZZ => P -> (
-    if not P.cache#?"h11" then elapsedTime setH11H21 P;
-    P.cache#"h11"
-    )
-
-h21OfCY ReflexivePolytope := ZZ => P -> (
-    if not P.cache#?"h21" then elapsedTime setH11H21 P;
-    P.cache#"h21"
-    )
-
-isFavorable ReflexivePolytope := Boolean => P -> (
-    if not P.cache#?"favorable" then elapsedTime setH11H21 P;
-    P.cache#"favorable"
-    )
-
--- TODO: test that the lattice points, vertices match up...
--- i.e. annotatedFaces align with other aspects(?) of these polyhedra.
-TEST ///
--*
-  restart
-  needsPackage "StringTorics"
-*-  
-  topes = kreuzerSkarke(3, Limit => 50);    
-  A = matrix topes_30
-  convexHull A
-  elapsedTime h11OfCY oo
-  polar convexHull A
-  elapsedTime P = reflexivePolytope A
-  elapsedTime assert(h11OfCY P == 3)
-  elapsedTime assert(h21OfCY P == 69)
-  elapsedTime assert(isFavorable P)
-  netList elapsedTime annotatedFaces P
-  annotatedFaces(4, P)
-  annotatedFaces(3, P)
-  annotatedFaces(2, P)
-  annotatedFaces(1, P)
-  annotatedFaces(0, P)
-  
-  
-  annotatedFaces(0, polytope P)
-  elapsedTime latticePointList polytope P
-  assert(dim P == dim polytope P)
-  rays P
-  latticePoints polytope P
-  elapsedTime transpose matrix latticePointList polytope P -- these should match annotatedFaces.  TEST THIS.
-  transpose matrix rays P -- this matches the non-zero lattice points of P.  Or maybe those not interior to 3-faces.
-  annotatedFaces polytope P
-  elapsedTime assert(h11OfCY P == 3)
-  elapsedTime assert(h21OfCY P == 69)
-  elapsedTime assert isFavorable P
-  -- Q = polar P  -- doesn't work yet for this example.
-///
 ----------------------------------------------------------------
 
 
@@ -1401,46 +1273,6 @@ TEST ///
 -- 
   -- Here, we only consider a triangulation of a reflexive polytope
   
-CalabiYauInToric.synonym = "Calabi-Yau in a normal toric variety"
-CalabiYauInToric.GlobalAssignHook = globalAssignFunction
-CalabiYauInToric.GlobalReleaseHook = globalReleaseFunction
-expression CalabiYauInToric := X -> if hasAttribute (X, ReverseDictionary) 
-    then expression getAttribute (X, ReverseDictionary) else 
-    (describe X)#0
-describe CalabiYauInToric := X -> Describe (expression CalabiYauInToric) (
-      expression "a" , expression 3)
---    expression rays X, expression max X)
-  
-makeCYInToric = (reflexivePolytope, FRSTtriangulation) -> (
-    -- TODO: consistency check for data.
-    new CalabiYauInToric from {
-        symbol cache => new CacheTable,
-        "polytope" => reflexivePolytope,
-        "triangulation" => FRSTtriangulation
-        }
-    )
-
-net CalabiYauInToric := X -> "a Calabi-Yau hypersurface in a simplicial toric variety of dimension " | dim polytope X
-
--- net CalabiYauInToric := T -> net T#"triangulation"
--- CalabiYauInToric#{Standard,AfterPrint} = X -> (
---      << endl;				  -- double space
---      << concatenate(interpreterDepth:"o") << lineNumber << " : "
---      << "a Calabi-Yau hypersurface in a simplicial toric variety of dimension " << 4 << endl;
---      )
-
-findAllFRSTs ReflexivePolytope := List => P -> (
-    T := findAllFRSTs transpose matrix rays P;
-    for t in T do if last t === {} then error "what?!"; -- this should not happen?
-    for t in T list makeCYInToric(P, last t) -- t is a pair: list of vertices, list of list of indices
-    )
-
-makeCY ReflexivePolytope := CalabiYauInToric => P -> (
-    P2 := polytope P;
-    (LP,tri) := regularStarTriangulation(dim P2-2,P2);
-    if rays P =!= LP then error "I have a lattice point mismatch";
-    makeCYInToric(P, tri)
-    )    
 
 reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
     -- P1 is a reflexive polytope in the M lattice.
@@ -1451,63 +1283,6 @@ reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
     P2 := polar P1;
     (LP,tri) := regularStarTriangulation(dim P2-2,P2);
     normalToricVariety(LP,tri,opts)
-    )
-
-normalToricVariety CalabiYauInToric := opts -> X -> (
-    if not X.cache.?NormalToricVariety then X.cache.NormalToricVariety = (
-        P := X#"polytope";
-        T := X#"triangulation";
-        GLSM := transpose matrix P#"glsm";
-        normalToricVariety(rays P, T, opts, WeilToClass => matrix GLSM)
-        );
-    X.cache.NormalToricVariety
-    -- TODO: this fails if the class group is torsion! (Fails: later it gives an inscrutable error...)
-    )
-
--- TODO: triangulation is used with 2 different pieces of data:
---  with, without cone point!  Change this to use only one point.
--- Also: there are 4 matrices one can imagine: A, A0 (A with origin), Ah, A0h...
--- We need to be consistent about these!
-triangulation CalabiYauInToric := Triangulation => opts -> X -> (
-    if not opts.Homogenize then error "Homogenize flag is not used in this method";
-    if not X.cache#?"triangulation" then (
-        rys := X#"polytope"#"rays";
-        d := #rys#0;
-        B := (transpose matrix rys) | matrix{d:{0}};
-        X.cache#"triangulation" = triangulation(B, for t in X#"triangulation" list append(t, #rys));
-        );
-    X.cache#"triangulation"
-    )
-
-ambient CalabiYauInToric := X -> normalToricVariety X
-polytope CalabiYauInToric := X -> X#"polytope"
-basisIndices CalabiYauInToric := X -> basisIndices polytope X
-abstractVariety CalabiYauInToric := opts -> X -> (
-    -- Store this with X.
-    V := ambient X;
-    aX := completeIntersection(V, {-toricDivisor V});
-    abstractVariety(aX, base())
-    )
-abstractVariety(CalabiYauInToric, AbstractVariety) := opts -> (X, pt) -> (
-    -- Store this with X?
-    -- Check: pt is of dimension zero?
-    V := ambient X;
-    aX := completeIntersection(V, {-toricDivisor V});
-    abstractVariety(aX, pt)
-    )
-
-topologicalData(CalabiYauInToric, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
-    V := ambient X;
-    P := polytope X;
-    data := elapsedTime topologyOfCY3(V, P#"basis indices");
-    -- this data above computes intersection numbers for all toric divisors. 
-    -- So we consider only the ones whose indices are contained in basis indices:
-    new TopologicalDataOfCY3 from {
-        "h11" => elapsedTime h11OfCY P,
-        "h21" => elapsedTime h21OfCY P,
-        "c2" => sub(data_3, vars RZ),
-        "cubic intersection form" => sub(data_2, vars RZ)
-        }
     )
 
 c2 = method()
@@ -1677,11 +1452,6 @@ gvInput = (moriGenerators, heftval, GLSM, intersectionnums, degreelimit, prec) -
 
 toricMoriCone = method()
 
--- Not functional...
--- toricMoriCone CalabiYauInToric := Cone => X -> (
---     posHull transpose matrix moriCone X
---     )
-
 toricMoriCone(NormalToricVariety, List) := Cone => (V, basisIndices) -> (
     IV := intersectionRing (abstractVariety V);
     Cs := matrix for x in orbits(V, 1) list (
@@ -1738,10 +1508,6 @@ gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices)
 gvInvariants CYData := HashTable => opts -> X -> (
     gvInvariants(ambient X, basisIndices X, opts)
     )
-
--- gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
---     gvInvariants(ambient X, basisIndices polytope X, opts)
---     )
 
 gvCone = method(Options => options gvInvariants)
 gvCone CYData := Cone => opts -> X -> (
