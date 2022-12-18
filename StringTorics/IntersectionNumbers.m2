@@ -83,7 +83,9 @@ computeToricIntersectionNumbers(Matrix, List) := (A, T2) -> (
         -- TODO: check that x is correct: A_{i}*x == -b?
         if x#0 == 0 then continue else  {i,i,i} => x#0
         );
-    sort join(pairs intnums1, pairs intnums2, pairs intnums3)
+    for x in sort join(pairs intnums1, pairs intnums2, pairs intnums3) list x#0 => x#1
+    --FIXME: this should return a list of {i,j,k} => a, not ({i,j,k},a)
+    -- (to match intersectionNumbers)
     )
 
 -- computeC2: An internal function for computeIntersectionNumbers
@@ -238,13 +240,13 @@ toRingElement(List, Ring) := (f, RZ) -> (
 
 c2Form = method()
 c2Form CYData := RingElement => X -> (
-    RZ := X.cache#"pic ring";
+    RZ := X.cache#"pic ring"; -- FIXME: if not there, it should create the ring.  Need a function: picardRing?
     ((vars RZ) * transpose matrix {c2 X})_(0,0)
     )
 
 cubicForm = method()
 cubicForm CYData := RingElement => X -> (
-    RZ := X.cache#"pic ring";
+    RZ := X.cache#"pic ring"; -- FIXME: if not there, it should create the ring.  Need a function: picardRing?
     toRingElement(intersectionNumbers X, RZ)
     )
 

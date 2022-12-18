@@ -319,7 +319,7 @@ restrictTriangulation CYData := List => (X) -> (
     Q := cyPolytopeData X;
     F := annotatedFaces Q;
     twofaces := for x in F list if x#0 =!= 2 then continue else {x#1, x#2, x#4};
-    T := X#"triangulation"; -- FIXME: should be a method to get this.  triangulation X doesn't work...
+    T := max X; -- triangulation
     for t2 in twofaces list (
         a := set t2#1; -- these are the indices we want.
         atri := sort unique for t in T list (
@@ -1122,7 +1122,10 @@ CYDataFields = {
 CYDataCache = {
     -- first entry: true means it must exist and be in the main hash table
     --   false: it might exist, and is in the cache table.
-    "id" => {value, toString, ZZ}
+    "id" => {value, toString, ZZ},
+    "c2" => {value, toString, List},
+    "intersection numbers" => {value, toString, List},
+    "toric intersection numbers" => {value, toString, List}
     }
 
 cyData = method(Options => {ID => null, Ring => null})
@@ -1201,10 +1204,14 @@ normalToricVariety CYData := opts -> X -> (
     -- TODO: this fails if the class group is torsion! (Fails: later it gives an inscrutable error...)
     )
 
+rays CYData := X -> rays cyPolytopeData X
+max CYData := X -> X#"triangulation"
+
 -- TODO: triangulation is used with 2 different pieces of data:
 --  with, without cone point!  Change this to use only one point.
 -- Also: there are 4 matrices one can imagine: A, A0 (A with origin), Ah, A0h...
 -- We need to be consistent about these!
+-- TODO: do we really need this?
 triangulation CYData := Triangulation => opts -> X -> (
     if not opts.Homogenize then error "Homogenize flag is not used in this method";
     if not X.cache#?"triangulation" then (
@@ -1217,12 +1224,13 @@ triangulation CYData := Triangulation => opts -> X -> (
     )
 
 cyPolytopeData CYData := opts -> X -> X#"polytope data"
-ambient CYData := X -> normalToricVariety X
 dim CYData := X -> dim ambient X - 1
 polytope CYData := X -> polytope cyPolytopeData X
 polytope(CYData, String) := (X, which) -> polytope(cyPolytopeData X, which)
 basisIndices CYData := List => X -> basisIndices cyPolytopeData X
 degrees CYData := List => X -> degrees cyPolytopeData X
+
+ambient CYData := X -> normalToricVariety X -- FIXME: this should be cached!
 
 label = method()
 label CYPolytopeData := Q -> if Q.cache#?"id" then Q.cache#"id" else ""
@@ -1243,6 +1251,7 @@ abstractVariety(CYData, AbstractVariety) := opts -> (X, pt) -> (
     )
 
 --topologicalData = method()
+-- this is the older, alternate version of this function.
 topologicalData(CYData, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
     V := ambient X;
     Q := X#"polytope data";
@@ -1351,10 +1360,10 @@ TEST ///
   -- Test the routines of this package on the example X given here (h11=3, h12=69)
   topes = kreuzerSkarke(3, Limit => 50);    
   A = matrix topes_30
-  P = cyPolytopeData topes_30
+  P = cyPolytopeData(topes_30, ID => 30)
   hh^(1,1) P == 3
   hh^(1,2) P == 69
-  X = makeCY(P, Ring => (RZ = ZZ[x,y,z]))
+  X = makeCY(P, Ring => (RZ = ZZ[x,y,z]), ID => 0)
   -- findAllFRSTs P
   -- X = cyData(P, first oo, ID => 0)
  
@@ -1362,20 +1371,36 @@ TEST ///
   assert(hh^(1,2) X == 69)
   assert(dim X == 3)
   elapsedTime topologicalData X
-  netList restrictTriangulation X
+  dump X
+  dump cyPolytopeData X
+  elapsedTime restrictTriangulation X
+
+  dim X  
+  rays X
+  max X
+  V = ambient X -- give the normal toric variety.  Works now, sort of. Problems though: TODO: cache it, allow options? degrees might be different...
+  rays V === rays X
+  max V === max X
   
+  intersectionNumbers X  
+  toricIntersectionNumbers X
+  c2 X
+  cubicForm X
+  c2Form X
+      
   elapsedTime topologicalData(X, RZ) -- cache this result?
   
   ambient X -- give the normal toric variety.  Works now.
   aX = abstractVariety X -- give the abstract variety.  -- TODO: should stash the value...?
   abstractVariety(X, base(a,b,c)) -- give the abstract variety
-  rays toricMoriCone X
-  hilbertBasis toricMoriCone X
-  gvInvariants(X, DegreeLimit => 10)
-
   IX = intersectionRing aX
   
-  intersectionNumbers X  
+  -- TODO: How is this computed?
+  rays toricMoriCone X
+  hilbertBasis toricMoriCone X
+
+  -- TODO: gvInvariants still goes through intersection ring
+  gvInvariants(X, DegreeLimit => 10)
 
   -- TODO: add tests for line bundles on X, and their cohomology.
 ///
@@ -1655,7 +1680,7 @@ installPackage "StringTorics"
 
 restart
 needsPackage "StringTorics"
-check oo -- currently, tests #30, 31, 32 fail!! 31 is not really a test, 32 has unimplemented behavior.
+check oo -- all tests currently check.
 
 -- Generation of some examples
 L = kreuzerSkarke(20, Limit => 100, Access=>"wget")
