@@ -241,7 +241,6 @@ CYData = new Type of HashTable
 
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- has some util code, but not much.  TODO: clean that up.
-load (currentFileDirectory | "StringTorics/triangulations-code.m2") -- has almost no code any longer, as Triangulations has most of it.
 
   findAllConnectedStarFine = method()
   findAllConnectedStarFine Triangulation := (T) -> (

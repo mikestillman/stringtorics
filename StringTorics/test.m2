@@ -439,8 +439,9 @@ TEST ///
   (fromM2, toM2) = matchNonZero(Amat, Bmat)
 
   Ts = readSageTriangulations sageTri
+  -- checkFan is no longer available.
   --elapsedTime for T in Ts do time checkFan(Bmat, T) -- this takes a while (24 seconds), too long for testing
-  elapsedTime checkFan(Bmat, Ts_5)
+  --elapsedTime checkFan(Bmat, Ts_5)
   applyPermutation(fromM2, allTRIS/max)
 
   -- the following are all in this list
