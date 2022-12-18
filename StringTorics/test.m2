@@ -10,17 +10,23 @@
   A = matrix topes_40 -- this will be vertices of a polytope in the M lattice 
   -- We need to get to a triangulation of the dual polytope...
   X0 = cyPolytopeData topes_40
-  X = makeCY X0
+  X = makeCY(X0, Ring => (RZ = ZZ[s_1..s_5]))
+
   -- X = calabiYau(A, Lattice => "M") -- A must define a reflexive polytope.
 
   V = ambient X
   aX = abstractVariety(X, base(a,b,c,d,e))
   intersectionRing aX -- defines integral.
   intersectionRing V -- defines integral.
-  RZ = ZZ[s_1..s_5]
   topX = topologicalData(X, RZ)
   cubicForm topX
   isFavorable cyPolytopeData X
+  
+  intersectionNumbers X
+  toricIntersectionNumbers X
+  c2 X
+  cubicForm X
+  c2Form X
 ///
 
 TEST ///

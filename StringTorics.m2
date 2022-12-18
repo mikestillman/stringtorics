@@ -131,9 +131,13 @@ export {
 
     -- Topological information 
     "intersectionNumbers",
-    "intersectionNumbersOfCY", -- possibly not for export
-    "cubicForm",
+    "toricIntersectionNumbers",
     "c2",
+    "intersectionForm",
+    "cubicForm",
+    "c2Form",
+    
+    "intersectionNumbersOfCY", -- possibly not for export
     
     -- gvInvariants
     "toricMoriCone",
@@ -302,8 +306,14 @@ load (currentFileDirectory | "StringTorics/triangulations-code.m2") -- has almos
       (starsList, new List from edges)
       )
 
+-- restrictTriangulation: returns a List of
+--   {2-face indices, 
+--    all indices of points in in this 2-face, 
+--    the triangles in this 2-face, 
+--    genus of this face}
+-- TODO: need also a function which returns just: triangles, genus information.
 restrictTriangulation = method()
-restrictTriangulation CYData := HashTable => (X) -> (
+restrictTriangulation CYData := List => (X) -> (
     -- given X, we use its annotated faces and its triangulation, to write down the triangulations of the 2-faces
     -- of the corresponding reflexive polytope in the N lattice side.
     Q := cyPolytopeData X;
@@ -1073,7 +1083,7 @@ addToCYDatabase(String, CYPolytopeData) := opts -> (dbfilename, Q) -> (
     if opts.NTFE then (
         elapsedTime H := partition(restrictTriangulation, Xs);
         << "  " << #(keys H) << " NTFE triangulations" << endl;
-        Xs = (keys H)/(k -> H#k#0);
+        Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
         );
     F := openDatabaseOut dbfilename;
     for X in Xs do (
@@ -1115,7 +1125,7 @@ CYDataCache = {
     "id" => {value, toString, ZZ}
     }
 
-cyData = method(Options => {ID => null})
+cyData = method(Options => {ID => null, Ring => null})
 cyData(CYPolytopeData, List) := opts -> (Q, triang) -> (
     X := new CYData from {
         symbol cache => new CacheTable,
@@ -1123,6 +1133,7 @@ cyData(CYPolytopeData, List) := opts -> (Q, triang) -> (
         "triangulation" => triang
         };
     if opts.ID =!= null then X.cache#"id" = opts.ID;
+    if opts#Ring =!= null then X.cache#"pic ring" = opts#Ring; -- Note: we should check that it is over ZZ, has h^(1,1) variables
     X
     )
 cyData(String, Function) := CYData => opts -> (str, F) -> (
@@ -1141,15 +1152,16 @@ cyData(String, Function) := CYData => opts -> (str, F) -> (
             readFcn := field#1#0;
             if fields#?k then k => readFcn fields#k else error("expected key "|k)
         ));
-    cyData := new CYData from prepend(symbol cache => new CacheTable, required);
+    X := new CYData from prepend(symbol cache => new CacheTable, required);
     -- now read in the cache values (including "id" value, if any)
     for field in CYDataCache do (
         k := field#0;
         readFcn := field#1#0;
-        if fields#?k then cyData.cache#k = readFcn fields#k;
+        if fields#?k then X.cache#k = readFcn fields#k;
         );
-    if opts.ID =!= null then cyData.cache#"id" = opts.ID; -- just for compatibility with other constructors...
-    cyData
+    if opts.ID =!= null then X.cache#"id" = opts.ID; -- just for compatibility with other constructors...
+    if opts#Ring =!= null then X.cache#"pic ring" = opts#Ring; -- Note: we should check that it is over ZZ, has h^(1,1) variables
+    X
     )
 
 dump CYData := String => {} >> opts -> X -> (
@@ -1170,7 +1182,7 @@ dump CYData := String => {} >> opts -> X -> (
     concatenate strs
     )
 
-makeCY = method(Options => {ID => null})
+makeCY = method(Options => {ID => null, Ring => null})
 makeCY CYPolytopeData := CYData => opts -> Q -> (
     P2 := polytope Q;
     (LP,tri) := regularStarTriangulation(dim P2-2,P2);
@@ -1230,7 +1242,7 @@ abstractVariety(CYData, AbstractVariety) := opts -> (X, pt) -> (
     abstractVariety(aX, pt)
     )
 
-topologicalData = method()
+--topologicalData = method()
 topologicalData(CYData, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
     V := ambient X;
     Q := X#"polytope data";
@@ -1284,9 +1296,6 @@ reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
     (LP,tri) := regularStarTriangulation(dim P2-2,P2);
     normalToricVariety(LP,tri,opts)
     )
-
-c2 = method()
-cubicForm = method()
 
 hh(Sequence, TopologicalDataOfCY3) := (pq, T) -> (
     (p,q) := pq;
@@ -1345,15 +1354,17 @@ TEST ///
   P = cyPolytopeData topes_30
   hh^(1,1) P == 3
   hh^(1,2) P == 69
-  X = makeCY P
-  findAllFRSTs P
-  X = cyData(P, first oo, ID => 0)
+  X = makeCY(P, Ring => (RZ = ZZ[x,y,z]))
+  -- findAllFRSTs P
+  -- X = cyData(P, first oo, ID => 0)
  
   assert(hh^(1,1) X == 3)
   assert(hh^(1,2) X == 69)
   assert(dim X == 3)
-
-  elapsedTime topologicalData(X, RZ = ZZ[x,y,z]) -- cache this result?
+  elapsedTime topologicalData X
+  netList restrictTriangulation X
+  
+  elapsedTime topologicalData(X, RZ) -- cache this result?
   
   ambient X -- give the normal toric variety.  Works now.
   aX = abstractVariety X -- give the abstract variety.  -- TODO: should stash the value...?
@@ -1469,6 +1480,11 @@ hilbertBasisGenerators = method()
 hilbertBasisGenerators Cone := List => C -> (
     for x in hilbertBasis C list flatten entries x
     )
+
+-- TODO: make the gvInvariants code not go through NormalToricVarieties.
+--  and use only info obtained from data we have in CYData.
+--  requires: intersectionNumbersOfCY
+--            toricMoriCone
 
 gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices) -> (
     -- Compute intersection numbers for X in V (using this basis)

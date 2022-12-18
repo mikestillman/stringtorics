@@ -1,5 +1,182 @@
 -- Intersection numbers for Calabi-Yau 3-folds
 
+intersectionNumbers = method()
+-- intersectionNumbers = method(Options => {Indices => null}) -- Indices: which elements to keep.
+--   -- these will be reordered 0, 1, ...,, #opts.Indices-1.
+--   -- default for CYData is `basisIndices X`
+
+------------------------
+-- New code, Nov/Dec 2022.
+-- This will replace the older code below, which uses the intersection ring.
+-- However, we want to keep that code to check the results.
+-- Also, the interface is currently totally different.
+--
+-- TODO:
+--   this function should stash its value in X?
+--   we need to stash:
+--    (a) intersectionNumbers (using basis, translating to 0, 1, ...): HashTable, lkeys are triples of ints
+--        and values are integer intersection numbers.
+--    (b) intersectionNumbers (full, using all toric divisors)
+--    (c) c2 (a list of c2.D_(i1), ... where i1, ... is the basis of toric divisors.
+--    (d) c2 (full)
+-- Functions we need here:
+--   the ring RZ should be given when X is created?  If not, M2 will create one?
+--   cubicForm X
+--   c2 X
+--   to/from intersection number tables and cubic form (for testing easily with older code).
+--   computeIntersectionNumbers(A, basis, T2)
+--   computeIntersectionNumbers(X) -- stashes results into X,
+--   intersectionNumbers X -- stashes value if not yet computed.
+--   c2 X -- stashes value if not yet computed.
+--   intersectionNumbers(X, Basis => Full)
+--   c2(X, Basis => Full)
+--   dump(X): should dump these values
+--   cyData(String, ...): should read these values
+--   topology X -- returns TopologicalDataOfCY3: h11, h12, c2, cubicForm.
+
+-- dump: make sure we write out info about c2, intersectionNumbers as well.
+--   and can read these back in.
+--   also write out two face triangulation...
+--
+-- topologicalData: return a type with (h11, h12, intersectionnumbers, c2 list)
+--   no ring involved.
+------------------------
+
+-- toBasisIntersectionNumbers: An internal function for computeIntersectionNumbers
+toBasisIntersectionNumbers = (toricIntersectionNumbers, basIndices) -> (
+    H := hashTable for i from 0 to #basIndices-1 list basIndices#i => i;
+    for t in toricIntersectionNumbers list (
+        if isSubset(t#0, basIndices) then t#0/(a -> H#a)//sort => t#1 else continue
+        )
+    )
+
+-- computeToricIntersectionNumbers: An internal function for computeIntersectionNumbers
+-- this is the workhorse function for computing intersection numbers on X.
+computeToricIntersectionNumbers = method()
+computeToricIntersectionNumbers(Matrix, List) := (A, T2) -> (
+    intnums1 := hashTable flatten for t in T2 list for s in t#2 list s => t#3+1;
+    E := sort unique flatten for t in T2 list flatten for s in t#2 list subsets(s, 2);
+    -- get intersection numbers {i,i,j} or {i,j,j}
+    intnums2 := hashTable flatten for e in E list (
+        (i,j) := toSequence e;
+        -- find intersection numbers for {i,i,j}, {i,j,j}.
+        A1 := A_e;
+        b := sum for k from 0 to numcols A - 1 list (
+            if k == i or k == j then continue else (
+                t := sort{i,j,k};
+                (if intnums1#?t then intnums1#t  else 0) * A_{k}
+                )
+            );
+        x := flatten entries solve(A1,-b); -- this is done over ZZ.  I think that is fine here...
+        -- TODO: check that x is correct: A1*x == -b?
+        select({{i,i,j} => x#0, {i,j,j} => x#1}, x -> x#1 != 0)
+        );
+    -- Now we get the triple intersection numbers.
+    intnums3 := hashTable for i from 0 to numcols A - 1 list (
+        b := sum for k from 0 to numcols A - 1 list (
+            if k == i then continue else (
+                t := sort{i,i,k};
+                (if intnums2#?t then (intnums2#t)  else 0) * A_{k}
+                )
+            );
+        x := flatten entries solve(A_{i},-b); -- this is done over ZZ.  I think that is fine here...
+        -- TODO: check that x is correct: A_{i}*x == -b?
+        if x#0 == 0 then continue else  {i,i,i} => x#0
+        );
+    sort join(pairs intnums1, pairs intnums2, pairs intnums3)
+    )
+
+-- computeC2: An internal function for computeIntersectionNumbers
+computeC2 = method()
+computeC2(List, List) := (toricIntersectionNumbers, basIndices) -> (
+    topval := toricIntersectionNumbers/first/max//max;
+    H := hashTable toricIntersectionNumbers;
+    for a in basIndices list (
+        -- add up all intersection numbers {a,i,j}, i<j
+        sum flatten for i from 0 to topval list for j from i+1 to topval list (
+            t := sort {a,i,j};
+            if H#?t then H#t else continue
+            )
+        )
+    )
+
+-- computeIntersectionNumbers: An internal function for intersectionNumbers. toricIntersectionNumbers, and c2.
+computeIntersectionNumbers = method()
+computeIntersectionNumbers CYData := X -> (
+    if not X.cache#?"toric intersection numbers" then  (
+        V := cyPolytopeData X;
+        basIndices := basisIndices V;
+        A := transpose matrix rays V;
+        T2 := restrictTriangulation X;
+        result := computeToricIntersectionNumbers(A, T2);
+        X.cache#"toric intersection numbers" = result;
+        X.cache#"intersection numbers" = toBasisIntersectionNumbers(result, basIndices);
+        X.cache#"c2" = computeC2(result, basIndices);
+        );
+    --{result, toBasisIntersectionNumbers(result, basIndices)}
+    )
+
+--------------------------------------------
+-- intersection number interface routines --
+--------------------------------------------
+intersectionNumbers CYData := X -> (
+    computeIntersectionNumbers X;
+    X.cache#"intersection numbers"
+    --intersectionNumbersOfCY(ambient X, basisIndices X)
+    )
+
+toricIntersectionNumbers = method()
+toricIntersectionNumbers CYData := X -> (
+    computeIntersectionNumbers X;
+    X.cache#"toric intersection numbers"
+    )
+
+c2 = method();
+c2 CYData := X -> (
+    computeIntersectionNumbers X;
+    X.cache#"c2"
+    )
+
+topologicalData = method()
+topologicalData CYData := TopologicalDataOfCY3 => X -> (
+    -- TODO: this does not consider torision in H_2(X, ZZ) or H_3(X, ZZ)
+    elapsedTime new TopologicalDataOfCY3 from {
+        "h11" => hh^(1,1) cyPolytopeData X,
+        "h21" => hh^(2,1) cyPolytopeData X,
+        "c2" => c2 X,
+        "intersection numbers" => intersectionNumbers X
+        }
+    )
+
+-- maybe: toricIntersectionNumbers, c2, c2Form, intersectionForm.
+--
+-- intersectionNumbers X, intersectionNumbers(X, Full => true), intersectionForm X
+-- c2 X, c2Form X.
+
+-- TODO: if X is not favorable, need to redo the basis, and intersection numbers (and also then the c2 form)
+
+TEST ///
+  restart
+  debug needsPackage "StringTorics"
+  F = openDatabase "polytopes-h11-5.dbm"
+    V = cyPolytopeData F#"1000"
+    close F
+  X = makeCY(V, ID => label V, Ring => (RZ = ZZ[a,b,c,d,e]))
+
+  elapsedTime intersectionNumbers X
+  toRingElement(oo, X.cache#"pic ring")
+  elapsedTime toricIntersectionNumbers X
+  assert(intersectionNumbers X === intersectionNumbersOfCY(ambient X, basisIndices X))
+  elapsedTime c2 X
+  c2Form X
+  cubicForm X
+
+  elapsedTime computeIntersectionNumbers X
+  intersectionNumbersOfCY(ambient X, basisIndices X)
+
+  elapsedTime topologicalData(X, ZZ[a..e])
+///
+
 -----------------------------------------------
 -- Utility functions --------------------------
 -- Used to translate between data formats -----
@@ -37,7 +214,7 @@ multinomial = exp -> (
 
 toCOO = method()
 toCOO RingElement := (F) -> (
-    for f1 in listForm F list (
+    sort for f1 in listForm F list (
         e := first f1; -- exponents
         c := last f1; -- coeff
         d := multinomial e;
@@ -57,6 +234,18 @@ toRingElement(List, Ring) := (f, RZ) -> (
         d := multinomial e;
         d * c * RZ_e
         )
+    )
+
+c2Form = method()
+c2Form CYData := RingElement => X -> (
+    RZ := X.cache#"pic ring";
+    ((vars RZ) * transpose matrix {c2 X})_(0,0)
+    )
+
+cubicForm = method()
+cubicForm CYData := RingElement => X -> (
+    RZ := X.cache#"pic ring";
+    toRingElement(intersectionNumbers X, RZ)
     )
 
 TEST ///
@@ -100,6 +289,12 @@ TEST ///
   toCOO L
   assert(toRingElement(toCOO L, RZ) == L)
 ///
+
+-------------------------------
+-- The code below this is still being used, but the code above should replace it
+-- (But will be used as an alternate method tom compute them
+-------------------------------
+
 
 -- Simple subroutine for finding the list of indices for possible intersections.
 -- e.g. if in the resulting list, {0,1,1} appears, then this will represent the
@@ -169,7 +364,6 @@ TEST ///
 --       would really be nice to work for CI in torics? (still CY's?)
 
 -- Simple code, which expects that we can compute the intersection ring of X.
-intersectionNumbers = method()
 
 -- Remove this version?
 intersectionNumbers(Ring, List) := HashTable => (IX, basisIndices) -> (
@@ -187,9 +381,9 @@ intersectionNumbers(Ring, List) := HashTable => (IX, basisIndices) -> (
         )
     )
 
-intersectionNumbers CYData := X -> (
-    intersectionNumbersOfCY(ambient X, basisIndices X)
-    )
+-- intersectionNumbers CYData := X -> (
+--     intersectionNumbersOfCY(ambient X, basisIndices X)
+--     )
 
     
 TEST ///
