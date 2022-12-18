@@ -245,11 +245,9 @@ h11OfCY = method() -- deprecate this
 h21OfCY = method() -- deprecate this
 findAllFRSTs = method()
 
-
-
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
 load (currentFileDirectory | "StringTorics/CYPolytopeData.m2")
---load (currentFileDirectory | "StringTorics/CYData.m2")
+load (currentFileDirectory | "StringTorics/CYData.m2")
 load (currentFileDirectory | "StringTorics/IntersectionNumbers.m2")
 
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- has some util code, but not much.  TODO: clean that up.
@@ -884,158 +882,6 @@ addToCYDatabase(String, Database, ZZ) := opts -> (dbfilename, topesDB, i) -> (
     addToCYDatabase(dbfilename, Q, opts);
     )
 
---------------------------------------------------------------
--- CYData (soon to change back to CalabiYauInToric? ----------
---------------------------------------------------------------
-
-CYData.synonym = "Calabi-Yau in a normal toric variety"
-CYData.GlobalAssignHook = globalAssignFunction
-CYData.GlobalReleaseHook = globalReleaseFunction
-expression CYData := X -> if hasAttribute (X, ReverseDictionary) 
-    then expression getAttribute (X, ReverseDictionary) else 
-    (describe X)#0
-describe CYData := X -> Describe (expression CYData) (
-      expression "a" , expression 3)
---    expression rays X, expression max X)
-
-CYDataFields = {
-    -- first entry: true means it must exist and be in the main hash table
-    --   false: it might exist, and is in the cache table.
-    "polytope data" => {value, Q -> toString Q.cache#"id", CYPolytopeData},
-    "triangulation" => {value, toString, List}
-    }
-
--- These are the cache fields that we write to a string via 'dump'
-CYDataCache = {
-    -- first entry: true means it must exist and be in the main hash table
-    --   false: it might exist, and is in the cache table.
-    "id" => {value, toString, ZZ},
-    "c2" => {value, toString, List},
-    "intersection numbers" => {value, toString, List},
-    "toric intersection numbers" => {value, toString, List}
-    }
-
-cyData = method(Options => {ID => null, Ring => null})
-cyData(CYPolytopeData, List) := opts -> (Q, triang) -> (
-    X := new CYData from {
-        symbol cache => new CacheTable,
-        "polytope data" => Q,
-        "triangulation" => triang
-        };
-    if opts.ID =!= null then X.cache#"id" = opts.ID;
-    if opts#Ring =!= null then X.cache#"pic ring" = opts#Ring; -- Note: we should check that it is over ZZ, has h^(1,1) variables
-    X
-    )
-cyData(String, Function) := CYData => opts -> (str, F) -> (
-    -- F is a function which takes an id of a CYPolytopeData and returns the object.
-    L := lines str;
-    if L#0 != "CYData" then error "string is not in proper format";
-    fields := hashTable for i from 1 to #L-1 list getKeyPair L#i;
-    -- First get the main elements (these are required!):
-    polytopeid := value fields#"polytope data";
-    required := for field in CYDataFields list (
-        k := field#0;
-        if k === "polytope data" then (
-            "polytope data" => F polytopeid
-            )
-        else (
-            readFcn := field#1#0;
-            if fields#?k then k => readFcn fields#k else error("expected key "|k)
-        ));
-    X := new CYData from prepend(symbol cache => new CacheTable, required);
-    -- now read in the cache values (including "id" value, if any)
-    for field in CYDataCache do (
-        k := field#0;
-        readFcn := field#1#0;
-        if fields#?k then X.cache#k = readFcn fields#k;
-        );
-    if opts.ID =!= null then X.cache#"id" = opts.ID; -- just for compatibility with other constructors...
-    if opts#Ring =!= null then X.cache#"pic ring" = opts#Ring; -- Note: we should check that it is over ZZ, has h^(1,1) variables
-    X
-    )
-
-dump CYData := String => {} >> opts -> X -> (
-    s1 := "CYData\n";
-    strs := for field in CYDataFields list (
-        k := field#0;
-        writerFunction := field#1#1;
-        if not X#?k then error("expected key: "|k#0);
-        "  " | k | ":" | writerFunction(X#k) | "\n"
-        );
-    strs2 := for field in CYDataCache list (
-        k := field#0;
-        writerFunction := field#1#1;
-        if not X.cache#?k then continue;
-        "  " | k | ":" | writerFunction(X.cache#k) | "\n"
-        );
-    strs = join({s1}, strs, strs2);
-    concatenate strs
-    )
-
-makeCY = method(Options => {ID => null, Ring => null})
-makeCY CYPolytopeData := CYData => opts -> Q -> (
-    P2 := polytope Q;
-    (LP,tri) := regularStarTriangulation(dim P2-2,P2);
-    if rays Q =!= LP then error "I have a lattice point mismatch";
-    cyData(Q, tri, opts)
-    )    
-
-normalToricVariety CYData := opts -> X -> (
-    if not X.cache.?NormalToricVariety then X.cache.NormalToricVariety = (
-        Q := X#"polytope data";
-        T := X#"triangulation";
-        GLSM := transpose matrix degrees Q;
-        normalToricVariety(rays Q, T, opts, WeilToClass => matrix GLSM)
-        );
-    X.cache.NormalToricVariety
-    -- TODO: this fails if the class group is torsion! (Fails: later it gives an inscrutable error...)
-    )
-
-rays CYData := X -> rays cyPolytopeData X
-max CYData := X -> X#"triangulation"
-
--- TODO: triangulation is used with 2 different pieces of data:
---  with, without cone point!  Change this to use only one point.
--- Also: there are 4 matrices one can imagine: A, A0 (A with origin), Ah, A0h...
--- We need to be consistent about these!
--- TODO: do we really need this?
-triangulation CYData := Triangulation => opts -> X -> (
-    if not opts.Homogenize then error "Homogenize flag is not used in this method";
-    if not X.cache#?"triangulation" then (
-        rys := X#"polytope data"#"rays";
-        d := #rys#0;
-        B := (transpose matrix rys) | matrix{d:{0}};
-        X.cache#"triangulation" = triangulation(B, for t in X#"triangulation" list append(t, #rys));
-        );
-    X.cache#"triangulation"
-    )
-
-cyPolytopeData CYData := opts -> X -> X#"polytope data"
-dim CYData := X -> dim ambient X - 1
-polytope CYData := X -> polytope cyPolytopeData X
-polytope(CYData, String) := (X, which) -> polytope(cyPolytopeData X, which)
-basisIndices CYData := List => X -> basisIndices cyPolytopeData X
-degrees CYData := List => X -> degrees cyPolytopeData X
-
-ambient CYData := X -> normalToricVariety X -- FIXME: this should be cached!
-
-label = method()
-label CYPolytopeData := Q -> if Q.cache#?"id" then Q.cache#"id" else ""
-label CYData := X -> (label cyPolytopeData X, if X.cache#?"id" then X.cache#"id" else "")
-
-abstractVariety CYData := opts -> X -> (
-    -- Store this with X.
-    V := ambient X;
-    aX := completeIntersection(V, {-toricDivisor V});
-    abstractVariety(aX, base())
-    )
-abstractVariety(CYData, AbstractVariety) := opts -> (X, pt) -> (
-    -- Store this with X?
-    -- Check: pt is of dimension zero?
-    V := ambient X;
-    aX := completeIntersection(V, {-toricDivisor V});
-    abstractVariety(aX, pt)
-    )
 
 --topologicalData = method()
 -- this is the older, alternate version of this function.
@@ -1093,6 +939,8 @@ reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
     normalToricVariety(LP,tri,opts)
     )
 
+
+-- TODO: remove these three functions
 hh(Sequence, TopologicalDataOfCY3) := (pq, T) -> (
     (p,q) := pq;
     if p > q then (p, q) = (q, p);
@@ -1113,31 +961,9 @@ hh(Sequence, TopologicalDataOfCY3) := (pq, T) -> (
         )
     )
 
-hh(Sequence, CYPolytopeData) := (pq, Q) -> (
-    cySetH11H21 Q;
-    (p,q) := pq;
-    if p > q then (p, q) = (q, p);
-    if p == 0 then (
-        if q == 3 or q == 0 then 1 else 0
-        )
-    else if p == 1 then (
-        if q == 1 then Q.cache#"h11"
-        else if q == 2 then Q.cache#"h21"
-        else 0
-        )
-    else if p == 2 then (
-        if q == 2 then Q.cache#"h11" else 0
-        )
-    else if p == 3 then (
-        if q == 3 then 1
-        else 0
-        )
-    )
-
-hh(Sequence, CYData) := (pq, X) -> hh^pq cyPolytopeData X
-
 c2 TopologicalDataOfCY3 := T -> T#"c2"
 cubicForm TopologicalDataOfCY3 := T -> T#"cubic intersection form"
+----- end of TODO -----------------------------
 
 TEST ///
 -*

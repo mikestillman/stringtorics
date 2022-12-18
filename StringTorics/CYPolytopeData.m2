@@ -217,3 +217,24 @@ polytope CYPolytopeData := Polyhedron => cyData -> polytope(cyData, "N")
 polar CYPolytopeData := cyData -> cyPolytopeData polytope(cyData, "M")
 
 findAllFRSTs CYPolytopeData := List => cyData -> (findAllFRSTs(transpose matrix rays cyData))/last
+
+hh(Sequence, CYPolytopeData) := (pq, Q) -> (
+    cySetH11H21 Q;
+    (p,q) := pq;
+    if p > q then (p, q) = (q, p);
+    if p == 0 then (
+        if q == 3 or q == 0 then 1 else 0
+        )
+    else if p == 1 then (
+        if q == 1 then Q.cache#"h11"
+        else if q == 2 then Q.cache#"h21"
+        else 0
+        )
+    else if p == 2 then (
+        if q == 2 then Q.cache#"h11" else 0
+        )
+    else if p == 3 then (
+        if q == 3 then 1
+        else 0
+        )
+    )
