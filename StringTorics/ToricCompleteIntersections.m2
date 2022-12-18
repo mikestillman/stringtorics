@@ -77,8 +77,6 @@ decompose SimplicialComplex := C -> (
 --    simplicialComplex flatten for f in faces list (1_S * product (f/(i -> S_i)))
 --    )
 ---------------------------------------------------
-h11OfCY = method()
-h21OfCY = method()
 hodgeOfCYToricDivisor = method();
 
 -------------------------------------------
@@ -134,7 +132,6 @@ h21OfCY Polyhedron := (P1) -> (
     np - 5 - t + t1
     )
 
-isFavorable = method();
 isFavorable Polyhedron := (P1) -> (
     -- This is from the Batyrev formula for h^11, 
     -- The term ell^*(theta) * ell^*(theta^*) gives new divisors.
