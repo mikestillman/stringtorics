@@ -76,7 +76,8 @@ export {
     "makeCY",
 
     "basisIndices",
-    
+    "restrictTriangulation", -- restrict triangulation to each 2-face
+        
     -- Extra polyhedral facilities, for lattice points and faces of a Polyhedron
     -- how much of this shoiuld be exported??
     "vertexMatrix",
@@ -90,26 +91,25 @@ export {
     "interiorLatticePointList",
     "annotatedFaces",
 
-    -- Triangulation code
-    "Origin",
-    "pointConfiguration",
-    "regularStarTriangulation",
+    -- current triangulation code
     "findAllFRSTs",
     "findAllCYs",
     "findAllConnectedStarFine",
     "findStarFineGraph",
-    "restrictTriangulation", -- restrict triangulation to each 2-face
+    
+    -- older triangulation code (still useful?)
+    "Origin",
+    "pointConfiguration",
+    "regularStarTriangulation",
+    "reflexiveToSimplicialToricVariety",
+    "reflexiveToSimplicialToricVarietyCleanDegrees",
+    "allZeros",
+    "augmentWithOrigin",
     
     -- This set maybe should be included in NormalToricVarieties?
     "singularCones",
     "singularLocusInToric",
     "normalToricVarietyFromGLSM",
-
-    -- StarTriangulations
-    "reflexiveToSimplicialToricVariety",
-    "reflexiveToSimplicialToricVarietyCleanDegrees",
-    "allZeros",
-    "augmentWithOrigin",
 
     -- Interfacing with Sage triangulations, triangulations from elsewhere
     "readSageTriangulations",
@@ -659,40 +659,6 @@ array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]),
     array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), 
     array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
     array([1, 2, 4, 6]), array([2, 4, 5, 6])]] "
-
---------------------------------------------------------
--- Code for complete intersections in toric varieties --
--- more functionality is in CohomCalg.m2              --
---------------------------------------------------------
-CompleteIntersectionInToric = new Type of HashTable
-
-completeIntersection = method()
-completeIntersection(NormalToricVariety, List) := (Y,CIeqns) -> (
-    if not all(CIeqns, d -> instance(d, ToricDivisor))
-    then error "expected a list of toric divisors";
-    if not all(CIeqns, d -> variety d === Y)
-    then error "expected a list of toric divisors on the given toric variety";
-    new CompleteIntersectionInToric from {
-        symbol Ambient => Y,
-        symbol CI => CIeqns,
-        symbol cache => new CacheTable
-        }
-    )
-dim CompleteIntersectionInToric := (X) -> dim X.Ambient - #X.CI
-ambient CompleteIntersectionInToric := (X) -> X.Ambient
-
-abstractVariety(CompleteIntersectionInToric, AbstractVariety) := opts -> (X,B) -> (
-    if not X.cache#?(abstractVariety, B) then X.cache#(abstractVariety, B) = (
-        aY := abstractVariety(ambient X, B);
-        -- Question: how best to define F??
-        bundles := X.CI/(d -> OO d);
-        F := bundles#0;
-        for i from 1 to #bundles-1 do F = F ++ bundles#i;
-        aF := abstractSheaf(ambient X, B, F);
-        sectionZeroLocus aF
-        );
-    X.cache#(abstractVariety, B)
-    )
 
 load (currentFileDirectory | "StringTorics/LineBundleCohomology.m2")
 
