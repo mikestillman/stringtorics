@@ -1,3 +1,6 @@
+-- TODO: compute toricMoriCone without intersection ring?
+-- 
+
 ----------------------------------------------------------------  
 -- gvInvariants ------------------------------------------------
 -- Uses computeGV.cpp from CYtools -----------------------------
@@ -129,6 +132,7 @@ partitionGVConeByGV CYData := HashTable => opts -> X -> (
     partition(f -> gv#(toSequence f), gvX)
     )
 
+-- TODO: move to Topology.m2? file?
 findLinearMaps = method()
 findLinearMaps(HashTable, HashTable) := List => (gv1, gv2) -> (
     if sort keys gv1 =!= sort keys gv2 then return {};

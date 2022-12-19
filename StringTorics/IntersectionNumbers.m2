@@ -1,4 +1,11 @@
--- Intersection numbers for Calabi-Yau 3-folds
+-------------------------------------------------
+-- Intersection numbers for Calabi-Yau 3-folds --
+-------------------------------------------------
+-- currently is functional only for hypersurfaces
+-- in a toric 4-fold.  Also, the polytope must be favorable.
+-- TODO: remove favorable hypothesis
+-- TODO: allow 4D CY's?
+-- TODO: allow CI CY's in a Fano toric.
 
 intersectionNumbers = method()
 -- intersectionNumbers = method(Options => {Indices => null}) -- Indices: which elements to keep.
@@ -139,17 +146,6 @@ c2 CYData := X -> (
     X.cache#"c2"
     )
 
-topologicalData = method()
-topologicalData CYData := TopologicalDataOfCY3 => X -> (
-    -- TODO: this does not consider torision in H_2(X, ZZ) or H_3(X, ZZ)
-    elapsedTime new TopologicalDataOfCY3 from {
-        "h11" => hh^(1,1) cyPolytopeData X,
-        "h21" => hh^(2,1) cyPolytopeData X,
-        "c2" => c2 X,
-        "intersection numbers" => intersectionNumbers X
-        }
-    )
-
 -- maybe: toricIntersectionNumbers, c2, c2Form, intersectionForm.
 --
 -- intersectionNumbers X, intersectionNumbers(X, Full => true), intersectionForm X
@@ -168,13 +164,13 @@ TEST ///
   elapsedTime intersectionNumbers X
   toRingElement(oo, X.cache#"pic ring")
   elapsedTime toricIntersectionNumbers X
-  assert(intersectionNumbers X === intersectionNumbersOfCY(ambient X, basisIndices X))
+  assert(intersectionNumbers X === intersectionNumbersOfCY X)
   elapsedTime c2 X
   c2Form X
   cubicForm X
 
-  elapsedTime computeIntersectionNumbers X
-  intersectionNumbersOfCY(ambient X, basisIndices X)
+  elapsedTime intersectionNumbers X
+  elapsedTime intersectionNumbersOfCY X
 
   elapsedTime topologicalData(X, ZZ[a..e])
 ///
@@ -292,27 +288,6 @@ TEST ///
   assert(toRingElement(toCOO L, RZ) == L)
 ///
 
--------------------------------
--- The code below this is still being used, but the code above should replace it
--- (But will be used as an alternate method tom compute them
--------------------------------
-
-
--- Simple subroutine for finding the list of indices for possible intersections.
--- e.g. if in the resulting list, {0,1,1} appears, then this will represent the
--- product H_0 . H_1 . H_1 (which is an integer)
-monoms = (deg, lo, hi) -> (
-    -- input: deg, lo, hi: all integers
-    -- output: a list of lists of integers all of length 'deg',
-    --   sorted in ascending order.
-    if deg == 0 then {{}}
-    else if lo === hi then {splice{deg:lo}}
-    else
-    flatten for i from lo to hi list (
-        L1 := monoms(deg-1, i, hi);
-        for t in L1 list prepend(i, t)
-        )
-    )
 
 TEST ///
 -- As it turns out, 'monoms' is much faster than first creating the basis,
@@ -351,24 +326,34 @@ TEST ///
   assert(mons1 === mons2) -- in the same order
 ///
 
---------------------------------------
--- Intersection numbers for CY3's which are hypersurfaces in simplicial res of 4d reflexive torics.
--- This is used to debug the more involved algorithm for these.
---------------------------------------
--- This code is in progress Sep 2021.  It is older code that I want to use now.
--- It had been in the file: rigid-divisors/m2-example/intersection-rings.m2
--- TODO: make sure it is correct.
---       would be nice if it worked for other dimensions of CY's too...
--- ALLOW
---       pare down the list to generators only.  Can we compute directly from generators? (I think not...)
--- WISHLIST
---       would really be nice to work for non-favorables.
---       would really be nice to work for CI in torics? (still CY's?)
+------------------------------------
+-- Intersection numbers via intersection ring in Schubert2
+-- This is an alternate method, slower than intersectionNumbers, 
+-- but that can be used to test intersectionNumbers.
 
--- Simple code, which expects that we can compute the intersection ring of X.
+-- Alternate to intersectionNumbers, slower.  But easier code.  Only
+-- works for the case when the ambient toric variety has no torsion in
+-- the Class group.
 
--- Remove this version?
-intersectionNumbers(Ring, List) := HashTable => (IX, basisIndices) -> (
+-- Simple subroutine for finding the list of indices for possible intersections.
+-- e.g. if in the resulting list, {0,1,1} appears, then this will represent the
+-- product H_0 . H_1 . H_1 (which is an integer)
+monoms = (deg, lo, hi) -> (
+    -- input: deg, lo, hi: all integers
+    -- output: a list of lists of integers all of length 'deg',
+    --   sorted in ascending order.
+    if deg == 0 then {{}}
+    else if lo === hi then {splice{deg:lo}}
+    else
+    flatten for i from lo to hi list (
+        L1 := monoms(deg-1, i, hi);
+        for t in L1 list prepend(i, t)
+        )
+    )
+
+intersectionNumbersOfCY = method()
+
+intersectionNumbersOfCY(Ring, List) := HashTable => (IX, basisIndices) -> (
     -- IX: should be a ring produced for Schubert2, having 'integral' function for top degree elements.
     -- basisIndices is a subList of {0, ..., numgens IX - 1}.
     -- WARNING: this is cubic in number of generators of IX.  This can be improved,
@@ -383,27 +368,19 @@ intersectionNumbers(Ring, List) := HashTable => (IX, basisIndices) -> (
         )
     )
 
---topologicalData = method()
--- this is the older, alternate version of this function.
-topologicalData(CYData, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
-    V := ambient X;
-    Q := X#"polytope data";
-    P := polytope Q;
-    data := elapsedTime topologyOfCY3(V, basisIndices X);
-    -- this data above computes intersection numbers for all toric divisors. 
-    -- So we consider only the ones whose indices are contained in basis indices:
-    new TopologicalDataOfCY3 from {
-        "h11" => elapsedTime hh^(1,1) Q,
-        "h21" => elapsedTime hh^(2,1) Q,
-        "c2" => sub(data_3, vars RZ),
-        "cubic intersection form" => sub(data_2, vars RZ)
-        }
+intersectionNumbersOfCY(NormalToricVariety, List) := (V, basisIndices) -> (
+    X := completeIntersection(V, {-toricDivisor V});
+    Xa := abstractVariety(X, base());
+    IX := intersectionRing Xa;
+    intersectionNumbersOfCY(IX, basisIndices)
+    )
+intersectionNumbersOfCY CYData := X -> (
+    intersectionNumbersOfCY(ambient X, basisIndices X)
     )
 
--- intersectionNumbers CYData := X -> (
---     intersectionNumbersOfCY(ambient X, basisIndices X)
---     )
-
+-- end of intersectionNumbersOfCY, alternate slower method for
+-- computing intersection numbers of a CY 3-fold.
+------------------------------------------
     
 TEST ///
   -- Let's test the basis intersection numbers code at slightly higher h11...
@@ -476,6 +453,10 @@ TEST ///
 ///
 
 
+------------------------------
+-- REMOVE: tripleProductsCY --
+------------------------------
+-- This code is no longer simpler than current code.
 -- Simpler code, used to debug the algorithm/implementation above.
 tripleProductsCY = method()
 tripleProductsCY NormalToricVariety := (V) -> (
@@ -497,7 +478,9 @@ tripleProductsCY NormalToricVariety := (V) -> (
         )
     )
 
-
+------------------------------
+-- REMOVE: possibleNonZeros --
+------------------------------
 possibleNonZeros = (V) -> (
     -- assumption currently: V has dim 4, is reflexive, and X is the anti-canonical CY3 divisor.
     -- returns a list of lists of 3 integers (0 <= i1 <= i2 <= i3 <= N-1)
@@ -519,6 +502,9 @@ possibleNonZeros = (V) -> (
     {singles,doubles,triples}
     )
 
+--------------------------------------
+-- REMOVE: CY3NonzeroMultiplicities --
+--------------------------------------
   CY3NonzeroMultiplicities = method()
   CY3NonzeroMultiplicities NormalToricVariety := (V) -> (
       RAYS := transpose matrix rays V;
@@ -554,7 +540,9 @@ possibleNonZeros = (V) -> (
       new HashTable from mult3
       )
 
-
+------------------------------
+-- REMOVE: CY3Intersections --
+------------------------------
 CY3Intersections = method()
 CY3Intersections(NormalToricVariety, List) := (V, indexOfDs) -> (
     H := CY3NonzeroMultiplicities V;
@@ -566,51 +554,3 @@ CY3Intersections(NormalToricVariety, List) := (V, indexOfDs) -> (
       )
   )
 
-
-topologyOfCY3 = method(Options => {
-        Variable => "x",
-        Ring => null
-        })
-topologyOfCY3(NormalToricVariety, List) := opts -> (V, basisIndices) -> (
-    -- input: 
-    --   V: a simplicial resolution of a Fano toric 4-fold
-    --      X is a (general) anti-canonical section of V.
-    --   basisIndices: list of integer indicesas to which V_i will be in the 
-    --      basis of Pic X that you choose.
-    -- output: a hash table containing:
-    --  a. triple intersection numbers (a hash table, H#{a,b,c}, with 0 <= a <= b <= c < h11(X))
-    --  b. the h11 numbers: c2(X) . D_i, 0 <= i < h11
-    --  c. the integers h11, h12
-    --  d. the cubic form C(x,y,z) in a polynomial ring ZZ[x_0, ..., x_(h11-1)]
-    --  e. a linear form L(x,y,z) in the same ring, representing c2(X).D_i
-    --
-    P := convexHull transpose matrix rays V;
-    h11 := h21OfCY P; -- we want h11 of `polar P`.
-    h21 := h11OfCY P;
-    if #basisIndices != h11 then error("expected "|h11|" indices");
-    H := CY3NonzeroMultiplicities V;
-    -- basisInv := new MutableHashTable;
-    -- for i from 0 to #basisIndices-1 do basisInv#(basisIndices#i) = i;
-    -- H3 := hashTable for x in keys H list (
-    --     if isSubset(x, basisIndices) then (
-    --         x' := apply(x, i -> basisInv#i);
-    --         x' => H#x 
-    --         ) else continue
-    --     );
-    -- Now let's get the cubic form and the linear form directly from the intersection theory.
-    -- For larger h11, this method will need to change.
-    x := getSymbol opts.Variable;
-    pt := base(x_0..x_(h11-1));
-    A := intersectionRing pt; -- over QQ
-    R := if opts#Ring =!= null then opts#Ring else ZZ (monoid A);
-    if numgens R =!= h11 then error("expected a ring with "|toString h11|" variables");
-
-    X := completeIntersection(V, {-toricDivisor V});
-    Xa := abstractVariety(X, pt);
-    IX := intersectionRing Xa;
-    h := sum(h11, i -> A_i * IX_(basisIndices#i));
-    C := sub(integral(h^3), vars R);
-    L := integral((chern_2 tangentBundle Xa) * h);
-    L = sub(L, vars R);
-    (h11, h21, C, L)
-    )

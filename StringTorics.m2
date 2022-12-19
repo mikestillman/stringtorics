@@ -62,10 +62,8 @@ newPackage(
 
 export {
     -- Types defined here
-    "CYPolytopeData",
-    "CYData",
---    "ReflexivePolytope",
---    "CalabiYauInToric",
+    "CYPolytopeData", -- rename to CYReflexivePair?  Uugh
+    "CYData",  -- rename to CalabiYauInToric?
     "TopologicalDataOfCY3",
 
     -- CYPolytopeData, CYData
@@ -77,10 +75,7 @@ export {
     "cyData",
     "makeCY",
 
-    -- Creating databases of polytopes (with precomputed data).
-    
-    "createPolytopeDatabase",
-    "addToCYDatabase",
+    "basisIndices",
     
     -- Extra polyhedral facilities, for lattice points and faces of a Polyhedron
     -- how much of this shoiuld be exported??
@@ -109,34 +104,28 @@ export {
     "singularCones",
     "singularLocusInToric",
     "normalToricVarietyFromGLSM",
-    -- These should stay here
+
+    -- StarTriangulations
     "reflexiveToSimplicialToricVariety",
     "reflexiveToSimplicialToricVarietyCleanDegrees",
     "allZeros",
     "augmentWithOrigin",
 
+    -- Interfacing with Sage triangulations, triangulations from elsewhere
     "readSageTriangulations",
     "sortTriangulation",
     "matchNonZero",
     "applyPermutation",
     "checkFan",
     "sageTri",
---    "Regular",
 
-    -- Reflexive polytope code
-    -- Uses ReflexivePolytope, a wrapper over Polyhedra package, and containing the info we want/need.
---    "reflexivePolytope", -- NOT NEEDED ANYMORE?
-    "basisIndices",
-    "topologicalData",
-
-    -- Topological information 
+    -- IntersectionNumbers
     "intersectionNumbers",
     "toricIntersectionNumbers",
     "c2",
     "intersectionForm",
     "cubicForm",
     "c2Form",
-    
     "intersectionNumbersOfCY", -- possibly not for export
     
     -- gvInvariants
@@ -146,13 +135,19 @@ export {
     "partitionGVConeByGV",
     "findLinearMaps",
 
-    "invariants", -- really in the topology section...
+    -- Topology
+    "topologicalData",
+    "invariants",
     
     -- CompleteIntersectionInToric's
     "completeIntersection",
     "CompleteIntersectionInToric",
         "Ambient",
         "CI",
+
+    -- Creating databases of polytopes (with precomputed data).
+    "createPolytopeDatabase",
+    "addToCYDatabase",
 
     -- Cohomology
     "toricCohomologySetup",
@@ -249,8 +244,9 @@ load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
 load (currentFileDirectory | "StringTorics/CYPolytopeData.m2")
 load (currentFileDirectory | "StringTorics/CYData.m2")
 load (currentFileDirectory | "StringTorics/IntersectionNumbers.m2")
-
+load (currentFileDirectory | "StringTorics/Topology.m2")
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- has some util code, but not much.  TODO: clean that up.
+load (currentFileDirectory | "StringTorics/DatabaseCreation.m2")
 
   findAllConnectedStarFine = method()
   findAllConnectedStarFine Triangulation := (T) -> (
@@ -314,40 +310,6 @@ load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- ha
       starsList := for i from 0 to starcount-1 list starsInv#i;
       (starsList, new List from edges)
       )
-
--- restrictTriangulation: returns a List of
---   {2-face indices, 
---    all indices of points in in this 2-face, 
---    the triangles in this 2-face, 
---    genus of this face}
--- TODO: need also a function which returns just: triangles, genus information.
-restrictTriangulation = method()
-restrictTriangulation CYData := List => (X) -> (
-    -- given X, we use its annotated faces and its triangulation, to write down the triangulations of the 2-faces
-    -- of the corresponding reflexive polytope in the N lattice side.
-    Q := cyPolytopeData X;
-    F := annotatedFaces Q;
-    twofaces := for x in F list if x#0 =!= 2 then continue else {x#1, x#2, x#4};
-    T := max X; -- triangulation
-    for t2 in twofaces list (
-        a := set t2#1; -- these are the indices we want.
-        atri := sort unique for t in T list (
-            b := sort toList(a * set t);
-            if #b == 3 then b else continue
-            );
-        {t2#0, t2#1, atri, t2#2}
-        )
-    )
--------------------------------------------------
--- Intersection numbers for Calabi-Yau 3-folds --
--------------------------------------------------
--- currently is functional only for hypersurfaces
--- in a toric 4-fold.  Also, the polytope must be favorable.
--- TODO: remove favorable hypothesis
--- TODO: allow 4D CY's?
--- TODO: allow CI CY's in a Fano toric.
-
------- end of Intersection Numbers code ---------
 
 protect nextVar
 protect nextFinalVar
@@ -833,54 +795,6 @@ findAllCYs CYPolytopeData := List => Q -> (
     for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i)
     )
 
-createPolytopeDatabase = method(
-    Options => {
-        "Hodge" => null, -- TODO: not used yet
-        "Count" => null  -- TODO: not used yet
-        })
-
-createPolytopeDatabase(String, List) := opts -> (dbfilename, topes) -> (
-    -- open data base file
-    F := openDatabaseOut dbfilename;
-    -- F#"info" = "4990 reflexive polytopes of h11=5"
-    -- F#"topes" = toString topes;
-    -- loop through topes, create CYPolytopeData, populate it, write it to data base.
-    elapsedTime for i from 0 to #topes - 1 do elapsedTime (
-        << "computing for polytope " << i << endl;
-        V := cyPolytopeData(topes#i, ID => i); -- note that the polytope data is really that of the dual to topes#i.
-        -- now fill it with data we want
-        basisIndices V; -- compute them
-        isFavorable V; -- compute h11, h21, favorability.
-        annotatedFaces V; -- compute annotated faces
-        -- now write it
-        F#(toString i) = dump V;
-        );
-    --if opts#"Hodge" =!= null then F#"hodge" = toString(opts.Hodge);
-    --if opts#"Count" =!= null then F#"count" = #topes;
-    close F;
-    )
-
-addToCYDatabase = method(Options => {NTFE => false})
-
-addToCYDatabase(String, CYPolytopeData) := opts -> (dbfilename, Q) -> (
-    elapsedTime Xs := findAllCYs Q;
-    << "  " << #Xs << " triangulations total" << endl;
-    if opts.NTFE then (
-        elapsedTime H := partition(restrictTriangulation, Xs);
-        << "  " << #(keys H) << " NTFE triangulations" << endl;
-        Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
-        );
-    F := openDatabaseOut dbfilename;
-    for X in Xs do (
-        F#(toString label X) = dump X;
-        );
-    close F;    
-    )
-addToCYDatabase(String, Database, ZZ) := opts -> (dbfilename, topesDB, i) -> (
-    <<  "-- doing polytope " << i << endl;
-    Q := cyPolytopeData(topesDB#(toString i), ID => i);
-    addToCYDatabase(dbfilename, Q, opts);
-    )
 
 -- keys: id, cypolytopedata, triangulation, cache.  The id is what? (id of polytope, which triangulation)
 --  write date: for cypolytopedata, just writes the id.
@@ -922,174 +836,7 @@ reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
     )
 
 
--- TODO: remove these three functions
-hh(Sequence, TopologicalDataOfCY3) := (pq, T) -> (
-    (p,q) := pq;
-    if p > q then (p, q) = (q, p);
-    if p == 0 then (
-        if q == 3 or q == 0 then 1 else 0
-        )
-    else if p == 1 then (
-        if q == 1 then T#"h11"
-        else if q == 2 then T#"h21"
-        else 0
-        )
-    else if p == 2 then (
-        if q == 2 then T#"h11" else 0
-        )
-    else if p == 3 then (
-        if q == 3 then 1
-        else 0
-        )
-    )
-
-c2 TopologicalDataOfCY3 := T -> T#"c2"
-cubicForm TopologicalDataOfCY3 := T -> T#"cubic intersection form"
------ end of TODO -----------------------------
-
-TEST ///
--*
-  restart
-  needsPackage "StringTorics"
-*-  
-  -- Test the routines of this package on the example X given here (h11=3, h12=69)
-  topes = kreuzerSkarke(3, Limit => 50);    
-  A = matrix topes_30
-  P = cyPolytopeData(topes_30, ID => 30)
-  hh^(1,1) P == 3
-  hh^(1,2) P == 69
-  X = makeCY(P, Ring => (RZ = ZZ[x,y,z]), ID => 0)
-  -- findAllFRSTs P
-  -- X = cyData(P, first oo, ID => 0)
- 
-  assert(hh^(1,1) X == 3)
-  assert(hh^(1,2) X == 69)
-  assert(dim X == 3)
-  elapsedTime topologicalData X
-  dump X
-  dump cyPolytopeData X
-  elapsedTime restrictTriangulation X
-
-  dim X  
-  rays X
-  max X
-  V = ambient X -- give the normal toric variety.  Works now, sort of. Problems though: TODO: cache it, allow options? degrees might be different...
-  rays V === rays X
-  max V === max X
-  
-  intersectionNumbers X  
-  toricIntersectionNumbers X
-  c2 X
-  cubicForm X
-  c2Form X
-      
-  elapsedTime topologicalData(X, RZ) -- cache this result?
-  
-  ambient X -- give the normal toric variety.  Works now.
-  aX = abstractVariety X -- give the abstract variety.  -- TODO: should stash the value...?
-  abstractVariety(X, base(a,b,c)) -- give the abstract variety
-  IX = intersectionRing aX
-  
-  -- TODO: How is this computed?
-  rays toricMoriCone X
-  hilbertBasis toricMoriCone X
-
-  -- TODO: gvInvariants still goes through intersection ring
-  gvInvariants(X, DegreeLimit => 10)
-
-  -- TODO: add tests for line bundles on X, and their cohomology.
-///
-
-TEST ///
--*
-  restart
-  needsPackage "StringTorics"
-*-  
-  topes = kreuzerSkarke(5, Limit => 10);
-  Qs = for i from 0 to #topes-1 list cyPolytopeData(topes#i, ID => i)
-  for tope in topes list isFavorable convexHull matrix tope
-  Q = cyPolytopeData(topes_8, ID => 8)
-  Ts = findAllFRSTs Q  
-  Xs = findAllCYs Q
-
-  for X in Xs list (X#"polytope data".cache#"id", X.cache#"id") -- id of each example.
-  for X in Xs list intersectionNumbers X
-
-  RZ = ZZ[a,b,c,d,e]
-  for X in Xs list topologicalData(X, RZ)
-  assert(# unique oo == 1)
-
-  Vs = Xs/ambient
-  assert all(Vs, isSimplicial)
-///  
-
-intersectionNumbersOfCY = method()
-intersectionNumbersOfCY(NormalToricVariety, List) := (V, basisIndices) -> (
-    X := completeIntersection(V, {-toricDivisor V});
-    Xa := abstractVariety(X, base());
-    IX := intersectionRing Xa;
-    intersectionNumbers(IX, basisIndices)
-    )
-
 load (currentFileDirectory | "StringTorics/GVInvariants.m2")
-
-TEST ///
--- XXX
--*
-  restart
-  needsPackage "StringTorics"
-*-  
-  topes = kreuzerSkarke(3, Limit => 50);    
-  Q = cyPolytopeData(topes_30, ID => 30)
-  Ts = findAllFRSTs Q
-  Xs = for i from 0 to #Ts-1 list cyData(Q, Ts#i, ID => i)
-  vertices polytope Q
-  label Q
-  assert((for X in Xs list label X) === {(30, 0), (30, 1)})
-  X = Xs#0
-  V = ambient X
-  assert isSimplicial V
-  assert isProjective V
-  intersectionNumbers X
-  intersectionNumbersOfCY(V, basisIndices Q)
-
-  assert(hh^(1,1) X == 3)
-  assert(hh^(1,2) X == 69)
-
-  elapsedTime T = topologicalData(X, ZZ[a,b,c])
-  hh^(1,1) T
-  hh^(1,2) T
-
-  partitionGVConeByGV(X, DegreeLimit => 10)
-  partitionGVConeByGV(X, DegreeLimit => 20)
-  partitionGVConeByGV(X, DegreeLimit => 40)
-  hilbertBasis gvCone(X, DegreeLimit => 20)
-  gv = gvInvariants(X, DegreeLimit => 30);
-///  
-----------------------------------------------------------------
-
-factors = method()
-factors RingElement := (F) -> (
-     facs := factor F;
-     facs//toList/toList/reverse
-     )
-
-invariants = method()
-invariants List := (f) -> (
-    RQ := QQ[gens ring first f];
-    facs := select((factors f_1 )/toList/last, g -> support g != {});
-    l1 := sub(f_0, RQ);
-    f1 := sub(f_1, RQ);
-    d := dim saturate ideal jacobian f1;
-    nc := # decompose ideal(l1, f1);
-    singZ := flatten entries gens gb saturate(ideal(f_1) + ideal jacobian f_1);
-    badp := select(singZ, a -> support leadTerm a === {});
-    badp = if badp === {} then 0 else first badp;
-    {badp, (trim content f_0)_0, (trim content f_1)_0, #facs, d, nc, f_2, f_3}
-    )
-
-
-----------------------------------------------------------------
 
 beginDocumentation()
 
@@ -1102,11 +849,8 @@ beginDocumentation()
 -- . triangulations can be too big
 -- . what else can be too big?
 
-
 load (currentFileDirectory | "StringTorics/doc.m2")
 load (currentFileDirectory | "StringTorics/test.m2")
-
-
 
 end--
 

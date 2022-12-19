@@ -152,3 +152,27 @@ abstractVariety(CYData, AbstractVariety) := opts -> (X, pt) -> (
     aX := completeIntersection(V, {-toricDivisor V});
     abstractVariety(aX, pt)
     )
+
+-- restrictTriangulation: returns a List of
+--   {2-face indices, 
+--    all indices of points in in this 2-face, 
+--    the triangles in this 2-face, 
+--    genus of this face}
+-- TODO: need also a function which returns just: triangles, genus information.
+restrictTriangulation = method()
+restrictTriangulation CYData := List => (X) -> (
+    -- given X, we use its annotated faces and its triangulation, to write down the triangulations of the 2-faces
+    -- of the corresponding reflexive polytope in the N lattice side.
+    Q := cyPolytopeData X;
+    F := annotatedFaces Q;
+    twofaces := for x in F list if x#0 =!= 2 then continue else {x#1, x#2, x#4};
+    T := max X; -- triangulation
+    for t2 in twofaces list (
+        a := set t2#1; -- these are the indices we want.
+        atri := sort unique for t in T list (
+            b := sort toList(a * set t);
+            if #b == 3 then b else continue
+            );
+        {t2#0, t2#1, atri, t2#2}
+        )
+    )

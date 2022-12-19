@@ -1405,3 +1405,119 @@ TEST ///
   decompose oo -- point union 2 points union conic in a plane
 
 ///
+
+TEST ///
+-*
+  restart
+  needsPackage "StringTorics"
+*-  
+  topes = kreuzerSkarke(5, Limit => 10);
+  Qs = for i from 0 to #topes-1 list cyPolytopeData(topes#i, ID => i)
+  for tope in topes list isFavorable convexHull matrix tope
+  Q = cyPolytopeData(topes_8, ID => 8)
+  Ts = findAllFRSTs Q  
+  Xs = findAllCYs Q
+
+  for X in Xs list (X#"polytope data".cache#"id", X.cache#"id") -- id of each example.
+  for X in Xs list intersectionNumbers X
+
+  RZ = ZZ[a,b,c,d,e]
+  for X in Xs list topologicalData(X, RZ)
+  assert(# unique oo == 1)
+
+  Vs = Xs/ambient
+  assert all(Vs, isSimplicial)
+///  
+
+TEST ///
+-- XXX
+-*
+  restart
+  needsPackage "StringTorics"
+*-  
+  topes = kreuzerSkarke(3, Limit => 50);    
+  Q = cyPolytopeData(topes_30, ID => 30)
+  Ts = findAllFRSTs Q
+  Xs = for i from 0 to #Ts-1 list cyData(Q, Ts#i, ID => i)
+  vertices polytope Q
+  label Q
+  assert((for X in Xs list label X) === {(30, 0), (30, 1)})
+  X = Xs#0
+  V = ambient X
+  assert isSimplicial V
+  assert isProjective V
+  intersectionNumbers X
+  intersectionNumbersOfCY X
+  oo === ooo
+  intersectionNumbersOfCY(V, basisIndices Q)
+
+  assert(hh^(1,1) X == 3)
+  assert(hh^(1,2) X == 69)
+
+  elapsedTime T = topologicalData(X, ZZ[a,b,c])
+  hh^(1,1) T
+  hh^(1,2) T
+
+  partitionGVConeByGV(X, DegreeLimit => 10)
+  partitionGVConeByGV(X, DegreeLimit => 20)
+  partitionGVConeByGV(X, DegreeLimit => 40)
+  hilbertBasis gvCone(X, DegreeLimit => 20)
+  gv = gvInvariants(X, DegreeLimit => 30);
+///  
+
+
+TEST ///
+-- XXX
+-*
+  restart
+  needsPackage "StringTorics"
+*-  
+  -- Test the routines of this package on the example X given here (h11=3, h12=69)
+  topes = kreuzerSkarke(3, Limit => 50);    
+  A = matrix topes_30
+  P = cyPolytopeData(topes_30, ID => 30)
+  hh^(1,1) P == 3
+  hh^(1,2) P == 69
+  X = makeCY(P, Ring => (RZ = ZZ[x,y,z]), ID => 0)
+  -- findAllFRSTs P
+  -- X = cyData(P, first oo, ID => 0)
+ 
+  assert(hh^(1,1) X == 3)
+  assert(hh^(1,2) X == 69)
+  assert(dim X == 3)
+  elapsedTime topologicalData X
+  dump X
+  dump cyPolytopeData X
+  elapsedTime restrictTriangulation X
+
+  dim X  
+  rays X
+  max X
+  V = ambient X -- give the normal toric variety.  Works now, sort of. Problems though: TODO: cache it, allow options? degrees might be different...
+  rays V === rays X
+  max V === max X
+  
+  intersectionNumbers X  
+  toricIntersectionNumbers X
+  c2 X
+  cubicForm X
+  c2Form X
+      
+  elapsedTime topologicalData(X, RZ) -- cache this result?
+  
+  ambient X -- give the normal toric variety.  Works now.
+  aX = abstractVariety X -- give the abstract variety.  -- TODO: should stash the value...?
+  abstractVariety(X, base(a,b,c)) -- give the abstract variety
+  IX = intersectionRing aX
+  
+  -- TODO: How is this computed?
+  rays toricMoriCone X
+  hilbertBasis toricMoriCone X
+
+  -- TODO: gvInvariants still goes through intersection ring
+  gvInvariants(X, DegreeLimit => 10)
+
+  -- TODO: add tests for line bundles on X, and their cohomology.
+///
+
+
