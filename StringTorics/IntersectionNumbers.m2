@@ -383,6 +383,23 @@ intersectionNumbers(Ring, List) := HashTable => (IX, basisIndices) -> (
         )
     )
 
+--topologicalData = method()
+-- this is the older, alternate version of this function.
+topologicalData(CYData, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
+    V := ambient X;
+    Q := X#"polytope data";
+    P := polytope Q;
+    data := elapsedTime topologyOfCY3(V, basisIndices X);
+    -- this data above computes intersection numbers for all toric divisors. 
+    -- So we consider only the ones whose indices are contained in basis indices:
+    new TopologicalDataOfCY3 from {
+        "h11" => elapsedTime hh^(1,1) Q,
+        "h21" => elapsedTime hh^(2,1) Q,
+        "c2" => sub(data_3, vars RZ),
+        "cubic intersection form" => sub(data_2, vars RZ)
+        }
+    )
+
 -- intersectionNumbers CYData := X -> (
 --     intersectionNumbersOfCY(ambient X, basisIndices X)
 --     )
