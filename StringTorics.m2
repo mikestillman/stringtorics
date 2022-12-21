@@ -138,6 +138,8 @@ export {
     -- Topology
     "topologicalData",
     "invariants",
+    "mapIsIsomorphism",
+    "partitionByTopology",
     
     -- CompleteIntersectionInToric's
     "completeIntersection",

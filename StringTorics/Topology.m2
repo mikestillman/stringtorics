@@ -50,7 +50,160 @@ invariants List := (f) -> (
     {badp, (trim content f_0)_0, (trim content f_1)_0, #facs, d, nc, f_2, f_3}
     )
 
+pointCount = method()
+pointCount(RingElement, ZZ) := ZZ => (F, p) -> (
+    -- F is a polynomial in 3 variables (FIXME: any number of variables)
+    -- p is a prime number
+    R := (ZZ/p) (monoid ring F);
+    Fp := sub(F, R);
+    # for x in (0,0,0)..(p-1,p-1,p-1) list if sub(Fp, matrix{{x}}) == 0 then x else continue
+    )
 
+invariants CYData := List => X -> (
+    L := c2Form X;
+    F := cubicForm X;
+    h11 := hh^(1,1) X;
+    h12 := hh^(1,2) X;
+    RZ := ring L;
+    if ring F =!= RZ then 
+        error "expected same rings for c2 and cubic form";
+    if coefficientRing RZ =!= ZZ then 
+        error "expected c2 and cubic form ring to be a polynomial ring over ZZ";
+    RQ := QQ[gens RZ];
+    facs := select((factors F)/toList/last, g -> support g != {});
+    LQ := sub(L, RQ);
+    FQ := sub(F, RQ);
+    d := dim saturate ideal jacobian FQ;
+    nc := # decompose ideal(LQ, FQ);
+    singZ := flatten entries gens gb saturate(ideal(F) + ideal jacobian F);
+    badp := select(singZ, a -> support leadTerm a === {});
+    badp = if badp === {} then 0 else sub(first badp, ZZ);
+    ptcounts := for p in {2, 3, 5, 7, 11} list pointCount(F, p);
+    {h11, h12, ptcounts, badp, (trim content L)_0, (trim content F)_0, #facs, d, nc}
+    )
+
+invariants1 = method()
+invariants1 CYData := List => X -> (
+    L := c2Form X;
+    F := cubicForm X;
+    h11 := hh^(1,1) X;
+    h12 := hh^(1,2) X;
+    contentL := (trim content L)_0;
+    contentF := (trim content F)_0;
+    ptcounts := for p in {2, 3, 5, 7, 11} list pointCount(F, p);
+    {h11, h12} |  ptcounts | {contentL, contentF}
+    )
+
+invariants2 = method()
+invariants2 CYData := List => X -> (
+    L := c2Form X;
+    F := cubicForm X;
+    h11 := hh^(1,1) X;
+    h12 := hh^(1,2) X;
+    RZ := ring L;
+    if ring F =!= RZ then 
+        error "expected same rings for c2 and cubic form";
+    if coefficientRing RZ =!= ZZ then 
+        error "expected c2 and cubic form ring to be a polynomial ring over ZZ";
+    RQ := QQ[gens RZ];
+    facs := select((factors F)/toList/last, g -> support g != {});
+    LQ := sub(L, RQ);
+    FQ := sub(F, RQ);
+    d := dim saturate ideal jacobian FQ;
+    nc := # decompose ideal(LQ, FQ);
+    singZ := flatten entries gens gb saturate(ideal(F) + ideal jacobian F);
+    badp := select(singZ, a -> support leadTerm a === {});
+    badp = if badp === {} then 0 else sub(first badp, ZZ);
+    {h11, h12, badp, (trim content L)_0, (trim content F)_0, #facs, d, nc}
+    )
+
+mapIsIsomorphism = method()
+mapIsIsomorphism(Matrix, CYData, CYData) := Boolean => (M, X1, X2) -> (
+    -- M is a matrix over the base field, a possible map giving
+    -- an isomorphism of topologies.
+    -- T1, T2 are two topologies.
+    F1 := cubicForm X1;
+    F2 := cubicForm X2;
+    RZ := ring F1;
+    if RZ =!= ring F2 then error "expected the same picard ring";
+    phi := map(RZ, RZ, M);
+    (phi c2Form X1 == c2Form X2) and (phi F1 == F2)
+    )
+
+partitionByTopology = method()
+partitionByTopology List := LGVs -> (
+    -- LGVs is a list of X => gvPartition.
+    -- output: a hashtable, keys are labels, values are lists of {label, matrix}
+    labels := for x in LGVs list label first x;
+    hashXs := hashTable for y in LGVs list (label first y) => y;
+    distinctTops := new MutableHashTable; -- label => list of labels.
+    for i in labels do (
+        Xi := first hashXs#i;
+        GVi := last hashXs#i;
+        << "trying " << i << endl;
+        prev := keys distinctTops;
+        isFound := false;
+        for j in prev do (
+            Xj := first hashXs#j;
+            GVj := last hashXs#j;
+            -- compare CY's i, j
+            Ms := findLinearMaps(GVj, GVi);
+            if Ms === {} then continue;
+            Ms = Ms/(m -> lift(m, ZZ));
+            Ms = select(Ms, m -> (d := det m; d === 1 or d === -1));
+            isIsos := Ms/(m -> mapIsIsomorphism(m, Xj, Xi));
+            if any(isIsos, x -> true) then (
+                mi := position(isIsos, x -> true);
+                << "found isomorphism" << endl;
+                distinctTops#j = append(distinctTops#j, {i, Ms#mi});
+                isFound = true;
+                break;
+                ));
+        if not isFound then (
+            distinctTops#i = {};
+            << "found new top: " << topologicalData Xi << endl;
+            );
+        );
+    new HashTable from distinctTops
+    )
+
+partitionByTopology(List, HashTable, ZZ) := (Ls, Xs, degreelimit) -> (
+    -- LGVs is a list of X => gvPartition.
+    -- output: a hashtable, keys are labels, values are lists of {label, matrix}
+    labels := Ls;
+    if #Ls === 1 then return hashTable {Ls#0 => {}};
+    hashXs := Xs;
+    GVs := hashTable for lab in labels list lab => partitionGVConeByGV(hashXs#lab, DegreeLimit => degreelimit);
+    distinctTops := new MutableHashTable; -- invariants => list of labels.
+    for i in labels do (
+        Xi := hashXs#i;
+        GVi := GVs#i;
+        << "trying " << i << endl;
+        prev := keys distinctTops;
+        isFound := false;
+        for j in prev do (
+            Xj := hashXs#j;
+            GVj := GVs#j;
+            -- compare CY's i, j
+            Ms := findLinearMaps(GVj, GVi);
+            if Ms === {} then continue;
+            Ms = Ms/(m -> lift(m, ZZ));
+            Ms = select(Ms, m -> (d := det m; d === 1 or d === -1));
+            isIsos := Ms/(m -> mapIsIsomorphism(m, Xj, Xi));
+            if any(isIsos, x -> true) then (
+                mi := position(isIsos, x -> true);
+                << "found isomorphism" << endl;
+                distinctTops#j = append(distinctTops#j, {i, Ms#mi});
+                isFound = true;
+                break;
+                ));
+        if not isFound then (
+            distinctTops#i = {};
+            << "found new top: " << i << endl;
+            );
+        );
+    new HashTable from distinctTops
+    )
 
 -- TODO: remove the following code (any reason to keep it?)
 topologyOfCY3 = method(Options => {

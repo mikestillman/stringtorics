@@ -115,7 +115,24 @@ gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices)
     )
 
 gvInvariants CYData := HashTable => opts -> X -> (
-    gvInvariants(ambient X, basisIndices X, opts)
+    intersectionnums := for t in intersectionNumbers X list append(t#0, t#1);
+    mori := if opts.Mori =!= null then 
+                opts.Mori 
+            else 
+                hilbertBasisGenerators toricMoriCone(ambient X, basisIndices X);
+    heft := if opts.Heft =!= null then opts.Heft else (
+      sum entries transpose rays dualCone posHull transpose matrix mori
+      );
+    -- OK, now we have computed everything we need.  Write it to a file
+    infile := opts.FilePrefix | "-input";
+    outfile := opts.FilePrefix | "-output";
+    infile << gvInput(mori, heft, transpose degrees ring ambient X, intersectionnums,
+        opts.DegreeLimit, opts.Precision) << close;
+    inputLine := opts.Executable | " <" | infile | " >" | outfile;
+    print inputLine;
+    run inputLine;
+    -- Get the output, package as a hash table
+    (lines get outfile)/value//hashTable
     )
 
 gvCone = method(Options => options gvInvariants)
@@ -129,7 +146,7 @@ partitionGVConeByGV CYData := HashTable => opts -> X -> (
     gv := gvInvariants(X, opts); -- TODO: stash this?
     C := posHull transpose matrix ((keys gv)/toList);
     gvX := entries transpose rays C;
-    partition(f -> gv#(toSequence f), gvX)
+    partition(f -> if gv#?(toSequence f) then gv#(toSequence f) else 0, gvX)
     )
 
 -- TODO: move to Topology.m2? file?
