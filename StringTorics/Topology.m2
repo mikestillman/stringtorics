@@ -50,13 +50,28 @@ invariants List := (f) -> (
     {badp, (trim content f_0)_0, (trim content f_1)_0, #facs, d, nc, f_2, f_3}
     )
 
+allPoints = (p, n) -> (
+    -- all points in kk = ZZ//p in kk^n
+    pts := for a from 0 to p-1 list {a};
+    if n == 1 then return pts;
+    if n <= 0 then error "internal logic error";
+    b := allPoints(p, n-1);
+    flatten for a from 0 to p-1 list (b/(b1 -> prepend(a, b1)))
+    )
+
 pointCount = method()
 pointCount(RingElement, ZZ) := ZZ => (F, p) -> (
     -- F is a polynomial in 3 variables (FIXME: any number of variables)
     -- p is a prime number
-    R := (ZZ/p) (monoid ring F);
+    kk := ZZ/p;
+    R := kk (monoid ring F);
     Fp := sub(F, R);
-    # for x in (0,0,0)..(p-1,p-1,p-1) list if sub(Fp, matrix{{x}}) == 0 then x else continue
+    allpts := allPoints(p, numgens ring F);
+    allmaps := allpts/(pt -> map(kk, R, pt));
+    ans1 := # for a in allpts list (phi := map(kk, R, a); if phi Fp == 0 then a else continue);
+    --ans2 := # for x in (0,0,0)..(p-1,p-1,p-1) list if sub(Fp, matrix{{x}}) == 0 then x else continue;
+    --if ans1 != ans2 then << "My previous code was incorrect" << endl;
+    ans1
     )
 
 invariants CYData := List => X -> (
@@ -116,6 +131,144 @@ invariants2 CYData := List => X -> (
     badp = if badp === {} then 0 else sub(first badp, ZZ);
     {h11, h12, badp, (trim content L)_0, (trim content F)_0, #facs, d, nc}
     )
+
+invariants3 = method()
+invariants3 CYData := List => X -> (
+    -- these are some invariants only involving the cubic form, not the c2 form...
+    -- (but currently also involving h11 and h12.
+    F := cubicForm X;
+    h11 := hh^(1,1) X;
+    h12 := hh^(1,2) X;
+    RZ := ring F;
+    if coefficientRing RZ =!= ZZ then 
+        error "expected c2 and cubic form ring to be a polynomial ring over ZZ";
+    RQ := QQ[gens RZ];
+    facs := select((factors F)/toList/last, g -> support g != {});
+    FQ := sub(F, RQ);
+    d := dim saturate ideal jacobian FQ;
+    singFZ := ideal gens gb saturate(ideal(F) + ideal jacobian F);
+    sing := (F) -> ideal F + ideal jacobian F;
+    linearcontent := (I) -> (
+        if I == 0 then return 0;
+        lins := select(I_*, f -> f != 0 and first degree f <= 1);
+        if #lins == 0 then return 0;
+        gcd for ell in lins list (trim content ell)_0
+        );
+    lincontent := linearcontent saturate sing F;
+    singZ := flatten entries gens gb saturate(ideal(F) + ideal jacobian F);
+    badp := select(singZ, a -> support leadTerm a === {});
+    badp = if badp === {} then 0 else sub(first badp, ZZ);
+    {h11, h12, badp, (trim content F)_0, #facs, d, lincontent}
+    )
+
+invariants4 = method()
+invariants4 CYData := List => X -> (
+    L := c2Form X;
+    F := cubicForm X;
+    h11 := hh^(1,1) X;
+    h12 := hh^(1,2) X;
+    RZ := ring L;
+    if ring F =!= RZ then 
+        error "expected same rings for c2 and cubic form";
+    if coefficientRing RZ =!= ZZ then 
+        error "expected c2 and cubic form ring to be a polynomial ring over ZZ";
+    RQ := QQ[gens RZ];
+    facs := select((factors F)/toList/last, g -> support g != {});
+    LQ := sub(L, RQ);
+    FQ := sub(F, RQ);
+    d := dim saturate ideal jacobian FQ;
+    sing := (F) -> ideal F + ideal jacobian F;
+    linearcontent := (I) -> (
+        if I == 0 then return 0;
+        lins := select(I_*, f -> f != 0 and first degree f <= 1);
+        if #lins == 0 then return 0;
+        gcd for ell in lins list (trim content ell)_0
+        );
+    lincontent := linearcontent saturate sing F;
+    nc := # decompose ideal(LQ, FQ);
+    singZ := flatten entries gens gb saturate(ideal(F) + ideal jacobian F);
+    badp := select(singZ, a -> support leadTerm a === {});
+    badp = if badp === {} then 0 else sub(first badp, ZZ);
+    {h11, h12, badp, (trim content L)_0, (trim content F)_0, #facs, d, nc, lincontent}
+    )
+
+-- This one contains the best info we have to date (which isn't quite good enough).
+polynomialContent = method()
+
+-- Assumption: F is a polynomial over ZZ (not over a field).
+-- Outout: the integer content of F.
+polynomialContent RingElement := F -> (trim content F)_0
+
+integerPart = method()
+integerPart Ideal := (I) -> (
+    -- expected: I is an ideal in a polynomial ring over ZZ.
+    gs := select(flatten entries gens gb I, f -> support f === {});
+    if #gs == 0 then 0 
+    else if #gs == 1 then lift(gs_0, ZZ) 
+    else error "internal error: somehow have two generators in ZZ in this GB"
+    )
+
+hessian = method()
+hessian RingElement := F -> diff(vars ring F, diff(transpose vars ring F, F))
+
+factorShape = method()
+factorShape RingElement := F -> (
+    facs := factors F;
+    sort for x in facs list if support x#1 == {} then 
+            {0, lift(x#1, ZZ)}
+        else
+            {first degree x#1, x#0}
+    )
+
+invariantsAll = method()
+invariantsAll(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
+    RZ := ring L;
+    if ring F =!= RZ then 
+        error "expected same rings for c2 and cubic form";
+    if coefficientRing RZ =!= ZZ then 
+        error "expected c2 and cubic form ring to be a polynomial ring over ZZ";
+    RQ := QQ[gens RZ];
+    toQQ := F -> sub(F, vars RQ);
+    sing := (cod, I) -> trim(I + minors(cod, jacobian I));
+    linearcontent := (I) -> (
+        if I == 0 then return 0;
+        lins := select(I_*, f -> f != 0 and first degree f <= 1);
+        if #lins == 0 then return 0;
+        gcd for ell in lins list (trim content ell)_0
+        );
+    FQ := toQQ F;
+    LQ := toQQ L;
+    inv0 := polynomialContent L;
+    inv1 := polynomialContent F;
+    -- dimension and degree of each component of the singular loci over QQ.
+    inv2 := sort for c in decompose sing_1 ideal FQ list {codim c, degree c};
+    inv3 := sort for c in decompose sing_2 ideal(LQ, FQ) list {codim c, degree c};
+    inv4 := betti res saturate sing_1 ideal FQ;
+    -- inverse system of FQ
+    inv5 := betti res inverseSystem FQ; -- not clear this one is worthwhile
+    -- integer parts of singular loci.
+    conductF := integerPart saturate sing_1 ideal F;
+    conductLF := integerPart saturate sing_2 ideal(L,F);
+    inv6 := conductF;
+    inv7 := conductLF;
+    inv8 := factorShape det hessian F;
+    inv9 := linearcontent saturate sing_1 F;
+    hashTable {"h11" => h11,
+     "h12" => h12,
+     "c(L)" => inv0, 
+     "c(F)" => inv1, 
+     "comps sing FQ" => inv2, 
+     "comps sing LFQ" => inv3, 
+     "bettti sing LFQ" => inv4,
+     "betti inv F" => inv5,
+     "conduct(F)" => inv6,
+     "conduct(L,F)}" => inv7,
+     "hessian shape" => inv8,
+     "lincontent sing F" => inv9
+     }
+    )
+
+invariantsAll CYData := X -> invariantsAll(c2Form X, cubicForm X, hh^(1,1) X, hh^(1,2) X)
 
 mapIsIsomorphism = method()
 mapIsIsomorphism(Matrix, CYData, CYData) := Boolean => (M, X1, X2) -> (
@@ -187,7 +340,8 @@ partitionByTopology(List, HashTable, ZZ) := (Ls, Xs, degreelimit) -> (
             -- compare CY's i, j
             Ms := findLinearMaps(GVj, GVi);
             if Ms === {} then continue;
-            Ms = Ms/(m -> lift(m, ZZ));
+            --Ms = Ms/(m -> lift(m, ZZ));
+            Ms = for m in Ms list try lift(m, ZZ) else continue;
             Ms = select(Ms, m -> (d := det m; d === 1 or d === -1));
             isIsos := Ms/(m -> mapIsIsomorphism(m, Xj, Xi));
             if any(isIsos, x -> true) then (
@@ -205,6 +359,116 @@ partitionByTopology(List, HashTable, ZZ) := (Ls, Xs, degreelimit) -> (
     new HashTable from distinctTops
     )
 
+-- Code to help determine equivalences between cubic forms.
+-- 1. DONE Create ring T, TR, and (general) matrix A, and perhaps a phi: TR --> TR
+--   corresponding to A.
+-- 2. Given a list of linear forms that must map to other linear forms, find the constraint ideal
+--   in T.
+-- 3. Given points that map to points (in the contravariant map between affine spaces), 
+--   find the constraint ideal.
+-- 4. Given a list of linear forms that must match, up to sign, another set of linear forms.
+--   
+genericLinearMap = method(Options => {Variable => null})
+genericLinearMap Ring := opts -> R -> (
+    -- R should be a polynomial ring in n variables.
+    n := numgens R;
+    K := coefficientRing R;
+    t := if opts.Variable === null then getSymbol "t" else opts.Variable;
+    T := K[t_(1,1)..t_(n,n)];
+    TR := T [gens R, Join => false];
+    A := map(T^n,,transpose genericMatrix(T, T_0, n, n));
+    phi := map(TR, TR, transpose A);
+    (A, phi)
+    )
+
+TEST ///
+  R = ZZ/101[a..d]
+  (A, phi) = genericLinearMap R
+  TR = target phi
+  assert(source phi === TR)
+  assert(ring A === coefficientRing TR)
+  for i from 0 to 3 do 
+    assert(phi TR_i == (A^{i} * (transpose vars TR))_(0,0))
+
+  R = ZZ[a..d]
+  (A, phi) = genericLinearMap R
+  TR = target phi
+  assert(source phi === TR)
+  assert(ring A === coefficientRing TR)
+  for i from 0 to 3 do 
+    assert(phi TR_i == (A^{i} * (transpose vars TR))_(0,0))
+
+  R = QQ[a..e]
+  (A, phi) = genericLinearMap R
+  TR = target phi
+  assert(source phi === TR)
+  assert(ring A === coefficientRing TR)
+  for i from 0 to numgens R - 1 do 
+    assert(phi TR_i == (A^{i} * (transpose vars TR))_(0,0))
+///
+
+linearEquationConstraints = method()
+linearEquationConstraints(Matrix, RingMap, List, List) := Sequence => (A, phi, Ls, pts) -> (
+    -- each entry of Ls is a list/sequence of length 2: {F, G}
+    -- where F, G are polynomials in a ring R, (A, phi) are obtained from
+    -- genericLinearMap.  We return the ideal of constraints in T
+    -- for which phi(F) = G, for all pairs {F,G} in Ls.
+    -- We also return A0, phi0 corresponding to these constraints.
+    T := ring A;
+    A0 := A;
+    TR := target phi;
+    I := sum for L in Ls list ideal sub(last coefficients(phi L_0 - L_1), T);
+    if I != 0 then A0 = sub(A, T) % (trim I);
+    J := sum for pq in pts list minors(2, 
+        (A0 * (transpose matrix {pq#1})) | transpose matrix {pq#0});
+    if J != 0 then A0 = A0 % (trim J);
+    (A0, map(TR, TR, transpose A0))
+    )
+
+TEST ///
+  R = QQ[a..d]
+  (A, phi) = genericLinearMap R
+  TR = target phi
+  assert(source phi === TR)
+  assert(ring A === coefficientRing TR)
+  for i from 0 to 3 do 
+    assert(phi TR_i == (A^{i} * (transpose vars TR))_(0,0))
+    
+  linearEquationConstraints(A, phi, {}, {
+          {{1,0,0,0}, {1,1,0,0}},
+          {{0,1,0,0}, {1,1,3,7}},
+          {{0,0,1,0}, {5,6,-2,8}},
+          {{0,0,0,1}, {0,1,0,0}}}
+      )
+
+  F1 = -2*a^3-6*a^2*b+6*b^2*c-12*a^2*d+12*a*b*d+12*b^2*d+36*b*c*d+30*a*d^2+60*b*d^2+54*c*d^2+76*d^3
+  F7 = -2*a^3+6*a^2*b-6*a*b^2+2*b^3-6*a*c^2-4*c^3+6*a^2*d-6*a*d^2+2*d^3
+
+  (A0, phi0) = linearEquationConstraints(A, phi, {
+          {b+2*d, a-d},
+          {b+3*d, a+c},
+          {a+b+2*d, a-b},
+          {F1, F7}
+          }, {
+          }
+      )
+  phi0 F1 == F7
+
+  -- this one isn't correct yet.
+  (A0, phi0) = linearEquationConstraints(A, phi, {
+          {b+2*d, a-d},
+          {b+3*d, a+c},
+          {a+b+2*d, a-b}
+          }, {
+          }
+      )
+          {{0,0,1,0}, {1,1,-1,1}}
+
+  trim ideal last coefficients(phi0 F1 - F7)
+
+
+///
+-------------------------------------------------------------------------
 -- TODO: remove the following code (any reason to keep it?)
 topologyOfCY3 = method(Options => {
         Variable => "x",

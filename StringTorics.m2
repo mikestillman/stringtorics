@@ -53,7 +53,8 @@ newPackage(
             "ReflexivePolytopesDB",
             "CohomCalg",
             "Topcom",
-            "Triangulations"
+            "Triangulations",
+            "InverseSystems"
             },
         PackageImports => {
             --"Graphs", 
@@ -148,8 +149,12 @@ export {
         "CI",
 
     -- Creating databases of polytopes (with precomputed data).
+    "hodgeNumbers", -- of KSEntry: gives (h11, h12) from KSEntry.  Should be in ReflexivePolytopesDB?
     "createPolytopeDatabase",
     "addToCYDatabase",
+    "readCYDatabase",
+    "readCYs",
+    "readCYPolytopes",
 
     -- Cohomology
     "toricCohomologySetup",
@@ -757,10 +762,18 @@ exampleP111122'44 = () -> (value /// () -> (
      )
 
 
-findAllCYs = method()
-findAllCYs CYPolytopeData := List => Q -> (
+findAllCYs = method(Options => {Ring => null}) -- opts.Ring: ZZ[h11 variables].
+findAllCYs CYPolytopeData := List => opts -> Q -> (
     Ts := findAllFRSTs Q;
-    for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i)
+    RZ := if opts#Ring === null then (
+        a := getSymbol "a";
+        h11 := hh^(1,1) Q;
+        ZZ[a_1 .. a_h11]
+        )
+    else (
+        opts#Ring
+        );
+    for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i, Ring => RZ)
     )
 
 
