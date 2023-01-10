@@ -211,14 +211,36 @@ integerPart Ideal := (I) -> (
 hessian = method()
 hessian RingElement := F -> diff(vars ring F, diff(transpose vars ring F, F))
 
+--factorShape = method()
+-- This one is WRONG: lift(xxx, ZZ) could be positive or negative.  Those cannot be different.
+-- factorShape RingElement := F -> (
+--     facs := factors F;
+--     sort for x in facs list if support x#1 == {} then 
+--             {0, lift(x#1, ZZ)}
+--         else
+--             {first degree x#1, x#0}
+--     )
+
 factorShape = method()
 factorShape RingElement := F -> (
     facs := factors F;
     sort for x in facs list if support x#1 == {} then 
-            {0, lift(x#1, ZZ)}
+            {0, abs lift(x#1, ZZ)}
         else
             {first degree x#1, x#0}
     )
+
+-- factorShape RingElement := F -> (
+--     facs := factors F;
+--     con := trim content F;
+--     con = con_0;
+--     posfactors := sort for x in facs list if support x#1 == {} then 
+--                      continue
+--                    else
+--                      {first degree x#1, x#0};
+--     prepend({0, con},  posfactors)
+--     )
+
 
 invariantsAll = method()
 invariantsAll(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
@@ -344,9 +366,9 @@ partitionByTopology(List, HashTable, ZZ) := (Ls, Xs, degreelimit) -> (
             Ms = for m in Ms list try lift(m, ZZ) else continue;
             Ms = select(Ms, m -> (d := det m; d === 1 or d === -1));
             isIsos := Ms/(m -> mapIsIsomorphism(m, Xj, Xi));
-            if any(isIsos, x -> true) then (
-                mi := position(isIsos, x -> true);
-                << "found isomorphism" << endl;
+            if any(isIsos, x -> x == true) then (
+                mi := position(isIsos, x -> x == true);
+                << "found isomorphism from " << j << " to " << i << ": " << Ms#mi << endl;
                 distinctTops#j = append(distinctTops#j, {i, Ms#mi});
                 isFound = true;
                 break;
@@ -468,6 +490,100 @@ TEST ///
 
 
 ///
+
+findMaps = (top1, top2, A, phi, RQ) -> (
+    TR := target phi;
+    n := numgens TR;
+    T := coefficientRing TR;
+    toTR := f -> sub(f, TR);
+    toQQ := f -> sub(f, RQ);
+    evalphi := (F,G) -> trim sub(ideal last coefficients((phi toTR F) - toTR G), T);
+    (L1, F1, h11, h12) := toSequence top1;
+    (L2, F2, l11, l12) := toSequence top2;
+    RZ := ring L1;
+    if RZ =!= ring F1 or RZ =!= ring L2 or RZ =!= ring F2 then error "expected polynomials over the same ring";
+    if h11 != l11 or h12 != l12 then return null;
+    I := (evalphi(L1, L2) + evalphi(F1, F2));
+    if I == 1 then return null;
+    -- first see if there is a unique solution.
+    -- if codim I === n*n and degree I === 1 then (
+    --     A0 := A % I;
+    --     if support A0 === {} then (
+    --         A0 = lift(A0, QQ);
+    --         phi0 := map(RQ, RQ, transpose A0);
+    --         if phi0 toQQ L1 != toQQ L2 or phi0 toQQ F1 != toQQ F2 then error "map is not correct!";
+    --         return (A0, phi0)
+    --         );
+    --     );
+    -- now let's look through all of the components for a smooth point.
+    compsI := decompose I;
+    As := for c in compsI list A % c;
+    As = for a in As list try lift(a, ZZ) else continue; -- grab the ones that lift.
+    As = select(As, a -> (d := det a; d == 1 or d == -1));
+    if #As > 0 then (
+        A0 := As#0;
+        phi0 := map(RZ, RZ, transpose A0);
+        if phi0 L1 != L2 or phi0 F1 != F2 then error "map is not correct!";
+        (A0, phi0)
+        )
+    else (
+        if any(compsI, c -> codim c < n*n or degree c =!= 1) then (
+            << "warning: there might be a map in this case!" << endl;
+            << netList compsI << endl;
+            << "----------------------------------" << endl;
+            compsI 
+            )
+        else null
+        )
+    )
+
+partitionH113sByTopology = method()
+partitionH113sByTopology(List, HashTable, Ring) := HashTable => (Ls, Ts, RQ) -> (
+    -- Ls is a list of labels to separate.
+    -- Ts is a hash table of label => {c2, cubicform, h11, h12}
+    -- This function first separates these by the invariants: invariantsAll.
+    -- The for each pair in each set, it attempts to find a map between them.
+    -- output: a hashtable, keys are labels, values are lists of {label, matrix}
+    (A, phi) := genericLinearMap RQ;
+    if #Ls === 1 then return hashTable {Ls#0 => {}};
+    H := partition(lab -> invariantsAll toSequence Ts#lab, Ls);
+    distinctTops := new MutableHashTable; -- label => list of {label, matrix}, those with the same topology
+    for i in Ls do (
+        Ti := Ts#i;
+        -- now we attempt to match this with each key of distinctTops
+        << "trying " << i << endl;
+        prev := keys distinctTops;
+        isFound := false;
+        for j in prev do (
+            Tj := Ts#j;
+            ans := findMaps(Tj, Ti, A, phi, RQ);
+            --if j == (115,0) and i == (120,0) then error "debug me";
+            if ans === null then (
+                -- Ti is distinct from Tj
+                )
+            else if class first ans === Matrix then (
+                -- we have a match!
+                (A0, phi0) := ans;
+                if all(flatten entries A0, a -> liftable(a, ZZ))
+                then (
+                    isFound = true;
+                    distinctTops#j = append(distinctTops#j, {i, lift(A0, ZZ)});
+                    break;
+                    )
+                )
+            else (
+                << (i,j) << " might be the same, might not" << endl;
+                )
+            );
+        if not isFound then (
+            distinctTops#i = {};
+            << "found new top: " << i << endl;
+            );
+        );
+    new HashTable from distinctTops
+    )
+
+
 -------------------------------------------------------------------------
 -- TODO: remove the following code (any reason to keep it?)
 topologyOfCY3 = method(Options => {
