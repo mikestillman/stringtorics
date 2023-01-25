@@ -155,8 +155,10 @@ elapsedTime H = partition(lab -> invariantsAll toSequence (Ts#lab), favorables);
 -- now for each set, we separate via finding isomorphisms...
 RQ = QQ[a,b,c]
 elapsedTime INV = for k in keys H list k => partitionH113sByTopology(H#k, Ts, RQ); -- 40 sec now 170 seconds...  Fix that!
+
     INV/(x -> #x#1)//tally
     INVMES = INV/last; -- 186 different topologies (not counting the non-favorable (232,0))
+
   REPS = for k in INV list (
       H := last k; -- a hash table
       K := keys H;
@@ -164,7 +166,6 @@ elapsedTime INV = for k in keys H list k => partitionH113sByTopology(H#k, Ts, RQ
       else sort K)
   netList REPS
 
-
   ALLREPS = for k in INV list (
       H := last k; -- a hash table
       K := keys H;
@@ -172,7 +173,7 @@ elapsedTime INV = for k in keys H list k => partitionH113sByTopology(H#k, Ts, RQ
   netList sort (ALLREPS)
 
   DIFFTOPS = sort flatten ALLREPS -- these are all, I believe, distinct topologies (mod worries about torsion)
-
+  #DIFFTOPS == 186 -- this is the number of different topologies we have found (up to torsion).
   -- Now we do the above, with the DIFFTOPS and all the ones from Richard's h11=3 database.
   load "~/src/stringtorics/m2-examples/richard-example/richard-db.m2"
   RICH = flatten flatten for h21 in findH21s DIR list 
@@ -180,28 +181,40 @@ elapsedTime INV = for k in keys H list k => partitionH113sByTopology(H#k, Ts, RQ
       for cy in findCYs(DIR, h21, pol) list 
         (h21, pol, cy) => toList join(getTopology(h21, pol, cy, RZ), {3, h21});
 
+  keysTops = join(DIFFTOPS, sort (RICH/first))
   allTs = hashTable join(
       for lab in DIFFTOPS list lab => Ts#lab,
       for x in RICH list x
       );
   #keys allTs == 969
-  assert(#keys allTs == #DIFFTOPS + #RICH)
+  assert(sort keys allTs == sort keysTops)
 
-  elapsedTime H = partition(lab -> invariantsAll toSequence (allTs#lab), keys allTs); 
+  elapsedTime H = partition(lab -> invariantsAll toSequence (allTs#lab), keysTops); -- 62 sec
   #keys H == 279
   -- now for each set, we separate via finding isomorphisms...
   RQ = QQ[a,b,c]
-  elapsedTime INV = for k in keys H list k => partitionH113sByTopology(H#k, allTs, RQ); --
+  elapsedTime INVALL = for k in keys H list k => partitionH113sByTopology(H#k, allTs, RQ); -- 1053 seconds
+    INVALL/(x -> #x#1)//tally
+    -- 259 invariants have only one class.  18 invariants have 2 classes, and 2 invariants have 3 clsses.
 
-  ALLREPS = for k in INV list (
+  REPSALL = for k in INVALL list (
       H := last k; -- a hash table
       K := keys H;
       sort K)
-  netList sort (ALLREPS)
+  netList sort REPSALL
 
-  DIFFTOPS = sort flatten ALLREPS -- these are all, I believe, distinct topologies (mod worries about torsion)
-  #DIFFTOP == 301
-    
+  DIFFTOPSALL = sort flatten REPSALL -- these are all, I believe, distinct topologies (mod worries about torsion)
+  #DIFFTOPSALL == 301
+
+  EQUIVS = INVALL/last/(x -> for k in keys x list prepend(k, (x#k)/first))//flatten;
+  EQUIVS = EQUIVS/sort;
+  netList EQUIVS  
+  #EQUIVS == 301
+  
+  -- uppshot so far: all for h11=3, favorable (243 favorable, 1 nonfavorable polytopes)
+  -- # different reflexives for h11=3, with different 2-face restrictions: 305
+  -- # different topologies of toric hypersurfaces: 186
+  -- # different topologies of toric hypersurfaces and their flops: 301
 -- testing:
 -- these all have the same invariants.  How many are isomorphic?
 Ls = {(138, 0), (141, 0), (142, 0), (143, 0), (143, 1), (143, 2), (149, 0), (149, 1), (149, 2), (149, 3), (149, 4), (149, 5), (152, 0), (152, 1)}
