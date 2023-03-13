@@ -125,7 +125,7 @@ getKeyPair String := Sequence => str -> (
     )
 
 cySetGLSM = method()
-cySetGLSM CYPolytopeData := (cyData) -> elapsedTime (
+cySetGLSM CYPolytopeData := (cyData) -> (
     if cyData.cache#?"glsm" then return;
     mLP := transpose matrix cyData#"rays";
     D := transpose syz mLP;
@@ -141,7 +141,7 @@ cySetH11H21 = cyData -> (
     -- this version is only for CY 3-fold hypersurfaces...
     -- P:ReflexivePolytope
     -- P := polytope cyData;
-    elapsedTime A := annotatedFaces cyData; -- polytope on N side.
+    A := annotatedFaces cyData; -- polytope on N side.
     A0 := for x in A list if x#0 == 0 then drop(x,1) else continue; -- annotatedFaces(0, P);
     A1 := for x in A list if x#0 == 1 then drop(x,1) else continue; -- annotatedFaces(1, P);
     A2 := for x in A list if x#0 == 2 then drop(x,1) else continue; -- annotatedFaces(2, P);

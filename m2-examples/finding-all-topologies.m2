@@ -16,7 +16,7 @@ restart
 needs "./finding-all-topologies.m2"
 topes = kreuzerSkarke(3, Limit => 10000);
 assert(#topes == 244)
-createPolytopeDatabase("polytopes-h11-3.dbm", topes)
+createCYDatabase("polytopes-h11-3.dbm", topes)
 ///
 
 ///
@@ -25,7 +25,7 @@ createPolytopeDatabase("polytopes-h11-3.dbm", topes)
   needsPackage "StringTorics"
   topes = kreuzerSkarke(4, Limit => 10000);
   assert(#topes == 1197)
-  elapsedTime createPolytopeDatabase("polytopes-h11-4.dbm", topes) -- 730 sec
+  elapsedTime createCYDatabase("polytopes-h11-4.dbm", topes) -- 730 sec
 ///
 
 ///
@@ -33,7 +33,7 @@ createPolytopeDatabase("polytopes-h11-3.dbm", topes)
   needsPackage "StringTorics"
   topes = kreuzerSkarke(5, Limit => 10000);
   assert(#topes == 4990)
-  elapsedTime createPolytopeDatabase("polytopes-h11-5.dbm", topes)
+  elapsedTime createCYDatabase("polytopes-h11-5.dbm", topes)
 ///
 
 
@@ -81,7 +81,7 @@ cyData(dump X, i -> V)
 
 X#"polytope data"
 dump X#"polytope data"
-createPolytopeDatabase("test-polytopes-h11-5.dbm", topes)
+createCYDatabase("test-polytopes-h11-5.dbm", topes)
 F = openDatabase "test-polytopes-h11-5.dbm" -- or also open it for writing?
 F#"10"
 peek cyPolytopeData F#"10"

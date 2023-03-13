@@ -150,7 +150,7 @@ export {
 
     -- Creating databases of polytopes (with precomputed data).
     "hodgeNumbers", -- of KSEntry: gives (h11, h12) from KSEntry.  Should be in ReflexivePolytopesDB?
-    "createPolytopeDatabase",
+    "createCYDatabase",
     "addToCYDatabase",
     "readCYDatabase",
     "readCYs",

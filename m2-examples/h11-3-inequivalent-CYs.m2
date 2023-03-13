@@ -11,12 +11,12 @@
   needsPackage "StringTorics"
   topes = kreuzerSkarke(3, Limit => 1000);
   assert(#topes == 244)
-  elapsedTime createPolytopeDatabase("foo-cys-ntfe-h11-3.dbm", topes) -- 83 seconds
+  elapsedTime createCYDatabase("foo2-cys-ntfe-h11-3.dbm", topes) -- 83 seconds
 
   -- Now let's add in all the CY's total, including all triangulations
   -- which are distinct when restricted to 2-faces (NTFE => true says don't use all triangulations).
-  Qs = readCYPolytopes "foo-cys-ntfe-h11-3.dbm";
-  elapsedTime for Q in values Qs do addToCYDatabase("foo-cys-ntfe-h11-3.dbm", Q, NTFE => true); -- 11 seconds
+  Qs = readCYPolytopes "foo2-cys-ntfe-h11-3.dbm";
+  elapsedTime for Q in values Qs do addToCYDatabase("foo2-cys-ntfe-h11-3.dbm", Q, NTFE => true); -- 11 seconds
 
   -- this creates a database whose keys are integers 0, 1, ..., 243
   -- (one for each polytope in the KS database, in the same order, and

@@ -31,6 +31,19 @@ doc ///
           TO generateTriangulations
           }@
     Text
+      @SUBSECTION "Creating and using CYDatabase's"@
+      
+      A CYDatabase is a file which contains precomputed data about a collection of
+      (reflexive) 4D-polytopes and the resulting Calabi Yau hypersurfaces.
+    Text
+      @UL {
+          TO createCYDatabase,
+          TO addToCYDatabase,
+          TO readCYDatabase,
+          TO readCYPolytopes,
+          TO readCYs
+          }@
+    Text
       @SUBSECTION "Cohomology"@
     Text
       @UL {
@@ -451,6 +464,124 @@ doc ///
     Text
   SeeAlso
 ///
+
+------------------------------------------------
+-- Database creation and retrieval functions ---
+------------------------------------------------
+doc ///
+  Key
+    (createCYDatabase, String, List)
+    createCYDatabase
+  Headline
+    create a database file and populate it with CYPolytope's
+  Usage
+    createCYDatabase(filename, topes)
+  Inputs
+    filename:String
+      the desired name of the data base file.  If the file doesn't exist it is created,
+      otherwise the name should be the name of an existing data base file, and this file
+      is modified
+    topes:List
+      of @ofClass KSEntry@'s, a list of Kreuzer-Skarke type entries for some polytopes
+  Consequences
+    Item
+      For each polytope corresponding to an entry in the {\tt topes} list, 
+      a @ofClass CYPolytopeData@ is created, and various information about it is computed
+      and then stored in the data base file for later use
+  Description
+    Text
+      A CYDatabase file is a database file whose contents are precomputed data
+      about some @TO CYPolytopeData@'s and @TO CYData@'s.  Since some information takes
+      non-trivial time to construct, we precompute this data, and then we can later pull up
+      this data via the functions @TO readCYDatabase@, @TO "readCYPolytopes"@, and @TO readCYs@.
+    Text
+      The CYPolytope corresponding to each item of the {\tt topes} list is constructed
+      and some basic data is computed (e.g. information about the faces of the polytopes, whether the
+      polytope is favorable, and degree information about it.  This data is then stored in the
+      database for later retrieval.
+    Example
+      filename = "foo-remove-me.dbm"
+      if fileExists filename then removeFile filename
+      topes = kreuzerSkarke(2, Limit => 3)
+      createCYDatabase(filename, topes)
+    Example
+      F = openDatabase filename
+      F#"1"
+      V = cyPolytopeData F#"1"
+      hh^(1,1) V
+      hh^(1,2) V
+      isFavorable V
+    Text
+      As a data base file, all keys of {\tt F} are strings, and the values are strings too.
+    Example
+      sort keys F
+    Text
+      Close the database file when done with it.
+    Example 
+      close F
+    Text
+      For this example, we also delete this database file.
+    Example
+      removeFile filename
+  SeeAlso
+    addToCYDatabase
+    readCYDatabase
+    readCYs
+///
+
+--     (addToCYDatabase, String, Database, ZZ) do we want this one?
+///
+  Key
+    addToCYDatabase
+    (addToCYDatabase, String, CYPolytopeData)
+  Headline
+    add data for every Calabi-Yau hypersurface coming from a given (reflexive) CYPolytopeData
+  Usage
+    addToCYDatabase(filename, Q)
+  Inputs
+    Q:CYPolytopeData
+  Consequences
+    Item
+      Data for all triangulations, or all 2-face inequivalent triangulations is placed into 
+      the database with file name {\tt filename}
+  Description
+    Text
+    Example
+      filename = "foo-remove-me.dbm"
+      if fileExists filename then removeFile filename
+      topes = kreuzerSkarke(2, Limit => 3)
+      createCYDatabase(filename, topes)
+    Text
+    Example
+      Qs = readCYPolytopes(filename)
+      addToCYDatabase(filename, Qs#0, NTFE => true)
+      addToCYDatabase(filename, Qs#1, NTFE => true)
+      addToCYDatabase(filename, Qs#2, NTFE => true)
+      readCYs(filename, Qs)
+      R = ZZ[x,y]
+      (Qs, Xs) = readCYDatabase(filename, Ring => R)
+      Qs
+      Xs
+      
+      R = ZZ[a,b,c,d]
+      (Qs, Xs) = readCYDatabase("./m2-examples/cys-ntfe-h11-4-h12-100.dbm", Ring => R);
+  SeeAlso
+///
+
+///
+  Key
+  Headline
+  Usage
+  Inputs
+  Outputs
+  Consequences
+    Item
+  Description
+    Text
+    Example
+  SeeAlso
+///
+
 
 
 ///
