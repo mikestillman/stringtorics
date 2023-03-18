@@ -13,6 +13,7 @@ topologicalData CYData := TopologicalDataOfCY3 => X -> (
         }
     )
 
+
 -- this is the older, alternate version of this function.
 -- this is to be removed.
 topologicalData(CYData, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
@@ -443,8 +444,9 @@ linearEquationConstraints(Matrix, RingMap, List, List) := Sequence => (A, phi, L
     if I != 0 then A0 = sub(A, T) % (trim I);
     J := sum for pq in pts list minors(2, 
         (A0 * (transpose matrix {pq#1})) | transpose matrix {pq#0});
-    if J != 0 then A0 = A0 % (trim J);
-    (A0, map(TR, TR, transpose A0))
+    J1 := if J != 0 then I+J else I;
+    if J != 0 then A0 = A0 % (trim J1);
+    (A0, map(TR, TR, transpose A0), trim ideal gens gb J1)
     )
 
 TEST ///
@@ -499,7 +501,7 @@ findMaps = (top1, top2, A, phi, RQ) -> (
     toQQ := f -> sub(f, RQ);
     evalphi := (F,G) -> trim sub(ideal last coefficients((phi toTR F) - toTR G), T);
     (L1, F1, h11, h12) := toSequence top1;
-    (L2, F2, l11, l12) := toSequence top2;
+    (L2, F2, l11, l12) := toSequence top2;    
     RZ := ring L1;
     if RZ =!= ring F1 or RZ =!= ring L2 or RZ =!= ring F2 then error "expected polynomials over the same ring";
     if h11 != l11 or h12 != l12 then return null;
@@ -536,6 +538,56 @@ findMaps = (top1, top2, A, phi, RQ) -> (
         else null
         )
     )
+
+
+-- findMaps = method()
+-- findMaps(CYData, CYData, Ring) := (X1, X2, RQ) -> (
+--     (A, phi) := genericLinearMap RQ;
+--     TR := target phi;
+--     n := numgens TR;
+--     T := coefficientRing TR;
+--     toTR := f -> sub(f, TR);
+--     toQQ := f -> sub(f, RQ);
+--     evalphi := (F,G) -> trim sub(ideal last coefficients((phi toTR F) - toTR G), T);
+--     (L1, F1, h11, h12) := (c2Form X1, cubicForm X1, hh^(1,1) X1, hh^(1,2) X1);
+--     (L2, F2, l11, l12) := (c2Form X2, cubicForm X2, hh^(1,1) X2, hh^(1,2) X2);
+--     RZ := ring L1;
+--     if RZ =!= ring F1 or RZ =!= ring L2 or RZ =!= ring F2 then error "expected polynomials over the same ring";
+--     if h11 != l11 or h12 != l12 then return null;
+--     I := (evalphi(L1, L2) + evalphi(F1, F2));
+--     if I == 1 then return null;
+--     -- first see if there is a unique solution.
+--     -- if codim I === n*n and degree I === 1 then (
+--     --     A0 := A % I;
+--     --     if support A0 === {} then (
+--     --         A0 = lift(A0, QQ);
+--     --         phi0 := map(RQ, RQ, transpose A0);
+--     --         if phi0 toQQ L1 != toQQ L2 or phi0 toQQ F1 != toQQ F2 then error "map is not correct!";
+--     --         return (A0, phi0)
+--     --         );
+--     --     );
+--     -- now let's look through all of the components for a smooth point.
+--     compsI := decompose I;
+--     As := for c in compsI list A % c;
+--     As = for a in As list try lift(a, ZZ) else continue; -- grab the ones that lift.
+--     As = select(As, a -> (d := det a; d == 1 or d == -1));
+--     if #As > 0 then (
+--         A0 := As#0;
+--         phi0 := map(RZ, RZ, transpose A0);
+--         if phi0 L1 != L2 or phi0 F1 != F2 then error "map is not correct!";
+--         (A0, phi0)
+--         )
+--     else (
+--         if any(compsI, c -> codim c < n*n or degree c =!= 1) then (
+--             << "warning: there might be a map in this case!" << endl;
+--             << netList compsI << endl;
+--             << "----------------------------------" << endl;
+--             compsI 
+--             )
+--         else null
+--         )
+--     )
+
 
 partitionH113sByTopology = method()
 partitionH113sByTopology(List, HashTable, Ring) := HashTable => (Ls, Ts, RQ) -> (
@@ -655,6 +707,6 @@ hh(Sequence, TopologicalDataOfCY3) := (pq, T) -> (
         )
     )
 
-c2 TopologicalDataOfCY3 := T -> T#"c2"
+c2Form TopologicalDataOfCY3 := T -> T#"c2"
 cubicForm TopologicalDataOfCY3 := T -> T#"cubic intersection form"
 ----- end of removing code TODO -----------------------------

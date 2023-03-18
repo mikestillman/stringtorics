@@ -15,7 +15,7 @@ completeIntersection(NormalToricVariety, List) := (Y,CIeqns) -> (
     then error "expected a list of toric divisors on the given toric variety";
     new CompleteIntersectionInToric from {
         symbol Ambient => Y,
-        symbol CI => CIeqns,
+        symbol CI => CIeqns, -- these are the degrees
         symbol cache => new CacheTable
         }
     )

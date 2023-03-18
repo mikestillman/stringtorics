@@ -565,6 +565,11 @@ doc ///
       
       R = ZZ[a,b,c,d]
       (Qs, Xs) = readCYDatabase("./m2-examples/cys-ntfe-h11-4-h12-100.dbm", Ring => R);
+      #(keys Qs)
+      #(keys Xs) 
+      Xs
+      debug StringTorics
+      partition(k -> invariantsAll Xs#k, keys Xs)
   SeeAlso
 ///
 

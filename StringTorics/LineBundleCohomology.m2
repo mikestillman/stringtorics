@@ -270,6 +270,34 @@ cohomologyVector = method()
 cohomologyVector(NormalToricVariety, ToricDivisor) := (Y,D) -> cohomologyVector(Y, degree D)
 cohomologyVector(NormalToricVariety, List) := (Y, D) -> (cohomCalg(Y, {D}); first Y.cache.CohomCalg#D)
 
+cohomology(ZZ, NormalToricVariety, List, RingElement) := opts -> (i,X,deg,F) -> (
+    (nrows, ncols, rk1) := cohomologyMatrixRank(i, X, deg, F);
+    (nrows2, ncols2, rk2) := cohomologyMatrixRank(i+1, X, deg, F);
+    nrows-rk1 + ncols2 - rk2
+    )
+
+cohomology(ZZ, CompleteIntersectionInToric, List, RingElement) := opts -> (i,X,deg,F) -> (
+    if dim X != dim ambient X - 1 then error "cohomology for line bundles of CI's of codimension >= 2 is not yet handled";
+    V := ambient X;
+    (nrows, ncols, rk1) := cohomologyMatrixRank(i, V, deg, F);
+    (nrows2, ncols2, rk2) := cohomologyMatrixRank(i+1, V, deg, F);
+    nrows-rk1 + ncols2 - rk2
+    )
+
+cohomologyVector(CompleteIntersectionInToric, List, RingElement) := (X, deg, F) -> (
+    -- TODO: allow full complete intersection here... Not just a hypersurface.
+    -- require currently that X has codim 1 in a toric variety
+    if dim X != dim ambient X - 1 then error "cohomology for line bundles of CI's of codimension >= 2 is not yet handled";
+    V := ambient X;
+    rks := for i from 0 to dim ambient X list cohomologyMatrixRank(i, V, deg, F);
+    -- rks is a list of (nrows, ncols, rk).
+    for j from 0 to 3 list (
+        (nrows1, ncols1, rk1) := rks#j;
+        (nrows2, ncols2, rk2) := rks#(j+1);
+        nrows1 - rk1 + ncols2 - rk2
+        )
+    )
+
 -------------------------------------------
 -- Cohomology from short exact sequences --
 -------------------------------------------
