@@ -19,13 +19,9 @@ hodgeNumbers KSEntry := (ks) -> (
         value substring(str, ans#2#0, ans#2#1))
     )
 
-createPolytopeDatabase = method()
-    -- Options => {
-    --     "Hodge" => null, -- TODO: not used yet
-    --     "Count" => null  -- TODO: not used yet
-    --     })
+createCYDatabase = method()
 
-createPolytopeDatabase(String, List) := (dbfilename, topes) -> (
+createCYDatabase(String, List) := (dbfilename, topes) -> (
     -- open data base file
     F := openDatabaseOut dbfilename;
     -- loop through topes, create CYPolytopeData, populate it, write it to data base.
@@ -46,8 +42,6 @@ createPolytopeDatabase(String, List) := (dbfilename, topes) -> (
 
 addToCYDatabase = method(Options => {NTFE => false})
 
--- in the following: want the triangulations to be numbered from 0, 1, ...
--- not from some ordering in Xs...
 addToCYDatabase(String, CYPolytopeData) := opts -> (dbfilename, Q) -> (
     elapsedTime Xs := findAllCYs Q; -- TODO: check: is findALlCYs still correct.
     << "  " << #Xs << " triangulations total" << endl;
@@ -109,7 +103,7 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
   needsPackage "StringTorics"
   topes = kreuzerSkarke(3, Limit => 1000);
   assert(#topes == 244)
-  elapsedTime createPolytopeDatabase("foo-ntfe-h11-3.dbm", topes)
+  elapsedTime createCYDatabase("foo-ntfe-h11-3.dbm", topes)
   
   -- Now let's add in all the CY's total, including all triangulations.
   Qs = readCYPolytopes "foo-ntfe-h11-3.dbm";
@@ -147,7 +141,7 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
 *-
 
   createNTFEDatabase = (dbname, topes) -> (
-      createPolytopeDatabase(dbname, topes);
+      createCYDatabase(dbname, topes);
       Qs := readCYPolytopes dbname;
       elapsedTime for Q in values Qs do addToCYDatabase(dbname, Q, NTFE => true);
       )
