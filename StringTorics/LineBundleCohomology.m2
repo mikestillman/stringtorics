@@ -298,6 +298,20 @@ cohomologyVector(CompleteIntersectionInToric, List, RingElement) := (X, deg, F) 
         )
     )
 
+cohomologyVector LineBundle := List => L -> (
+    X := variety L;
+    Fs := equations X;
+    cohomologyVector(X, degree L, Fs#0)
+    )
+
+hh^ZZ(LineBundle) := ZZ => (i,L) -> (
+    X := ambient L;
+    Fs := equations X;
+    cohomology(i, X, degree L, Fs#0)
+    )
+
+ScriptedFunctor ^* := (scriptedfun) -> if scriptedfun === hh then cohomologyVector else null
+
 -------------------------------------------
 -- Cohomology from short exact sequences --
 -------------------------------------------

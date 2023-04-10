@@ -78,7 +78,7 @@ export {
 
     "basisIndices",
     "restrictTriangulation", -- restrict triangulation to each 2-face
-        
+
     -- Extra polyhedral facilities, for lattice points and faces of a Polyhedron
     -- how much of this shoiuld be exported??
     "vertexMatrix",
@@ -147,6 +147,11 @@ export {
     "CompleteIntersectionInToric",
         "Ambient",
         "CI",
+        "Equations",
+    "equations",
+    "LineBundle",
+    "lineBundle",
+    
 
     -- Creating databases of polytopes (with precomputed data).
     "hodgeNumbers", -- of KSEntry: gives (h11, h12) from KSEntry.  Should be in ReflexivePolytopesDB?
