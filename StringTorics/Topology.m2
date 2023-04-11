@@ -3,7 +3,7 @@
 -- (this appears to be equivalent to being diffeomorphic).
 
 topologicalData = method()
-topologicalData CYData := TopologicalDataOfCY3 => X -> (
+topologicalData CalabiYauInToric := TopologicalDataOfCY3 => X -> (
     -- TODO: this does not consider torision in H_2(X, ZZ) or H_3(X, ZZ)
     elapsedTime new TopologicalDataOfCY3 from {
         "h11" => hh^(1,1) cyPolytopeData X,
@@ -16,7 +16,7 @@ topologicalData CYData := TopologicalDataOfCY3 => X -> (
 
 -- this is the older, alternate version of this function.
 -- this is to be removed.
-topologicalData(CYData, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
+topologicalData(CalabiYauInToric, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
     V := ambient X;
     Q := X#"polytope data";
     P := polytope Q;
@@ -75,7 +75,7 @@ pointCount(RingElement, ZZ) := ZZ => (F, p) -> (
     ans1
     )
 
-invariants CYData := List => X -> (
+invariants CalabiYauInToric := List => X -> (
     L := c2Form X;
     F := cubicForm X;
     h11 := hh^(1,1) X;
@@ -99,7 +99,7 @@ invariants CYData := List => X -> (
     )
 
 invariants1 = method()
-invariants1 CYData := List => X -> (
+invariants1 CalabiYauInToric := List => X -> (
     L := c2Form X;
     F := cubicForm X;
     h11 := hh^(1,1) X;
@@ -111,7 +111,7 @@ invariants1 CYData := List => X -> (
     )
 
 invariants2 = method()
-invariants2 CYData := List => X -> (
+invariants2 CalabiYauInToric := List => X -> (
     L := c2Form X;
     F := cubicForm X;
     h11 := hh^(1,1) X;
@@ -134,7 +134,7 @@ invariants2 CYData := List => X -> (
     )
 
 invariants3 = method()
-invariants3 CYData := List => X -> (
+invariants3 CalabiYauInToric := List => X -> (
     -- these are some invariants only involving the cubic form, not the c2 form...
     -- (but currently also involving h11 and h12.
     F := cubicForm X;
@@ -163,7 +163,7 @@ invariants3 CYData := List => X -> (
     )
 
 invariants4 = method()
-invariants4 CYData := List => X -> (
+invariants4 CalabiYauInToric := List => X -> (
     L := c2Form X;
     F := cubicForm X;
     h11 := hh^(1,1) X;
@@ -291,10 +291,10 @@ invariantsAll(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
      }
     )
 
-invariantsAll CYData := X -> invariantsAll(c2Form X, cubicForm X, hh^(1,1) X, hh^(1,2) X)
+invariantsAll CalabiYauInToric := X -> invariantsAll(c2Form X, cubicForm X, hh^(1,1) X, hh^(1,2) X)
 
 mapIsIsomorphism = method()
-mapIsIsomorphism(Matrix, CYData, CYData) := Boolean => (M, X1, X2) -> (
+mapIsIsomorphism(Matrix, CalabiYauInToric, CalabiYauInToric) := Boolean => (M, X1, X2) -> (
     -- M is a matrix over the base field, a possible map giving
     -- an isomorphism of topologies.
     -- T1, T2 are two topologies.
@@ -405,6 +405,7 @@ genericLinearMap Ring := opts -> R -> (
     )
 
 TEST ///
+  debug StringTorics
   R = ZZ/101[a..d]
   (A, phi) = genericLinearMap R
   TR = target phi
@@ -450,6 +451,7 @@ linearEquationConstraints(Matrix, RingMap, List, List) := Sequence => (A, phi, L
     )
 
 TEST ///
+  debug StringTorics
   R = QQ[a..d]
   (A, phi) = genericLinearMap R
   TR = target phi
@@ -468,7 +470,7 @@ TEST ///
   F1 = -2*a^3-6*a^2*b+6*b^2*c-12*a^2*d+12*a*b*d+12*b^2*d+36*b*c*d+30*a*d^2+60*b*d^2+54*c*d^2+76*d^3
   F7 = -2*a^3+6*a^2*b-6*a*b^2+2*b^3-6*a*c^2-4*c^3+6*a^2*d-6*a*d^2+2*d^3
 
-  (A0, phi0) = linearEquationConstraints(A, phi, {
+  (A0, phi0, I1) = linearEquationConstraints(A, phi, {
           {b+2*d, a-d},
           {b+3*d, a+c},
           {a+b+2*d, a-b},
@@ -479,18 +481,17 @@ TEST ///
   phi0 F1 == F7
 
   -- this one isn't correct yet.
-  (A0, phi0) = linearEquationConstraints(A, phi, {
+  (A0, phi0, I1) = linearEquationConstraints(A, phi, {
           {b+2*d, a-d},
           {b+3*d, a+c},
           {a+b+2*d, a-b}
           }, {
+          {{0,0,1,0}, {1,1,-1,1}}
           }
       )
-          {{0,0,1,0}, {1,1,-1,1}}
+--          
 
-  trim ideal last coefficients(phi0 F1 - F7)
-
-
+  A0 % sub(trim ideal last coefficients(phi0 F1 - F7), coefficientRing TR)
 ///
 
 findMaps = (top1, top2, A, phi, RQ) -> (
@@ -541,7 +542,7 @@ findMaps = (top1, top2, A, phi, RQ) -> (
 
 
 -- findMaps = method()
--- findMaps(CYData, CYData, Ring) := (X1, X2, RQ) -> (
+-- findMaps(CalabiYauInToric, CalabiYauInToric, Ring) := (X1, X2, RQ) -> (
 --     (A, phi) := genericLinearMap RQ;
 --     TR := target phi;
 --     n := numgens TR;

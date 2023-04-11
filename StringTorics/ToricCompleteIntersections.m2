@@ -26,15 +26,15 @@ completeIntersection(NormalToricVariety, List) := opts -> (Y,CIeqns) -> (
         }
     )
 
-variety(CYData, Ring) := CompleteIntersectionInToric => (X, kk) -> (
+variety(CalabiYauInToric, Ring) := CompleteIntersectionInToric => (X, kk) -> (
     if not X.cache#?(variety, kk) then X.cache#(variety, kk) = (
         V := normalToricVariety X;
         X1 := completeIntersection(V, { - toricDivisor V});
-        X1.cache.CYData = X;
+        X1.cache.CalabiYauInToric = X;
         X1);
     X.cache#(variety, kk)
     )
-variety CYData  := X -> variety(X, QQ)
+variety CalabiYauInToric  := X -> variety(X, QQ)
 
 dim CompleteIntersectionInToric := (X) -> dim X.Ambient - #X.CI
 ambient CompleteIntersectionInToric := (X) -> X.Ambient

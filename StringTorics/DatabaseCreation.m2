@@ -110,12 +110,12 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
   elapsedTime for Q in values Qs do addToCYDatabase("foo-ntfe-h11-3.dbm", Q, NTFE => true);
 
   -- How to access all of the polytopes and CY's at once.
-  -- We create a hashtable for each, keys are their labels, and values are the CYPolytopeData and CYData's.
+  -- We create a hashtable for each, keys are their labels, and values are the CYPolytopeData and CalabiYauInToric's.
   Qs = readCYPolytopes "foo-ntfe-h11-3.dbm";
   for k in sort keys Qs do assert instance(Qs#k, CYPolytopeData)
 
   Xs = readCYs("foo-ntfe-h11-3.dbm", Qs);
-  for k in sort keys Xs do assert instance(Xs#k, CYData)
+  for k in sort keys Xs do assert instance(Xs#k, CalabiYauInToric)
 
   -- or both at the same time..
   (Qs1, Xs1) = readCYDatabase "foo-ntfe-h11-3.dbm";

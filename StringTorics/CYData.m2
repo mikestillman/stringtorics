@@ -1,14 +1,14 @@
 --------------------------------------------------------------
--- CYData (soon to change back to CalabiYauInToric? ----------
+-- CalabiYauInToric (soon to change back to CalabiYauInToric? ----------
 --------------------------------------------------------------
 
-CYData.synonym = "Calabi-Yau in a normal toric variety"
-CYData.GlobalAssignHook = globalAssignFunction
-CYData.GlobalReleaseHook = globalReleaseFunction
-expression CYData := X -> if hasAttribute (X, ReverseDictionary) 
+CalabiYauInToric.synonym = "Calabi-Yau in a normal toric variety"
+CalabiYauInToric.GlobalAssignHook = globalAssignFunction
+CalabiYauInToric.GlobalReleaseHook = globalReleaseFunction
+expression CalabiYauInToric := X -> if hasAttribute (X, ReverseDictionary) 
     then expression getAttribute (X, ReverseDictionary) else 
     (describe X)#0
-describe CYData := X -> Describe (expression CYData) (
+describe CalabiYauInToric := X -> Describe (expression CalabiYauInToric) (
       expression "a" , expression 3)
 --    expression rays X, expression max X)
 
@@ -31,7 +31,7 @@ CYDataCache = {
 
 cyData = method(Options => {ID => null, Ring => null})
 cyData(CYPolytopeData, List) := opts -> (Q, triang) -> (
-    X := new CYData from {
+    X := new CalabiYauInToric from {
         symbol cache => new CacheTable,
         "polytope data" => Q,
         "triangulation" => triang
@@ -40,7 +40,7 @@ cyData(CYPolytopeData, List) := opts -> (Q, triang) -> (
     if opts#Ring =!= null then X.cache#"pic ring" = opts#Ring; -- Note: we should check that it is over ZZ, has h^(1,1) variables
     X
     )
-cyData(String, Function) := CYData => opts -> (str, F) -> (
+cyData(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
     -- F is a function which takes an id of a CYPolytopeData and returns the object.
     L := lines str;
     if L#0 != "CYData" then error "string is not in proper format";
@@ -56,7 +56,7 @@ cyData(String, Function) := CYData => opts -> (str, F) -> (
             readFcn := field#1#0;
             if fields#?k then k => readFcn fields#k else error("expected key "|k)
         ));
-    X := new CYData from prepend(symbol cache => new CacheTable, required);
+    X := new CalabiYauInToric from prepend(symbol cache => new CacheTable, required);
     -- now read in the cache values (including "id" value, if any)
     for field in CYDataCache do (
         k := field#0;
@@ -68,7 +68,7 @@ cyData(String, Function) := CYData => opts -> (str, F) -> (
     X
     )
 
-dump CYData := String => {} >> opts -> X -> (
+dump CalabiYauInToric := String => {} >> opts -> X -> (
     s1 := "CYData\n";
     strs := for field in CYDataFields list (
         k := field#0;
@@ -87,14 +87,14 @@ dump CYData := String => {} >> opts -> X -> (
     )
 
 makeCY = method(Options => {ID => null, Ring => null})
-makeCY CYPolytopeData := CYData => opts -> Q -> (
+makeCY CYPolytopeData := CalabiYauInToric => opts -> Q -> (
     P2 := polytope Q;
     (LP,tri) := regularStarTriangulation(dim P2-2,P2);
     if rays Q =!= LP then error "I have a lattice point mismatch";
     cyData(Q, tri, opts)
     )    
 
-normalToricVariety CYData := opts -> X -> (
+normalToricVariety CalabiYauInToric := opts -> X -> (
     if not X.cache.?NormalToricVariety then X.cache.NormalToricVariety = (
         Q := X#"polytope data";
         T := X#"triangulation";
@@ -105,15 +105,15 @@ normalToricVariety CYData := opts -> X -> (
     -- TODO: this fails if the class group is torsion! (Fails: later it gives an inscrutable error...)
     )
 
-rays CYData := X -> rays cyPolytopeData X
-max CYData := X -> X#"triangulation"
+rays CalabiYauInToric := X -> rays cyPolytopeData X
+max CalabiYauInToric := X -> X#"triangulation"
 
 -- TODO: triangulation is used with 2 different pieces of data:
 --  with, without cone point!  Change this to use only one point.
 -- Also: there are 4 matrices one can imagine: A, A0 (A with origin), Ah, A0h...
 -- We need to be consistent about these!
 -- TODO: do we really need this?
-triangulation CYData := Triangulation => opts -> X -> (
+triangulation CalabiYauInToric := Triangulation => opts -> X -> (
     if not opts.Homogenize then error "Homogenize flag is not used in this method";
     if not X.cache#?"triangulation" then (
         rys := X#"polytope data"#"rays";
@@ -124,28 +124,28 @@ triangulation CYData := Triangulation => opts -> X -> (
     X.cache#"triangulation"
     )
 
-cyPolytopeData CYData := opts -> X -> X#"polytope data"
-dim CYData := X -> dim ambient X - 1
-polytope CYData := X -> polytope cyPolytopeData X
-polytope(CYData, String) := (X, which) -> polytope(cyPolytopeData X, which)
-basisIndices CYData := List => X -> basisIndices cyPolytopeData X
-degrees CYData := List => X -> degrees cyPolytopeData X
+cyPolytopeData CalabiYauInToric := opts -> X -> X#"polytope data"
+dim CalabiYauInToric := X -> dim ambient X - 1
+polytope CalabiYauInToric := X -> polytope cyPolytopeData X
+polytope(CalabiYauInToric, String) := (X, which) -> polytope(cyPolytopeData X, which)
+basisIndices CalabiYauInToric := List => X -> basisIndices cyPolytopeData X
+degrees CalabiYauInToric := List => X -> degrees cyPolytopeData X
 
-ambient CYData := X -> normalToricVariety X
+ambient CalabiYauInToric := X -> normalToricVariety X
 
 label = method()
 label CYPolytopeData := Q -> if Q.cache#?"id" then Q.cache#"id" else ""
-label CYData := X -> (label cyPolytopeData X, if X.cache#?"id" then X.cache#"id" else "")
+label CalabiYauInToric := X -> (label cyPolytopeData X, if X.cache#?"id" then X.cache#"id" else "")
 
-hh(Sequence, CYData) := (pq, X) -> hh^pq cyPolytopeData X
+hh(Sequence, CalabiYauInToric) := (pq, X) -> hh^pq cyPolytopeData X
 
-abstractVariety CYData := opts -> X -> (
+abstractVariety CalabiYauInToric := opts -> X -> (
     -- Store this with X.
     V := ambient X;
     aX := completeIntersection(V, {-toricDivisor V});
     abstractVariety(aX, base())
     )
-abstractVariety(CYData, AbstractVariety) := opts -> (X, pt) -> (
+abstractVariety(CalabiYauInToric, AbstractVariety) := opts -> (X, pt) -> (
     -- Store this with X?
     -- Check: pt is of dimension zero?
     V := ambient X;
@@ -160,7 +160,7 @@ abstractVariety(CYData, AbstractVariety) := opts -> (X, pt) -> (
 --    genus of this face}
 -- TODO: need also a function which returns just: triangles, genus information.
 restrictTriangulation = method()
-restrictTriangulation CYData := List => (X) -> (
+restrictTriangulation CalabiYauInToric := List => (X) -> (
     -- given X, we use its annotated faces and its triangulation, to write down the triangulations of the 2-faces
     -- of the corresponding reflexive polytope in the N lattice side.
     Q := cyPolytopeData X;

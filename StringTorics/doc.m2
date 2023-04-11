@@ -491,7 +491,7 @@ doc ///
   Description
     Text
       A CYDatabase file is a database file whose contents are precomputed data
-      about some @TO CYPolytopeData@'s and @TO CYData@'s.  Since some information takes
+      about some @TO CYPolytopeData@'s and @TO CalabiYauInToric@'s.  Since some information takes
       non-trivial time to construct, we precompute this data, and then we can later pull up
       this data via the functions @TO readCYDatabase@, @TO "readCYPolytopes"@, and @TO readCYs@.
     Text

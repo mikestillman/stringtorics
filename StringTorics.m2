@@ -63,11 +63,11 @@ newPackage(
 
 export {
     -- Types defined here
-    "CYPolytopeData", -- rename to CYReflexivePair?  Uugh
-    "CYData",  -- rename to CalabiYauInToric?
+    "CYPolytopeData", -- rename to CYReflexivePair?  How about CYPolytope?
+    "CalabiYauInToric",  -- rename to CalabiYauInToric
     "TopologicalDataOfCY3",
 
-    -- CYPolytopeData, CYData
+    -- CYPolytopeData, CalabiYauInToric
     "ID",
     "cyPolytopeData",
     "dump",
@@ -244,7 +244,7 @@ TopologicalDataOfCY3 = new Type of HashTable
   -- contains h11, h21, c2, cubic intersection form
 
 CYPolytopeData = new Type of HashTable
-CYData = new Type of HashTable
+CalabiYauInToric = new Type of HashTable
 
 dump = method(Options => true)
 isFavorable = method();

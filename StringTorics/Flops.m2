@@ -27,7 +27,7 @@ debug needsPackage "StringTorics"
 
 
   heftFunction = method()
-  heftFunction CYData := X -> (
+  heftFunction CalabiYauInToric := X -> (
       mori := hilbertBasisGenerators toricMoriCone(ambient X, basisIndices X);
       sum entries transpose rays dualCone posHull transpose matrix mori
       )
