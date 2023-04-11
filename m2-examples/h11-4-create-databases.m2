@@ -23,7 +23,7 @@
   elapsedTime Qs = readCYPolytopes "foo-cys-ntfe-h11-4.dbm";
   for k from 0 to 1196 do (
       Q := Qs#k;
-      assert instance(Q, CYPolytopeData);
+      assert instance(Q, CYPolytope);
       assert(Q#?"rays");
       assert(Q#?"face dimensions");
       assert(Q.cache#?"favorable");

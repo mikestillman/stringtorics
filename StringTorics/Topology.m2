@@ -6,8 +6,8 @@ topologicalData = method()
 topologicalData CalabiYauInToric := TopologicalDataOfCY3 => X -> (
     -- TODO: this does not consider torision in H_2(X, ZZ) or H_3(X, ZZ)
     elapsedTime new TopologicalDataOfCY3 from {
-        "h11" => hh^(1,1) cyPolytopeData X,
-        "h21" => hh^(2,1) cyPolytopeData X,
+        "h11" => hh^(1,1) cyPolytope X,
+        "h21" => hh^(2,1) cyPolytope X,
         "c2" => c2 X,
         "intersection numbers" => intersectionNumbers X
         }

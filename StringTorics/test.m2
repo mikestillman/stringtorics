@@ -9,7 +9,7 @@
   #topes == 4990
   A = matrix topes_40 -- this will be vertices of a polytope in the M lattice 
   -- We need to get to a triangulation of the dual polytope...
-  X0 = cyPolytopeData topes_40
+  X0 = cyPolytope topes_40
   X = makeCY(X0, Ring => (RZ = ZZ[s_1..s_5]))
 
   -- X = calabiYau(A, Lattice => "M") -- A must define a reflexive polytope.
@@ -20,7 +20,7 @@
   intersectionRing V -- defines integral.
   topX = topologicalData(X, RZ)
   cubicForm topX
-  isFavorable cyPolytopeData X
+  isFavorable cyPolytope X
   
   intersectionNumbers X
   toricIntersectionNumbers X
@@ -299,7 +299,7 @@ TEST ///
   -- XXX
   topes = kreuzerSkarke 3;
   A = matrix topes_30
-  Q = cyPolytopeData topes_30
+  Q = cyPolytope topes_30
   hh^(1,1) Q
   P1 = polytope(Q, "M")
   P2 = polytope(Q, "N")
@@ -1140,8 +1140,8 @@ TEST ///
   classGroup V
   transpose matrix degrees ring V
 
---  elapsedTime Qs = for tope in topes list cyPolytopeData(tope);
-  elapsedTime Qs = for i from 0 to #topes -1 list cyPolytopeData(topes#i, ID => i);
+--  elapsedTime Qs = for tope in topes list cyPolytope(tope);
+  elapsedTime Qs = for i from 0 to #topes -1 list cyPolytope(topes#i, ID => i);
   Qs/isFavorable -- takes .1 - .2 seconds per polytope.  Why so long?
   favorables = positions(Qs, isFavorable)
 
@@ -1187,7 +1187,7 @@ TEST ///
   picardGroup V
   h11OfCY P
 
-  Q = cyPolytopeData topes_1
+  Q = cyPolytope topes_1
   -- Q = reflexivePolytope A -- really the dual of A.
   vertices polytope Q
   netList annotatedFaces Q -- annotated faces of the dual of A.
@@ -1222,7 +1222,7 @@ TEST ///
   needsPackage "StringTorics"
 *-
   topes = kreuzerSkarke(6, Limit => 10)  
-  Q = cyPolytopeData(topes_7, ID => 7)
+  Q = cyPolytope(topes_7, ID => 7)
   X = makeCY Q
   assert isFavorable Q
   elapsedTime Xs = findAllCYs Q;
@@ -1262,13 +1262,13 @@ TEST ///
 
 
   
-  Qs = for i from 0 to #topes-1 list cyPolytopeData(topes_i, ID => i)
+  Qs = for i from 0 to #topes-1 list cyPolytope(topes_i, ID => i)
   Qs/isFavorable
 
   topes = kreuzerSkarke(7, Limit => 10)  
   topes = kreuzerSkarke(8, Limit => 10)
 
-  Qs = for i from 0 to #topes-1 list cyPolytopeData(topes_i, ID => i)
+  Qs = for i from 0 to #topes-1 list cyPolytope(topes_i, ID => i)
   Qs/isFavorable
   --A = transpose matrix rays Qs_0
   A = transpose matrix rays Qs_7
@@ -1416,9 +1416,9 @@ TEST ///
   needsPackage "StringTorics"
 *-  
   topes = kreuzerSkarke(5, Limit => 10);
-  Qs = for i from 0 to #topes-1 list cyPolytopeData(topes#i, ID => i)
+  Qs = for i from 0 to #topes-1 list cyPolytope(topes#i, ID => i)
   for tope in topes list isFavorable convexHull matrix tope
-  Q = cyPolytopeData(topes_8, ID => 8)
+  Q = cyPolytope(topes_8, ID => 8)
   Ts = findAllFRSTs Q  
   Xs = findAllCYs Q
 
@@ -1440,7 +1440,7 @@ TEST ///
   needsPackage "StringTorics"
 *-  
   topes = kreuzerSkarke(3, Limit => 50);    
-  Q = cyPolytopeData(topes_30, ID => 30)
+  Q = cyPolytope(topes_30, ID => 30)
   Ts = findAllFRSTs Q
   Xs = for i from 0 to #Ts-1 list cyData(Q, Ts#i, ID => i)
   vertices polytope Q
@@ -1479,7 +1479,7 @@ TEST ///
   -- Test the routines of this package on the example X given here (h11=3, h12=69)
   topes = kreuzerSkarke(3, Limit => 50);    
   A = matrix topes_30
-  P = cyPolytopeData(topes_30, ID => 30)
+  P = cyPolytope(topes_30, ID => 30)
   hh^(1,1) P == 3
   hh^(1,2) P == 69
   X = makeCY(P, Ring => (RZ = ZZ[x,y,z]), ID => 0)
@@ -1491,7 +1491,7 @@ TEST ///
   assert(dim X == 3)
   elapsedTime topologicalData X
   dump X
-  dump cyPolytopeData X
+  dump cyPolytope X
   elapsedTime restrictTriangulation X
 
   dim X  

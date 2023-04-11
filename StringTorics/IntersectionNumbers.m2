@@ -113,7 +113,7 @@ computeC2(List, List) := (toricIntersectionNumbers, basIndices) -> (
 computeIntersectionNumbers = method()
 computeIntersectionNumbers CalabiYauInToric := X -> (
     if not X.cache#?"toric intersection numbers" then  (
-        V := cyPolytopeData X;
+        V := cyPolytope X;
         basIndices := basisIndices V;
         A := transpose matrix rays V;
         T2 := restrictTriangulation X;
@@ -157,7 +157,7 @@ TEST ///
   restart
   debug needsPackage "StringTorics"
   F = openDatabase "polytopes-h11-5.dbm"
-    V = cyPolytopeData F#"1000"
+    V = cyPolytope F#"1000"
     close F
   X = makeCY(V, ID => label V, Ring => (RZ = ZZ[a,b,c,d,e]))
 

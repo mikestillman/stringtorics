@@ -7,14 +7,14 @@
 restart
 needsPackage "StringTorics"
 
--- First, lets find the polytope (CYPolytopeData) we will use.
+-- First, lets find the polytope (CYPolytope) we will use.
   F = openDatabase "polytopes-h11-5.dbm"
-  elapsedTime Qs = for i from 0 to 4989 list cyPolytopeData F#(toString i); -- 3.25 seconds to read this...
+  elapsedTime Qs = for i from 0 to 4989 list cyPolytope F#(toString i); -- 3.25 seconds to read this...
   close F
   assert(1 == # select(Qs, Q -> h21OfCY Q == 20))
   Q = first select(Qs, Q -> h21OfCY Q == 20)
   dump Q
-  -- CYPolytopeData
+  -- CYPolytope
   --   rays:{{-1, -1, 0, 0}, {-1, -1, 0, 1}, {-1, 0, -1, 0}, {-1, 1, -1, 0}, {0, -1, 0, -1}, {0, -1, 1, -1}, {0, 0, -1, -1}, {1, 0, -1, -1}, {1, 1, 1, 1}}
   --   face dimensions:{0, 0, 0, 0, 0, 0, 0, 0, 0}
   --   id:0
@@ -85,7 +85,7 @@ T2 = {{0, 1, 2, 3}, {0, 1, 2, 6}, {0, 1, 3, 5}, {0, 1, 4, 5}, {0, 1, 4, 6},
     {0, 2, 3, 6}, {0, 3, 5, 6}, {0, 4, 5, 6}, {1, 2, 3, 7}, {1, 2, 6, 7}, 
     {1, 3, 5, 8}, {1, 3, 7, 8}, {1, 4, 5, 7}, {1, 4, 6, 7}, {1, 5, 7, 8}, 
     {2, 3, 6, 7}, {3, 5, 6, 7}, {3, 5, 7, 8}, {4, 5, 6, 7}}
-Q = cyPolytopeData convexHull transpose matrix Qrays
+Q = cyPolytope convexHull transpose matrix Qrays
 assert(degrees Q === GLSM)
 assert(basisIndices Q == basisInd)
 X1 = cyData(Q, T1)

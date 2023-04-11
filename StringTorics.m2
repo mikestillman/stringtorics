@@ -63,13 +63,13 @@ newPackage(
 
 export {
     -- Types defined here
-    "CYPolytopeData", -- rename to CYReflexivePair?  How about CYPolytope?
-    "CalabiYauInToric",  -- rename to CalabiYauInToric
+    "CYPolytope", -- rename to CYReflexivePair?  How about CYPolytope?
+    "CalabiYauInToric",
     "TopologicalDataOfCY3",
 
-    -- CYPolytopeData, CalabiYauInToric
+    -- CYPolytope, CalabiYauInToric
     "ID",
-    "cyPolytopeData",
+    "cyPolytope",
     "dump",
     "label",
     
@@ -243,7 +243,7 @@ ReverseDictionary = value Core#"private dictionary"#"ReverseDictionary";
 TopologicalDataOfCY3 = new Type of HashTable
   -- contains h11, h21, c2, cubic intersection form
 
-CYPolytopeData = new Type of HashTable
+CYPolytope = new Type of HashTable
 CalabiYauInToric = new Type of HashTable
 
 dump = method(Options => true)
@@ -768,7 +768,7 @@ exampleP111122'44 = () -> (value /// () -> (
 
 
 findAllCYs = method(Options => {Ring => null}) -- opts.Ring: ZZ[h11 variables].
-findAllCYs CYPolytopeData := List => opts -> Q -> (
+findAllCYs CYPolytope := List => opts -> Q -> (
     Ts := findAllFRSTs Q;
     RZ := if opts#Ring === null then (
         a := getSymbol "a";
@@ -785,9 +785,9 @@ findAllCYs CYPolytopeData := List => opts -> Q -> (
 -- keys: id, cypolytopedata, triangulation, cache.  The id is what? (id of polytope, which triangulation)
 --  write date: for cypolytopedata, just writes the id.
 --  read data: given id, need to be able to get at which polytope it is.
---    maybe a table with id => CYPolytopeData, or a function which takes an integer and returns 
---    the CYPolytopeData object to use, with this id.
---  construct one from a CYPolytopeData, id, triangulation.
+--    maybe a table with id => CYPolytope, or a function which takes an integer and returns 
+--    the CYPolytope object to use, with this id.
+--  construct one from a CYPolytope, id, triangulation.
 --  what is in the cache?
 --    ambient toric
 --    CYInToric?

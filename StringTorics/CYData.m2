@@ -15,7 +15,7 @@ describe CalabiYauInToric := X -> Describe (expression CalabiYauInToric) (
 CYDataFields = {
     -- first entry: true means it must exist and be in the main hash table
     --   false: it might exist, and is in the cache table.
-    "polytope data" => {value, Q -> toString Q.cache#"id", CYPolytopeData},
+    "polytope data" => {value, Q -> toString Q.cache#"id", CYPolytope},
     "triangulation" => {value, toString, List}
     }
 
@@ -30,7 +30,7 @@ CYDataCache = {
     }
 
 cyData = method(Options => {ID => null, Ring => null})
-cyData(CYPolytopeData, List) := opts -> (Q, triang) -> (
+cyData(CYPolytope, List) := opts -> (Q, triang) -> (
     X := new CalabiYauInToric from {
         symbol cache => new CacheTable,
         "polytope data" => Q,
@@ -41,7 +41,7 @@ cyData(CYPolytopeData, List) := opts -> (Q, triang) -> (
     X
     )
 cyData(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
-    -- F is a function which takes an id of a CYPolytopeData and returns the object.
+    -- F is a function which takes an id of a CYPolytope and returns the object.
     L := lines str;
     if L#0 != "CYData" then error "string is not in proper format";
     fields := hashTable for i from 1 to #L-1 list getKeyPair L#i;
@@ -87,7 +87,7 @@ dump CalabiYauInToric := String => {} >> opts -> X -> (
     )
 
 makeCY = method(Options => {ID => null, Ring => null})
-makeCY CYPolytopeData := CalabiYauInToric => opts -> Q -> (
+makeCY CYPolytope := CalabiYauInToric => opts -> Q -> (
     P2 := polytope Q;
     (LP,tri) := regularStarTriangulation(dim P2-2,P2);
     if rays Q =!= LP then error "I have a lattice point mismatch";
@@ -105,7 +105,7 @@ normalToricVariety CalabiYauInToric := opts -> X -> (
     -- TODO: this fails if the class group is torsion! (Fails: later it gives an inscrutable error...)
     )
 
-rays CalabiYauInToric := X -> rays cyPolytopeData X
+rays CalabiYauInToric := X -> rays cyPolytope X
 max CalabiYauInToric := X -> X#"triangulation"
 
 -- TODO: triangulation is used with 2 different pieces of data:
@@ -124,20 +124,20 @@ triangulation CalabiYauInToric := Triangulation => opts -> X -> (
     X.cache#"triangulation"
     )
 
-cyPolytopeData CalabiYauInToric := opts -> X -> X#"polytope data"
+cyPolytope CalabiYauInToric := opts -> X -> X#"polytope data"
 dim CalabiYauInToric := X -> dim ambient X - 1
-polytope CalabiYauInToric := X -> polytope cyPolytopeData X
-polytope(CalabiYauInToric, String) := (X, which) -> polytope(cyPolytopeData X, which)
-basisIndices CalabiYauInToric := List => X -> basisIndices cyPolytopeData X
-degrees CalabiYauInToric := List => X -> degrees cyPolytopeData X
+polytope CalabiYauInToric := X -> polytope cyPolytope X
+polytope(CalabiYauInToric, String) := (X, which) -> polytope(cyPolytope X, which)
+basisIndices CalabiYauInToric := List => X -> basisIndices cyPolytope X
+degrees CalabiYauInToric := List => X -> degrees cyPolytope X
 
 ambient CalabiYauInToric := X -> normalToricVariety X
 
 label = method()
-label CYPolytopeData := Q -> if Q.cache#?"id" then Q.cache#"id" else ""
-label CalabiYauInToric := X -> (label cyPolytopeData X, if X.cache#?"id" then X.cache#"id" else "")
+label CYPolytope := Q -> if Q.cache#?"id" then Q.cache#"id" else ""
+label CalabiYauInToric := X -> (label cyPolytope X, if X.cache#?"id" then X.cache#"id" else "")
 
-hh(Sequence, CalabiYauInToric) := (pq, X) -> hh^pq cyPolytopeData X
+hh(Sequence, CalabiYauInToric) := (pq, X) -> hh^pq cyPolytope X
 
 abstractVariety CalabiYauInToric := opts -> X -> (
     -- Store this with X.
@@ -163,7 +163,7 @@ restrictTriangulation = method()
 restrictTriangulation CalabiYauInToric := List => (X) -> (
     -- given X, we use its annotated faces and its triangulation, to write down the triangulations of the 2-faces
     -- of the corresponding reflexive polytope in the N lattice side.
-    Q := cyPolytopeData X;
+    Q := cyPolytope X;
     F := annotatedFaces Q;
     twofaces := for x in F list if x#0 =!= 2 then continue else {x#1, x#2, x#4};
     T := max X; -- triangulation

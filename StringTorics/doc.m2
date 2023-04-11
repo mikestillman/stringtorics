@@ -486,12 +486,12 @@ doc ///
   Consequences
     Item
       For each polytope corresponding to an entry in the {\tt topes} list, 
-      a @ofClass CYPolytopeData@ is created, and various information about it is computed
+      a @ofClass CYPolytope@ is created, and various information about it is computed
       and then stored in the data base file for later use
   Description
     Text
       A CYDatabase file is a database file whose contents are precomputed data
-      about some @TO CYPolytopeData@'s and @TO CalabiYauInToric@'s.  Since some information takes
+      about some @TO CYPolytope@'s and @TO CalabiYauInToric@'s.  Since some information takes
       non-trivial time to construct, we precompute this data, and then we can later pull up
       this data via the functions @TO readCYDatabase@, @TO "readCYPolytopes"@, and @TO readCYs@.
     Text
@@ -507,7 +507,7 @@ doc ///
     Example
       F = openDatabase filename
       F#"1"
-      V = cyPolytopeData F#"1"
+      V = cyPolytope F#"1"
       hh^(1,1) V
       hh^(1,2) V
       isFavorable V
@@ -533,13 +533,13 @@ doc ///
 ///
   Key
     addToCYDatabase
-    (addToCYDatabase, String, CYPolytopeData)
+    (addToCYDatabase, String, CYPolytope)
   Headline
-    add data for every Calabi-Yau hypersurface coming from a given (reflexive) CYPolytopeData
+    add data for every Calabi-Yau hypersurface coming from a given (reflexive) CYPolytope
   Usage
     addToCYDatabase(filename, Q)
   Inputs
-    Q:CYPolytopeData
+    Q:CYPolytope
   Consequences
     Item
       Data for all triangulations, or all 2-face inequivalent triangulations is placed into 
