@@ -209,6 +209,22 @@ doc ///
    SeeAlso
 ///
 
+///
+  Key
+  Headline
+  Usage
+  Inputs
+  Outputs
+  Consequences
+  Description
+    Text
+    Example
+  Caveat
+  SeeAlso
+///
+
+
+
 doc ///
    Key
      hodgeOfCYToricDivisor

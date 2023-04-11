@@ -253,8 +253,8 @@ h21OfCY = method() -- deprecate this
 findAllFRSTs = method()
 
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
-load (currentFileDirectory | "StringTorics/CYPolytopeData.m2")
-load (currentFileDirectory | "StringTorics/CYData.m2")
+load (currentFileDirectory | "StringTorics/CYPolytope.m2")
+load (currentFileDirectory | "StringTorics/CalabiYauInToric.m2")
 load (currentFileDirectory | "StringTorics/IntersectionNumbers.m2")
 load (currentFileDirectory | "StringTorics/Topology.m2")
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- has some util code, but not much.  TODO: clean that up.
