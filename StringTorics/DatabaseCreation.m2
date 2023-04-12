@@ -24,12 +24,12 @@ createCYDatabase = method()
 createCYDatabase(String, List) := (dbfilename, topes) -> (
     -- open data base file
     F := openDatabaseOut dbfilename;
-    -- loop through topes, create CYPolytopeData, populate it, write it to data base.
+    -- loop through topes, create CYPolytope, populate it, write it to data base.
     elapsedTime for i from 0 to #topes - 1 do elapsedTime (
         lab := label topes_i;
         if lab === null then lab = i; -- else print "using label";
         << "computing for polytope " << lab << endl;
-        V := cyPolytopeData(topes#i, ID => lab); -- note that the polytope data is really that of the dual to topes#i.
+        V := cyPolytope(topes#i, ID => lab); -- note that the polytope data is really that of the dual to topes#i.
         -- now fill it with data we want
         basisIndices V; -- compute them
         isFavorable V; -- compute h11, h21, favorability.
@@ -42,7 +42,7 @@ createCYDatabase(String, List) := (dbfilename, topes) -> (
 
 addToCYDatabase = method(Options => {NTFE => false})
 
-addToCYDatabase(String, CYPolytopeData) := opts -> (dbfilename, Q) -> (
+addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
     elapsedTime Xs := findAllCYs Q; -- TODO: check: is findALlCYs still correct.
     << "  " << #Xs << " triangulations total" << endl;
     if opts.NTFE then (
@@ -60,7 +60,7 @@ addToCYDatabase(String, CYPolytopeData) := opts -> (dbfilename, Q) -> (
     )
 addToCYDatabase(String, Database, ZZ) := opts -> (dbfilename, topesDB, i) -> (
     <<  "-- doing polytope " << i << endl;
-    Q := cyPolytopeData(topesDB#(toString i), ID => i);
+    Q := cyPolytope(topesDB#(toString i), ID => i);
     addToCYDatabase(dbfilename, Q, opts);
     )
 
@@ -70,7 +70,7 @@ readCYDatabase String := Sequence => opts -> (dbname) -> (
       labs := (keys F)/value;
       Qlabels := sort select(labs, lab -> instance(lab, ZZ));
       Xlabels := sort select(labs, lab -> instance(lab, Sequence));
-      Qs := hashTable for lab in Qlabels list lab => cyPolytopeData F#(toString lab);
+      Qs := hashTable for lab in Qlabels list lab => cyPolytope F#(toString lab);
       Xs := hashTable for lab in Xlabels list lab => cyData(F#(toString lab), i -> Qs#i, opts);
     close F;
     (Qs, Xs)
@@ -81,7 +81,7 @@ readCYPolytopes String := HashTable => (dbname) -> (
     F := openDatabase dbname;
       labs := (keys F)/value;
       Qlabels := sort select(labs, lab -> instance(lab, ZZ));
-      Qs := hashTable for lab in Qlabels list lab => cyPolytopeData F#(toString lab);
+      Qs := hashTable for lab in Qlabels list lab => cyPolytope F#(toString lab);
     close F;
     Qs
     )
@@ -110,12 +110,12 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
   elapsedTime for Q in values Qs do addToCYDatabase("foo-ntfe-h11-3.dbm", Q, NTFE => true);
 
   -- How to access all of the polytopes and CY's at once.
-  -- We create a hashtable for each, keys are their labels, and values are the CYPolytopeData and CYData's.
+  -- We create a hashtable for each, keys are their labels, and values are the CYPolytope and CalabiYauInToric's.
   Qs = readCYPolytopes "foo-ntfe-h11-3.dbm";
-  for k in sort keys Qs do assert instance(Qs#k, CYPolytopeData)
+  for k in sort keys Qs do assert instance(Qs#k, CYPolytope)
 
   Xs = readCYs("foo-ntfe-h11-3.dbm", Qs);
-  for k in sort keys Xs do assert instance(Xs#k, CYData)
+  for k in sort keys Xs do assert instance(Xs#k, CalabiYauInToric)
 
   -- or both at the same time..
   (Qs1, Xs1) = readCYDatabase "foo-ntfe-h11-3.dbm";
@@ -2052,7 +2052,7 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
     Qlabels = sort select(keys F, k -> (a := value k; instance(a, ZZ)))
     assert(#Xlabels == 526)
     assert(#Qlabels == 244)
-    elapsedTime Qs = for k in Qlabels list cyPolytopeData(F#k, ID => value k);
+    elapsedTime Qs = for k in Qlabels list cyPolytope(F#k, ID => value k);
     elapsedTime Xs = for k in Xlabels list cyData(F#k, i -> Qs#i, Ring => RZ);
     assert(Xs/label === Xlabels/value)
   close F
@@ -2074,8 +2074,8 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
       )
   nontorsionfrees == {(0, 0), (9, 0), (9, 1), (10, 0), (10, 1), (10, 2), (55, 0), (62, 0), (232, 0)}
 
-  nonFavorables = select(sort keys Xs, lab -> not isFavorable cyPolytopeData Xs#lab)
-  favorables = select(sort keys Xs, lab -> isFavorable cyPolytopeData Xs#lab)
+  nonFavorables = select(sort keys Xs, lab -> not isFavorable cyPolytope Xs#lab)
+  favorables = select(sort keys Xs, lab -> isFavorable cyPolytope Xs#lab)
 
   elapsedTime H = partition(lab -> (
           X := Xs#lab;
@@ -2208,7 +2208,7 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
     Qlabels = sort select(keys F, k -> (a := value k; instance(a, ZZ)))
     assert(#Xlabels == 306)
     assert(#Qlabels == 244)
-    elapsedTime Qs = for k in Qlabels list cyPolytopeData(F#k, ID => value k);
+    elapsedTime Qs = for k in Qlabels list cyPolytope(F#k, ID => value k);
     elapsedTime Xs = for k in Xlabels list cyData(F#k, i -> Qs#i, Ring => RZ);
     assert(Xs/label === Xlabels/value)
   close F
@@ -2230,8 +2230,8 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
       )
   nontorsionfrees == {(0, 0), (9, 0), (10, 0), (55, 0), (62, 0), (232, 0)}
 
-  nonFavorables = select(sort keys Xs, lab -> not isFavorable cyPolytopeData Xs#lab)
-  favorables = select(sort keys Xs, lab -> isFavorable cyPolytopeData Xs#lab)
+  nonFavorables = select(sort keys Xs, lab -> not isFavorable cyPolytope Xs#lab)
+  favorables = select(sort keys Xs, lab -> isFavorable cyPolytope Xs#lab)
 
   -- XXXX
   elapsedTime H1 = partition(lab -> topologicalData Xs#lab, torsionfrees); -- take one from each.

@@ -29,7 +29,7 @@ toricMoriCone(NormalToricVariety, List) := Cone => (V, basisIndices) -> (
     posHull transpose lift(Cs, QQ) -- TODO: lift to ZZ?
     )
 
-toricMoriCone CYData := Cone => X -> (
+toricMoriCone CalabiYauInToric := Cone => X -> (
     toricMoriCone(ambient X, basisIndices X)
     )
 
@@ -72,7 +72,7 @@ gvInput = (moriGenerators, heftval, GLSM, intersectionnums, degreelimit, prec) -
     )
 
 -- TODO: make the gvInvariants code not go through NormalToricVarieties.
---  and use only info obtained from data we have in CYData.
+--  and use only info obtained from data we have in CalabiYauInToric.
 --  requires: intersectionNumbersOfCY
 --            toricMoriCone
 
@@ -114,7 +114,7 @@ gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices)
     (lines get outfile)/value//hashTable
     )
 
-gvInvariants CYData := HashTable => opts -> X -> (
+gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
     intersectionnums := for t in intersectionNumbers X list append(t#0, t#1);
     mori := if opts.Mori =!= null then 
                 opts.Mori 
@@ -136,13 +136,13 @@ gvInvariants CYData := HashTable => opts -> X -> (
     )
 
 gvCone = method(Options => options gvInvariants)
-gvCone CYData := Cone => opts -> X -> (
+gvCone CalabiYauInToric := Cone => opts -> X -> (
     gv := gvInvariants(X, opts);
     posHull transpose matrix ((keys gv)/toList)
     )
 
 partitionGVConeByGV = method(Options => options gvInvariants)
-partitionGVConeByGV CYData := HashTable => opts -> X -> (
+partitionGVConeByGV CalabiYauInToric := HashTable => opts -> X -> (
     gv := gvInvariants(X, opts); -- TODO: stash this?
     C := posHull transpose matrix ((keys gv)/toList);
     gvX := entries transpose rays C;

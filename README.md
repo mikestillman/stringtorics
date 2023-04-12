@@ -1,18 +1,20 @@
 # stringtorics
 
+This is a bit out of date.  TODO: clean it up.    
+    
 Currently, we have the poorly named types:
 
-  -- CYPolytopeData -- contains essentially the reflexive polytope, but also some computed
+  -- CYPolytope -- contains essentially the reflexive polytope, but also some computed
     -- data that is meant for ease of creating Calabi Yau hypersurfaces.
     -- Is there a better way to handle this?
-  -- CYData
-    -- this is a CYPolytopeData, and Triangulation, and also caches other info
+  -- CalabiYauInToric
+    -- this is a CYPolytope, and Triangulation, and also caches other info
 
 These classes are designed to be easily dumped/restored from a string or database file
     (via openDatabase).
 
-TODO: rename these types.  e.g. CYData could be CYHypersurface.
-      but I'm not sure about CYPolytopeData.
+TODO: rename these types.  e.g. CalabiYauInToric could be CYHypersurface.
+      but I'm not sure about CYPolytope.
   Option 1: name it CYPolytope
   Option 2: use Polyhedra, and stash this info into it.  I'm reluctant to do this
     as we want functions that are more easily understood in physics realm.
@@ -21,19 +23,19 @@ TODO: rename these types.  e.g. CYData could be CYHypersurface.
     Reason for reluctance: I don't want Polyhedra to do any computation when I first
     create the polytope (I think).  I'm also concerned about naming conflicts for functions.
       (e.g. allTriangulations).
-    So: test whether stashing CYPolytopeData in a Polyhedron is ok?
+    So: test whether stashing CYPolytope in a Polyhedron is ok?
     Naming conflicts on functions?  e.g. triangulations?
 
 TODO: make sure that dbm files created on apple M1 can be used in linux on intel...
 
 TODO: tests should be more coherrent.
-    -- test basics of CYPolytopeData
-    -- test basics of CYData
+    -- test basics of CYPolytope
+    -- test basics of CalabiYauInToric
     -- test creation of data bases,use of data bases
     -- test polyhedral functions, including triangulations stuff
     -- test intersection numbers, c2, topology
     -- test GV invariants
-    -- code for determining topological equivalence of 2 CYData's.
+    -- code for determining topological equivalence of 2 CalabiYauInToric's.
     -- intersection theory
     -- cohomology of line bundles on V, X.
     -- effective cones, Mori cones, nef cones.
