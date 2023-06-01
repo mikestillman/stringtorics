@@ -27,7 +27,7 @@
 -- Step 2.  Regenerate from data base all polytopes (Qs), all CY3's (Xs) ---
 ----------------------------------------------------------------------------
   -- First we grab all of the polytopes.  This returns a hash table: keys are integers 0..243, 
-  -- and the corresponding value is the corresponding "CYPolytopeData"
+  -- and the corresponding value is the corresponding "CYPolytope"
 
   restart
   debug needsPackage "StringTorics"
@@ -42,8 +42,8 @@
   # keys Xs
 
   -- some simple checking.
-  for k in sort keys Qs do assert instance(Qs#k, CYPolytopeData)
-  for k in sort keys Xs do assert instance(Xs#k, CYData)
+  for k in sort keys Qs do assert instance(Qs#k, CYPolytope)
+  for k in sort keys Xs do assert instance(Xs#k, CalabiYauInToric)
 
   -- example of use of Q:
   Q = Qs#100

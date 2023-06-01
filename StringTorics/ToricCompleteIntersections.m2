@@ -7,20 +7,67 @@
 --------------------------------------------------------
 CompleteIntersectionInToric = new Type of HashTable
 
-completeIntersection = method()
-completeIntersection(NormalToricVariety, List) := (Y,CIeqns) -> (
+completeIntersection = method(Options => {Equations => true})
+completeIntersection(NormalToricVariety, List) := opts -> (Y,CIeqns) -> (
     if not all(CIeqns, d -> instance(d, ToricDivisor))
     then error "expected a list of toric divisors";
     if not all(CIeqns, d -> variety d === Y)
     then error "expected a list of toric divisors on the given toric variety";
+    eqns := if opts.Equations then (
+            S := ring Y;
+            for D in CIeqns list random(degree D, S)
+        ) else 
+            null;
     new CompleteIntersectionInToric from {
         symbol Ambient => Y,
         symbol CI => CIeqns, -- these are the degrees
+        symbol Equations => eqns,
         symbol cache => new CacheTable
         }
     )
+
+variety(CalabiYauInToric, Ring) := CompleteIntersectionInToric => (X, kk) -> (
+    if not X.cache#?(variety, kk) then X.cache#(variety, kk) = (
+        V := normalToricVariety X;
+        X1 := completeIntersection(V, { - toricDivisor V});
+        X1.cache.CalabiYauInToric = X;
+        X1);
+    X.cache#(variety, kk)
+    )
+variety CalabiYauInToric  := X -> variety(X, QQ)
+
 dim CompleteIntersectionInToric := (X) -> dim X.Ambient - #X.CI
 ambient CompleteIntersectionInToric := (X) -> X.Ambient
+
+equations = method()
+equations CompleteIntersectionInToric := List => X -> (
+    X.Equations
+    )
+
+LineBundle = new Type of HashTable
+lineBundle = method()
+lineBundle(CompleteIntersectionInToric, List) := (X, deg) -> (
+    if not all(deg, x -> instance(x, ZZ)) or #deg =!= degreeLength ring ambient X
+    then error("expected multidegree of length "|degreeLength ring ambient X);
+    new LineBundle from {
+        symbol cache => new CacheTable,
+        symbol variety => X,
+        symbol degree => deg
+        }
+    )
+
+degree LineBundle := L -> L.degree
+variety LineBundle := L -> L.variety
+
+installMethod(symbol _, OO, CompleteIntersectionInToric, LineBundle => 
+     (OO,X) -> lineBundle(X, (degree 1_(ring ambient X)))
+     )
+
+LineBundle Sequence := (L, deg) -> (
+    lineBundle(variety L, degree L + toList deg)
+    )
+
+
 
 abstractVariety(CompleteIntersectionInToric, AbstractVariety) := opts -> (X,B) -> (
     if not X.cache#?(abstractVariety, B) then X.cache#(abstractVariety, B) = (

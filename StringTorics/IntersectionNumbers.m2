@@ -10,7 +10,7 @@
 intersectionNumbers = method()
 -- intersectionNumbers = method(Options => {Indices => null}) -- Indices: which elements to keep.
 --   -- these will be reordered 0, 1, ...,, #opts.Indices-1.
---   -- default for CYData is `basisIndices X`
+--   -- default for CalabiYauInToric is `basisIndices X`
 
 ------------------------
 -- New code, Nov/Dec 2022.
@@ -111,9 +111,9 @@ computeC2(List, List) := (toricIntersectionNumbers, basIndices) -> (
 
 -- computeIntersectionNumbers: An internal function for intersectionNumbers. toricIntersectionNumbers, and c2.
 computeIntersectionNumbers = method()
-computeIntersectionNumbers CYData := X -> (
+computeIntersectionNumbers CalabiYauInToric := X -> (
     if not X.cache#?"toric intersection numbers" then  (
-        V := cyPolytopeData X;
+        V := cyPolytope X;
         basIndices := basisIndices V;
         A := transpose matrix rays V;
         T2 := restrictTriangulation X;
@@ -128,20 +128,20 @@ computeIntersectionNumbers CYData := X -> (
 --------------------------------------------
 -- intersection number interface routines --
 --------------------------------------------
-intersectionNumbers CYData := X -> (
+intersectionNumbers CalabiYauInToric := X -> (
     computeIntersectionNumbers X;
     X.cache#"intersection numbers"
     --intersectionNumbersOfCY(ambient X, basisIndices X)
     )
 
 toricIntersectionNumbers = method()
-toricIntersectionNumbers CYData := X -> (
+toricIntersectionNumbers CalabiYauInToric := X -> (
     computeIntersectionNumbers X;
     X.cache#"toric intersection numbers"
     )
 
 c2 = method();
-c2 CYData := X -> (
+c2 CalabiYauInToric := X -> (
     computeIntersectionNumbers X;
     X.cache#"c2"
     )
@@ -157,7 +157,7 @@ TEST ///
   restart
   debug needsPackage "StringTorics"
   F = openDatabase "polytopes-h11-5.dbm"
-    V = cyPolytopeData F#"1000"
+    V = cyPolytope F#"1000"
     close F
   X = makeCY(V, ID => label V, Ring => (RZ = ZZ[a,b,c,d,e]))
 
@@ -235,13 +235,13 @@ toRingElement(List, Ring) := (f, RZ) -> (
     )
 
 c2Form = method()
-c2Form CYData := RingElement => X -> (
+c2Form CalabiYauInToric := RingElement => X -> (
     RZ := X.cache#"pic ring"; -- FIXME: if not there, it should create the ring.  Need a function: picardRing?
     ((vars RZ) * transpose matrix {c2 X})_(0,0)
     )
 
 cubicForm = method()
-cubicForm CYData := RingElement => X -> (
+cubicForm CalabiYauInToric := RingElement => X -> (
     RZ := X.cache#"pic ring"; -- FIXME: if not there, it should create the ring.  Need a function: picardRing?
     toRingElement(intersectionNumbers X, RZ)
     )
@@ -374,7 +374,7 @@ intersectionNumbersOfCY(NormalToricVariety, List) := (V, basisIndices) -> (
     IX := intersectionRing Xa;
     intersectionNumbersOfCY(IX, basisIndices)
     )
-intersectionNumbersOfCY CYData := X -> (
+intersectionNumbersOfCY CalabiYauInToric := X -> (
     intersectionNumbersOfCY(ambient X, basisIndices X)
     )
 

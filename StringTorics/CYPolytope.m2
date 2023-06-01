@@ -1,5 +1,5 @@
 ---------------------------------------
--- CYPolytopeData ---------------------
+-- CYPolytope ---------------------
 ---------------------------------------
 -- This type can be written to disk, and tries to retain computations computed already.
 -- It does not retain Polyhedron objects, but hopefully it recreates these quickly.
@@ -25,15 +25,15 @@ CYPolytopeCache = {
     "annotated faces" => {value, toString, List}
     }
 
-cyPolytopeData = method(Options => {ID => null})
+cyPolytope = method(Options => {ID => null})
 
-cyPolytopeData Polyhedron := opts -> P2 -> (    
+cyPolytope Polyhedron := opts -> P2 -> (    
     LP := latticePointList P2;
     LPdim := for lp in LP list dim(P2, minimalFace(P2, lp));
     -- now remove the ones that are in facets (or the origin):
     LP = for i from 0 to #LP-1 list if LPdim#i <= 2 then LP#i else continue;
     LPdim = for i from 0 to #LP-1 list if LPdim#i <= 2 then LPdim#i else continue;
-    cyData := new CYPolytopeData from {
+    cyData := new CYPolytope from {
         symbol cache => new CacheTable,
         "rays" => LP,
         "face dimensions" => LPdim
@@ -42,23 +42,23 @@ cyPolytopeData Polyhedron := opts -> P2 -> (
     cyData
     )
 -- vertices: Matrix whose columns are the vertices of the reflexive polytope.
-cyPolytopeData Matrix := CYPolytopeData => opts -> vertices -> (
+cyPolytope Matrix := CYPolytope => opts -> vertices -> (
     P2 := convexHull vertices;
-    cyPolytopeData(P2, opts)
+    cyPolytope(P2, opts)
     )
 -- vertices: A list of the integer coordinates (also a list) of the vertices of the polytope
-cyPolytopeData List := CYPolytopeData => opts -> vertices -> (
-    cyPolytopeData(transpose matrix vertices, opts)
+cyPolytope List := CYPolytope => opts -> vertices -> (
+    cyPolytope(transpose matrix vertices, opts)
     )
-cyPolytopeData KSEntry := CYPolytopeData => opts -> tope -> (
+cyPolytope KSEntry := CYPolytope => opts -> tope -> (
     -- KSEntry is a Kreuzer-Skarke polytope entry, returned from
     --   ReflexivePolytopesDB functions.
     P1 := convexHull matrix tope;
     P2 := polar P1;
-    cyPolytopeData(P2, opts)
+    cyPolytope(P2, opts)
     )
 
-cyPolytopeData String := CYPolytopeData => opts -> str -> (
+cyPolytope String := CYPolytope => opts -> str -> (
     L := lines str;
     if L#0 != "CYPolytopeData" then error "string is not in proper format";
     fields := hashTable for i from 1 to #L-1 list getKeyPair L#i;
@@ -68,7 +68,7 @@ cyPolytopeData String := CYPolytopeData => opts -> str -> (
         readFcn := field#1#0;
         if fields#?k then k => readFcn fields#k else error("expected key "|k)
         );
-    cyData := new CYPolytopeData from prepend(symbol cache => new CacheTable, required);
+    cyData := new CYPolytope from prepend(symbol cache => new CacheTable, required);
     -- now read in the cache values (including "id" value, if any)
     for field in CYPolytopeCache do (
         k := field#0;
@@ -82,7 +82,7 @@ cyPolytopeData String := CYPolytopeData => opts -> str -> (
 -- todo: translation function: {1, 2, 3, 6} ==> "1 2 3 6" (and viceversa)
 -- todo: translation function: {{1,3},{4,7},{6,7,8}} ==> "1 3;4 7;6 7 8;" or "1 3;4 7;6 7 8" (white space is not relevant after or before a ;)
 -- Format
--- CYPolytopeData
+-- CYPolytope
 --   rays: 1 0 0; 1 0 -1; 1 1 1
 --   face dimensions: 0 0 0
 --   id: 12
@@ -98,7 +98,7 @@ cyPolytopeData String := CYPolytopeData => opts -> str -> (
 -- present, and the lengths of the various integer vectors and lists
 -- are compatible.
 
-dump CYPolytopeData := String => {} >> opts -> (Q) -> (
+dump CYPolytope := String => {} >> opts -> (Q) -> (
     s1 := "CYPolytopeData\n";
     strs := for field in CYPolytopeFields list (
         k := field#0;
@@ -125,7 +125,7 @@ getKeyPair String := Sequence => str -> (
     )
 
 cySetGLSM = method()
-cySetGLSM CYPolytopeData := (cyData) -> (
+cySetGLSM CYPolytope := (cyData) -> (
     if cyData.cache#?"glsm" then return;
     mLP := transpose matrix cyData#"rays";
     D := transpose syz mLP;
@@ -165,35 +165,35 @@ cySetH11H21 = cyData -> (
     (h11, h21)
     )
 
-rays CYPolytopeData := List => cyData -> cyData#"rays"
-dim CYPolytopeData := List => cyData -> dim polytope(cyData, "N")
-degrees CYPolytopeData := List => cyData -> (
+rays CYPolytope := List => cyData -> cyData#"rays"
+dim CYPolytope := List => cyData -> dim polytope(cyData, "N")
+degrees CYPolytope := List => cyData -> (
     if not cyData.cache#?"glsm" then cySetGLSM cyData;
     cyData.cache#"glsm"
     )
 basisIndices = method()
-basisIndices CYPolytopeData := List => cyData -> (
+basisIndices CYPolytope := List => cyData -> (
     if not cyData.cache#?"basis indices" then cySetGLSM cyData;
     cyData.cache#"basis indices"
     )
--- h11OfCY CYPolytopeData := ZZ => cyData -> (
+-- h11OfCY CYPolytope := ZZ => cyData -> (
 --     if not cyData.cache#?"h11" then cySetH11H21 cyData;
 --     cyData.cache#"h11"
 --     )
--- h21OfCY CYPolytopeData := ZZ => cyData -> (
+-- h21OfCY CYPolytope := ZZ => cyData -> (
 --     if not cyData.cache#?"h21" then cySetH11H21 cyData;
 --     cyData.cache#"h21"
 --     )
-isFavorable CYPolytopeData := Boolean => cyData -> (
+isFavorable CYPolytope := Boolean => cyData -> (
     if not cyData.cache#?"favorable" then cySetH11H21 cyData;
     cyData.cache#"favorable"
     )
-annotatedFaces CYPolytopeData := cyData -> (
+annotatedFaces CYPolytope := cyData -> (
     if not cyData.cache#?"annotated faces" then
       cyData.cache#"annotated faces" = annotatedFaces polytope(cyData, "N");
     cyData.cache#"annotated faces"
     )
-polytope(CYPolytopeData, String) := Polyhedron => (cyData, which) -> (
+polytope(CYPolytope, String) := Polyhedron => (cyData, which) -> (
     if which === "N" then (
         if not cyData.cache#?"N polytope" then (
             LP := cyData#"rays";
@@ -212,13 +212,13 @@ polytope(CYPolytopeData, String) := Polyhedron => (cyData, which) -> (
     else
       error "expected second argument to be either \"M\" or \"N\""
     )
-polytope CYPolytopeData := Polyhedron => cyData -> polytope(cyData, "N")
+polytope CYPolytope := Polyhedron => cyData -> polytope(cyData, "N")
 
-polar CYPolytopeData := cyData -> cyPolytopeData polytope(cyData, "M")
+polar CYPolytope := cyData -> cyPolytope polytope(cyData, "M")
 
-findAllFRSTs CYPolytopeData := List => cyData -> (findAllFRSTs(transpose matrix rays cyData))/last
+findAllFRSTs CYPolytope := List => cyData -> (findAllFRSTs(transpose matrix rays cyData))/last
 
-hh(Sequence, CYPolytopeData) := (pq, Q) -> (
+hh(Sequence, CYPolytope) := (pq, Q) -> (
     cySetH11H21 Q;
     (p,q) := pq;
     if p > q then (p, q) = (q, p);
