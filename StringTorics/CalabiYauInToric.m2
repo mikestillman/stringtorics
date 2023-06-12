@@ -2,15 +2,26 @@
 -- CalabiYauInToric (soon to change back to CalabiYauInToric? ----------
 --------------------------------------------------------------
 
-CalabiYauInToric.synonym = "Calabi-Yau in a normal toric variety"
+CalabiYauInToric.synonym = "Calabi-Yau hypersurface in a normal toric variety"
 CalabiYauInToric.GlobalAssignHook = globalAssignFunction
 CalabiYauInToric.GlobalReleaseHook = globalReleaseFunction
-expression CalabiYauInToric := X -> if hasAttribute (X, ReverseDictionary) 
+expression CalabiYauInToric := X -> if hasAttribute(X, ReverseDictionary) 
+     then expression toString getAttribute(X, ReverseDictionary) else 
+     (describe X)#0
+net CalabiYauInToric := X -> net expression X     
+describe CalabiYauInToric := X -> Describe (
+    "A Calabi-Yau "|dim X|"-fold hypersurface with h11="|hh^(1,1) X|" and h21="|hh^(1,2) X |" in a "|(dim X + 1)|"-dimensional toric variety"
+    )
+
+CYPolytope.synonym = "Calabi-Yau reflexive polytope"
+CYPolytope.GlobalAssignHook = globalAssignFunction
+CYPolytope.GlobalReleaseHook = globalReleaseFunction
+expression CYPolytope := X -> if hasAttribute (X, ReverseDictionary) 
     then expression getAttribute (X, ReverseDictionary) else 
     (describe X)#0
-describe CalabiYauInToric := X -> Describe (expression CalabiYauInToric) (
-      expression "a" , expression 3)
---    expression rays X, expression max X)
+describe CYPolytope := X -> Describe (expression CYPolytope) (
+    expression rays X, expression max X)
+
 
 CYDataFields = {
     -- first entry: true means it must exist and be in the main hash table
@@ -175,4 +186,33 @@ restrictTriangulation CalabiYauInToric := List => (X) -> (
             );
         {t2#0, t2#1, atri, t2#2}
         )
+    )
+
+lineBundle(CalabiYauInToric, List) := (X, deg) -> (
+    if not all(deg, x -> instance(x, ZZ)) or #deg =!= degreeLength ring ambient X
+    then error("expected multidegree of length "|degreeLength ring ambient X);
+    new LineBundle from {
+        symbol cache => new CacheTable,
+        symbol variety => X,
+        symbol degree => deg
+        }
+    )
+
+degree LineBundle := L -> L.degree
+variety LineBundle := L -> L.variety
+
+installMethod(symbol _, OO, CalabiYauInToric, LineBundle => 
+     (OO,X) -> lineBundle(X, (degree 1_(ring ambient X)))
+     )
+
+LineBundle Sequence := (L, deg) -> (
+    lineBundle(variety L, degree L + toList deg)
+    )
+
+equations CalabiYauInToric := List => X -> (
+    if not X.cache.?Equations then X.cache.Equations = (
+        V := ambient X;
+        {random(degree(-toricDivisor V), ring V)} -- TODO: (1) allow tuned equations, (2) do the random call more efficiently.
+        );
+    X.cache.Equations
     )

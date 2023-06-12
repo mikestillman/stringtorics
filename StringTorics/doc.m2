@@ -15,6 +15,22 @@ doc ///
           {TO "Example use", ", a first example showing basic usage of this package"}
           }@
     Text
+      @SUBSECTION "Reflexive polytopes"@
+    Text
+      In this package, a key type is @TO CYPolytope@.  Objects of this class
+      contain information about a reflexive polytope.  It also stores
+      Calabi-Yau data associated to this polytope that is independent of the
+      triangulation of the polytope used.  
+    Text
+      @UL {
+          TO CYPolytope,
+          TO (annotatedFaces, CYPolytope),
+          TO basisIndices,
+          TO (isFavorable, CYPolytope),
+          TO (polar, CYPolytope),
+          TO (degrees, CYPolytope)
+          }@
+    Text
       @SUBSECTION "Routines to access the Kreuzer-Skarke database"@
     Text
       @UL {
@@ -30,6 +46,15 @@ doc ///
           TO allTriangulations,
           TO generateTriangulations
           }@
+    Text
+      @SUBSECTION "Calabi Yau hypersurfaces in toric varieties"@
+    Text
+      @UL {
+          {TO "CalabiYauInToric"},
+          {TO "makeCY"},
+          {TO "findAllCYs"}
+          }@
+
     Text
       @SUBSECTION "Creating and using CYDatabase's"@
       
@@ -57,6 +82,143 @@ doc ///
    Caveat
    SeeAlso
      "installing StringTorics"
+///
+
+doc ///
+  Key
+    CYPolytope
+  Headline
+    polytope data for a Calabi-Yau 3-fold hypersurface in a toric variety
+  Description
+    Text
+  SeeAlso
+    CalabiYauInToric
+///
+
+doc ///
+  Key
+    CalabiYauInToric
+  Headline
+    a Calabi-Yau 3-fold hypersurface in a simplicial toric variety
+  Description
+    Text
+  SeeAlso
+    CYPolytope
+///
+
+///
+  Key
+  Headline
+  Usage
+  Inputs
+  Outputs
+  Consequences
+    Item
+  Description
+    Text
+    Example
+  Caveat
+  SeeAlso
+///
+
+///
+  Key
+    cyPolytope
+  Headline
+    create a reflexive polytope pair
+  Usage
+    cyPolytope ks
+    cyPolytope vertexlist
+    cyPolytope m
+    cyPolytope P
+    cyPolytope str
+  Inputs
+    ks:KSEntry
+    vertexList:List
+    m:Matrix
+      the vertices are the columns
+    Q:CYPolytope
+      or @ofClass Polyhedron@
+    ID => ZZ
+      :ZZ
+        a label for this polytope (TODO: is this a string or integer?)
+  Outputs
+    :CYPolytope
+      
+  Description
+    Text
+      topes = kreuzerSkarke(3, Limit => 50);
+      topes_40
+      matrix topes_40
+      Q = cyPolytope topes_40 -- this is a polytope
+      rays Q
+      Q1 = cyPolytope matrix topes_40
+      Q2 = cyPolytope rays Q1
+      verts = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {-1, 0, -1}, {0, -1, 0}, {-1, 0, 0}, {-1, 1, 0}}
+      QN = cyPolytope verts
+      netList annotatedFaces QN
+      vertices polytope(QN, "N")
+      vertices polytope(QN, "M")
+      latticePoints polytope(QN, "N")
+      latticePoints polytope(QN, "M")
+      polar QN
+      rays oo
+      netList annotatedFaces QN
+      netList annotatedFaces polar QN
+      PN = convexHull transpose matrix verts
+      PM = polar PN
+      vertices PM
+      
+      isReflexive P
+      vertices P -- notice these are in a different order
+
+      netList annotatedFaces Q
+      rays smoothFanoToricVariety(3, 12) -- this is how we obtained these vertices.
+    Example
+  Caveat
+  SeeAlso
+///
+
+///
+  Key
+    annotatedFaces
+  Headline
+    a list of faces of a reflexive polytope together with lattice point information
+  Usage
+    annotatedFaces Q
+  Inputs
+    Q:CYPolytope
+      or @ofClass Polyhedron@
+  Outputs
+    :List
+      each entry is a list containing: the dimension of the face, the indices of the
+      vertices, the indices of all (boundary) lattice points in the face, the number
+      of interior points in the face, and the number of interior points in the dual face
+  Description
+    Text
+      verts = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {-1, 0, -1}, {0, -1, 0}, {-1, 0, 0}, {-1, 1, 0}}
+      QN = cyPolytope verts
+      netList annotatedFaces QN
+      vertices polytope(QN, "N")
+      vertices polytope(QN, "M")
+      latticePoints polytope(QN, "N")
+      latticePoints polytope(QN, "M")
+      polar QN
+      rays oo
+      netList annotatedFaces QN
+      netList annotatedFaces polar QN
+      PN = convexHull transpose matrix verts
+      PM = polar PN
+      vertices PM
+      
+      isReflexive P
+      vertices P -- notice these are in a different order
+
+      netList annotatedFaces Q
+      rays smoothFanoToricVariety(3, 12) -- this is how we obtained these vertices.
+    Example
+  Caveat
+  SeeAlso
 ///
 
 -*
@@ -209,8 +371,211 @@ doc ///
    SeeAlso
 ///
 
+doc ///
+   Key
+     "Example: (3,3) hypersurface in P2 x P2"
+   Headline
+     the bicubic threefold
+   Description
+    Text
+      Let's analyze one particular toric variety, and the corresponding 
+      Calabi-Yau hypersurface.
+      
+      First, let's construct this toric variety, and the corresponding Calabi-Yau
+      3-fold.  Let $V = \PP^2 \times \PP^2$, and let $X \subset V$ be defined
+      by a random $(3,3)$ form in 6 variables.
+    Example
+      P2 = toricProjectiveSpace 2
+      V0 = P2 ** P2
+      isSmooth V0
+      RZ = QQ[a,b]
+      Q = cyPolytope(rays V0)
+      isFavorable Q
+      hh^(1,1) Q
+      hh^(1,2) Q
+    Text
+      $Q \subset N \otimes \RR$ is the reflexive polytope in the $N = \ZZ^3$ lattice, and 
+      
+      We now create the Calabi-Yau. The ring here should be in $h^(1,1)(X)$ variables (over the integers, or
+      the rationals.
+    Example
+      X = makeCY(Q, Ring => RZ)
+      normalToricVariety(X, CoefficientRing => ZZ/32003)
+      dim X
+      describe X
+      cubicForm X
+      c2Form X
+    Text
+      Hirzebruch-Riemann-Roch gives the following for the euler characteristic of OO(a,b).
+    Example
+      aX = abstractVariety(X, base(a,b))
+      basisIndices X
+      intersectionRing aX
+      chi OO(a * t_0 + b*t_1)
+      1/6 * cubicForm X + 1/12 * c2Form X 
+    Text
+      Now let's investigate the cohomology of line bundles $\mathcal{O}_X(a,b)$.
+      Very few cohomologies are non-zero on the ambient $V = \PP^2 \times \PP^2$.
+    Example
+      V = ambient X
+      netList toricOrthants V
+    Text
+      For $a,b \ge 0$, $H^0(\mathcal{O}_X(a,b)) = H^0(\mathcal{O}_V(a,b)) = S_{ab}$, where $S$ is the Cox ring of $V$,
+      and is zero outside of this range.
+    Example
+      S = ring V
+      describe S
+      cohomologyBasis(2, V, {-4,0})
+      cohoms = hashTable flatten for a from -6 to 6 list for b from -6 to 6 list elapsedTime (a,b) => (hh^*(OO_X(a,b)))
+      matrix for a from -6 to 6 list for b from -6 to 6 list (cohoms#(a,b))_0
+      matrix for a from -6 to 6 list for b from -6 to 6 list (cohoms#(a,b))_1
+      matrix for a from -6 to 6 list for b from -6 to 6 list (cohoms#(a,b))_2
+      matrix for a from -6 to 6 list for b from -6 to 6 list (cohoms#(a,b))_3
+      for a from 0 to 10 list a => hh^*(OO_X(0,a))
+      
+      cohomologyBasis(2, V, {-6,3})
+      cohomologyBasis(2, V, {-3,6})
+      cohomologyMatrix(2, V, {-3, 6}, first equations X)
+      matrix first oo
+      rank oo
+      for a from -3 to 3 list cohomologyBasis(2, V, {a,0})
+      for a from -3 to 3 list cohomologyBasis(2, V, {-3,a-3})
+      
+///
+
+///
+-- scratch work trying to understand cohomology for bicubics.
+      fcn = (b) -> (10 * binomial(b-3 + 2, 2), binomial(b+2,2))
+      fcn 100
+      fcn 1000
+      
+      T = ZZ/101[x,y,z]
+      C = res ideal random(T^1, T^{10:-3})
+      C.dd_2
+      
+      hh^*(OO_X(-3,3))
+      hh^*(OO_X(-3,4)) -- 15 of these
+      
+      fcn = (a,b) -> (
+          binomial(-a+2,2) * binomial(b-1,2),
+          binomial(-a-1,2) * binomial(b+2,2))
+      fcn(0,3)
+      fcn(0,4)
+      matrix first cohomologyMatrix(2, V, {-3,4}, first equations X)
+      fcn(-3,4)
+      fcn(-3,3)
+      fcn(-3,2)
+      for b from 3 to 20 list fcn(-3,b)
+      for b from 3 to 20 list fcn(-4,b)
+      for b from 3 to 20 list fcn(-5,b)
+      for b from 3 to 20 list fcn(-6,b)
+          binomial(-a+2,2) * binomial(b-1,2) -
+          binomial(-a-1,2) * binomial(b+2,2)
+
+      t = symbol t
+      R = ZZ/101[t_0..t_9]
+      M = matrix{{t_0, t_1, t_2, t_3, t_4, t_5, t_6, t_7, t_8, t_9, 0, 0, 0, 0, 0},
+          {0, t_0, 0, t_1, t_2, 0, t_3, t_4, t_5, 0, t_6, t_7, t_8, t_9, 0},
+          {0,0, t_0, 0, t_1, t_2, 0, t_3, t_4, t_5, 0, t_6, t_7, t_8, t_9}
+          }
+      minimalBetti coker M
+      C = res coker M
+      
+      S = ZZ/101[a,b,c]
+      phi = map(S, R, random(S^1, S^{10:-3}))
+      C = res coker phi M
+
+///
+
+///
+   Key
+     "Example: the tetraquadric Calabi-Yau 3-fold"
+   Headline
+     the tetraquadric
+   Description
+    Text
+      Let's analyze one particular toric variety, and the corresponding 
+      Calabi-Yau hypersurface.
+      
+      First, let's construct this toric variety, and the corresponding Calabi-Yau
+      3-fold.  Let $V = \PP^1 \times \PP^1 \times \PP^1 \times \PP^1$, and let $X \subset V$ be defined
+      by a random $(2,2,2,2)$ form in 8 variables.
+    Example
+      P1 = toricProjectiveSpace 1
+      V0 = P1 ** P1 ** P1 ** P1
+      isSmooth V0
+      RZ = ZZ[a..d]
+      Q = cyPolytope(rays V0)
+      isFavorable Q
+      hh^(1,1) Q
+      hh^(1,2) Q
+    Text
+      $Q \subset N \otimes \RR$ is the reflexive polytope in the $N = \ZZ^4$ lattice, and 
+      
+      We now create the Calabi-Yau. The ring here should be in $h^(1,1)(X)$ variables (over the integers, or
+      the rationals.
+    Example
+      X = makeCY(Q, Ring => RZ)
+      V = normalToricVariety(X, CoefficientRing => ZZ/32003)
+      dim X
+      describe X
+      cubicForm X
+      c2Form X
+    Text
+      Eventually, put in the GV invariants and flop matrices one finds.
+      
+      
+    Example
+      M1 = matrix"-1,0,0,0;2,1,0,0;2,0,1,0;2,0,0,1"
+      for a in {0,0,0}..{3,3,3} list a => hh^*(OO_X(-1,a#0,a#1,a#2))
+      GV = gvInvariants(X, DegreeLimit => 10);
+      hh^*(OO_X(-1,2,2,2))
+      hh^*(OO_X(-1,2,2,3))
+      hh^*(OO_X(-2,2,2,2))
+      hh^*(OO_X(-2,4,4,3))
+      F = first equations X
+      cohomologyBasis(1, V, {-4,2,2,2})
+      cohomologyBasis(1, V, {-2,4,4,4})
+      cohomologyMatrix(1, V, {-2,4,4,4}, F)
+      hh^*(OO_X(-4,5,0,0))
+      (m, tar, src) = cohomologyMatrix(1, V, {-2,4,4,4}, F)
+      matrix m;
+      #tar
+      #src
+      rank m
+///
+
+///
+-- scratch work for tetraquadric example.
+    Text
+      The following won't be in this tutorial.
+    Example
+      S = ZZ/32003[x_1,y_1,x_2,y_2,x_3,y_3, Degrees => {2:{1,0,0}, 2:{0,1,0}, 2:{0,0,1}}]
+      G0 = random({2,2,2}, S)
+      G1 = random({2,2,2}, S)
+      G2 = random({2,2,2}, S)
+      syz matrix{{G0,G1,G2}}
+      degrees source oo
+
+      A = symbol A
+      C = symbol C
+      S = ZZ/32003[x_1,y_1,A_1..C_3, Degrees => {2:{1,0},9:{0,1}}]
+      G0 = x_1^2 * A_1 + x_1*y_1 * A_2 + y_1^2 * A_3
+      G1 = x_1^2 * B_1 + x_1*y_1 * B_2 + y_1^2 * B_3
+      G2 = x_1^2 * C_1 + x_1*y_1 * C_2 + y_1^2 * C_3
+      syz matrix{{G0,G1,G2}}
+      syz matrix{{G0,G1,G2,0},{0,G0,G1,G2}}
+      M = coker matrix{{G0,G1,G2,0},{0,G0,G1,G2}}
+      res M
+o67_{0}
+o67_{1}
+      T = ZZ/32003[a,b,c]
+      syz matrix{{a,b,c,0},{0,a,b,c}}
+///
+
 ///
   Key
+    
   Headline
   Usage
   Inputs
@@ -218,7 +583,109 @@ doc ///
   Consequences
   Description
     Text
+      This is the first way to use the package.  Grab a reflexive polytope from the Kreuzer-Skarke database.
     Example
+      restart
+      needsPackage "StringTorics"
+      topes = kreuzerSkarke(3, Limit => 100);
+      Q = cyPolytope(topes_50, ID => 50)
+      RZ = ZZ[x,y,z]
+      X = makeCY(Q, Ring => RZ, ID => 0)
+      label X
+      V = normalToricVariety(X, CoefficientRing => ZZ/101)
+      V === ambient X
+      assert(coefficientRing ring ambient X === ZZ/101)
+      L = OO_X(1,2,3)
+      L = OO_X(1,2,-1)
+      hh^* L
+      cubicForm X
+      c2Form X
+      intersectionNumbers X
+      basisIndices X
+      dim X
+      aX = abstractVariety(X, base(x,y,z))
+      use intersectionRing aX
+
+      L = OO_X(1,2,-33)
+      hh^* L
+      chi OO(t_0  + 2*t_1 - 33*t_2)
+
+      for d in (-2,-2,-2)..(2,2,2) list d => hh^* OO_X(d)
+      chi(OO(x * t_0 + y * t_1 + z * t_2))
+      RQ = ring oo
+      assert(
+          1/6 * sub(cubicForm X, RQ) + 1/12 * sub(c2Form X, RQ) 
+          == 
+          chi(OO(x * t_0 + y * t_1 + z * t_2))
+          )
+
+      -- Method #2 to use the package.      
+      p1 = toricProjectiveSpace 1
+      V0 = p1 ** p1 ** p1 ** p1
+      isSimplicial V0
+      max V0
+      RZ = ZZ[a,b,c,d]
+      Q1 = cyPolytope(rays V0, ID => 0)
+      X = makeCY(Q1, ID => 0, Ring => RZ)
+      V = normalToricVariety(X, CoefficientRing => ZZ/101)
+      isWellDefined V
+      L = OO_X(2,1,-1,-2)
+      hh^* L      
+      equations X
+
+      describe X
+      equations X
+      X = calabiYauHypersurface V -- not written yet.
+      X = toricCompleteIntersection(V, {-toricDivisor V}, Equations => generic)
+        -- should detect it is CY?
+
+      P2 = convexHull transpose matrix rays V
+      isReflexive P2
+      isSimplicial P2
+      V1 = cyPolytope(rays V, ID => 0)
+      degrees V1
+      peek V1.cache
+      X1 = cyData(V1, max V)
+      X = variety(X1, ZZ/32003)
+      hh^*(OO_X(1,1,1,1))
+      cyData X
+
+    topes = kreuzerSkarke(3, Limit => 100)      
+    ks = topes_70
+    V0 = normalToricVariety(ks, CoefficientRing => ZZ/101)
+    Xs = makeCYs V0
+    ambient Xs_0 -- a simplicial normal toric variety
+    
+    normalToricVariety KSEntry := opts -> ks -> (
+        polytopeData := cyPolytope ks;
+        normalToricVariety(rays polytopeData
+        )
+
+  V0 = normalToricVariety(ks, CoefficientRing => ZZ/101)
+  Xs = findAllCYs V0 -- creates CalabiYauInToric's
+  X = findOneCY V0 -- choose one triangulation
+  ambient Xs_0 -- gives a simplicial toric variety (over same coefficient ring).
+    
+    V0 = cyPolytope ks
+    for a in annotatedFaces V0 list if a#0 != dim V0 - 1 then continue else a#
+    select(annotatedFaces V0, a -> a#0 == dim V0 - 1)
+    PN = convexHull transpose matrix rays V0
+    PN2 = polytope(ks, "N")
+
+
+-- Usage #1.
+  Q = cyPolytope(tope, ID => label)
+  Xs = findAllCYs(Q, Ring => RZ) -- labels them
+  X = makeCY(Q, ID => lab, Ring => RZ)
+  -- given an X = Xs_0 say
+  -- really want line bundles on X, cohomology on X.  But might also want equations.  Where to put those?
+  
+-- Usage #2. Start with a toric variety constructed elsewhere.
+-- Case A: it is simplicial, from reflexive.
+-- Case B: it is not simplicial, but is from reflexive.
+  X = cyHypersurface(V, Ring => RZ, Equations => ...)
+  V = ambient X
+  
   Caveat
   SeeAlso
 ///
@@ -691,3 +1158,21 @@ doc ///
 ///
 *-
 
+
+///
+Andreas Schachner to Everyone (Apr 14, 2023, 9:53 AM)
+https://arxiv.org/pdf/2112.12106.pdf
+You to Everyone (Apr 14, 2023, 10:00 AM)
+{{-1, 0, 0, 0}, {1, 0, 0, 0}, {0, -1, 0, 0}, {0, 1, 0, 0}, {0, 0, -1, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}, {0, 0, 0, 1}}
+Andreas Schachner to Everyone (Apr 14, 2023, 10:54 AM)
+https://cyjax.readthedocs.io/en/latest/
+Nathaniel MacFadden to Everyone (Apr 14, 2023, 10:58 AM)
+https://docs.python.org/3/library/doctest.html
+Nathaniel MacFadden to Everyone (Apr 14, 2023, 11:07 AM)
+https://developers.google.com/optimization/mip/mip_example
+Nathaniel MacFadden to Everyone (Apr 14, 2023, 11:19 AM)
+https://www.scipopt.org/
+Nathaniel MacFadden to Everyone (Apr 14, 2023, 11:26 AM)
+GLOP
+https://developers.google.com/optimization/lp/lp_advanced
+///

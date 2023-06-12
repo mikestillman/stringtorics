@@ -39,13 +39,10 @@ variety CalabiYauInToric  := X -> variety(X, QQ)
 dim CompleteIntersectionInToric := (X) -> dim X.Ambient - #X.CI
 ambient CompleteIntersectionInToric := (X) -> X.Ambient
 
-equations = method()
 equations CompleteIntersectionInToric := List => X -> (
     X.Equations
     )
 
-LineBundle = new Type of HashTable
-lineBundle = method()
 lineBundle(CompleteIntersectionInToric, List) := (X, deg) -> (
     if not all(deg, x -> instance(x, ZZ)) or #deg =!= degreeLength ring ambient X
     then error("expected multidegree of length "|degreeLength ring ambient X);
