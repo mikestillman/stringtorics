@@ -298,6 +298,24 @@ cohomologyVector(CompleteIntersectionInToric, List, RingElement) := (X, deg, F) 
         )
     )
 
+cohomology(ZZ, CalabiYauInToric, List, RingElement) := opts -> (i,X,deg,F) -> (
+    V := ambient X;
+    (nrows, ncols, rk1) := cohomologyMatrixRank(i, V, deg, F);
+    (nrows2, ncols2, rk2) := cohomologyMatrixRank(i+1, V, deg, F);
+    nrows-rk1 + ncols2 - rk2
+    )
+
+cohomologyVector(CalabiYauInToric, List, RingElement) := (X, deg, F) -> (
+    V := ambient X;
+    rks := for i from 0 to dim ambient X list cohomologyMatrixRank(i, V, deg, F);
+    -- rks is a list of (nrows, ncols, rk).
+    for j from 0 to 3 list (
+        (nrows1, ncols1, rk1) := rks#j;
+        (nrows2, ncols2, rk2) := rks#(j+1);
+        nrows1 - rk1 + ncols2 - rk2
+        )
+    )
+
 cohomologyVector LineBundle := List => L -> (
     X := variety L;
     Fs := equations X;

@@ -246,6 +246,10 @@ TopologicalDataOfCY3 = new Type of HashTable
 CYPolytope = new Type of HashTable
 CalabiYauInToric = new Type of HashTable
 
+LineBundle = new Type of HashTable
+lineBundle = method()
+equations = method()
+
 dump = method(Options => true)
 isFavorable = method();
 h11OfCY = method() -- deprecate this
@@ -806,10 +810,7 @@ findAllCYs CYPolytope := List => opts -> Q -> (
 ----------------------------------------------------------------
 -- FRST Triangulations (Fine, regular, star triangulations) ----
 ----------------------------------------------------------------
--- 
-  -- Here, we only consider a triangulation of a reflexive polytope
   
-
 reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
     -- P1 is a reflexive polytope in the M lattice.
     -- Creates a simplicial toric variety via a triangulation
@@ -842,11 +843,13 @@ end--
 
 restart
 needsPackage "StringTorics"
-
+path = append(path, "......")
+needsPackage("StringTorics", FileName => "/Users/.../StringTorics.m2")
 restart
 uninstallPackage "StringTorics"
 restart
 installPackage "StringTorics"
+viewHelp oo
 
 restart
 needsPackage "StringTorics"
