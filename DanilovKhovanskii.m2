@@ -110,8 +110,9 @@ computeHodgeDeligne Polyhedron := opts -> P -> (--P := X#"polytope data";
 	oneFaces := facesAsPolyhedra(d - 1, P);
 	Pfaces := faces(P);-- print(Pfaces);
 	for i from 0 to #oneFaces - 1 do (--print(i, Pfaces#(d - 1)#i#0, oneFaces#i);
-	    eZfaces#(Pfaces#(d - 1)#i#0) = new MutableHashTable from {};
-	    eZfaces#(Pfaces#(d - 1)#i#0)#(0,0) = #latticePoints(oneFaces#i) - 1;
+	    --eZfaces#(Pfaces#(d - 1)#i#0) = new MutableHashTable from {};
+	    --eZfaces#(Pfaces#(d - 1)#i#0)#(0,0) = #latticePoints(oneFaces#i) - 1;
+	    eZfaces#(Pfaces#(d - 1)#i#0) = new HashTable from {(0, 0) => #latticePoints(oneFaces#i) - 1};
 	    --print(eZfaces#(Pfaces#(d - 1)#i#0));
 	    );-- print("done 1");
 	for n from 2 to d - 1 do (
@@ -169,9 +170,119 @@ computeHodgeDeligne Polyhedron := opts -> P -> (--P := X#"polytope data";
     (new HashTable from eZ, new HashTable from eZbar, new HashTable from eZfaces)
     )
 
+--check M versus N lattice
 computeHodgeDeligne CYPolytope := P -> computeHodgeDeligne(convexHull transpose matrix rays P)
 
 computeHodgeDeligne CalabiYauInToric := X -> computeHodgeDeligne(convexHull transpose matrix rays X#"polytope data")
+
+--For (a hypersurface in) a toric variety that is a subset of the projective toric variety that has polytope P.
+--Not tested.
+computeHodgeDeligneInPToric = method();
+computeHodgeDeligneInPToric (Polyhedron, List) := (P, whichFaces) -> (
+    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(P);
+    eZtoric := new MutableHashTable from {};
+    for k in keys eZfaces do (
+	eZtoric#k = eZ#k + sum for f in whichFaces list getSparseeZ(eZfaces#f, k);
+	);
+    eZtoric
+    )
+
+--For a hypersurface in T^n x C^r.
+--cheap option can be (but is not currently) used for complete intersections.
+--not cheap option not finished yet.
+computeHodgeDeligneAffineAndTorus = method(Options => {cheap => false});
+computeHodgeDeligneAffineAndTorus (Polyhedron, ZZ, ZZ) := opts -> (P, n, r) -> (
+    eZtoric := new MutableHashTable from {};
+    subs := subsets(r);
+    if opts.cheap then ( print("cheap");
+	for s in subs do (
+	    vs := vertices P; print(vs);
+	    newP := convexHull vs_(for i from 0 to numcols vs - 1 list (
+		    if (a := true;
+			for b in s do (
+			    a = (a and vs_(n + b, i) == 1)
+			    ); print(a);
+			a
+			)
+		    then i else continue
+		    )
+		);
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(newP); 
+	    for k in keys(eZ) do (print(k);
+		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
+		); print("done subset:" | toString(s));
+	    );
+	)
+    else (
+	for s in subs do (
+	    vs := vertices P; print(vs);
+	    newP := P;--finish...
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(newP); 
+	    eZ#s = eZ;
+	    for k in keys(eZ) do (print(k);
+		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
+		); print("done subset:" | toString(s));	    
+	    );
+	);
+    eZtoric
+    )
+
+--For a hypersurface in T^n x C^r. Takes a matrix instead of a polyhedron.
+--cheap option is currently the routine used for complete intersections.
+--not cheap option not finished yet.
+computeHodgeDeligneAffineAndTorus (Matrix, ZZ, ZZ) := opts -> (M, n, r) -> (
+    eZtoric := new MutableHashTable from {};
+    subs := subsets(r);
+    if opts.cheap then (print("cheap");
+	for s in subs do (
+	    newP := convexHull M_(for i from 0 to numcols M - 1 list (
+		    if (a := true;
+			for b in s do (
+			    a = (a and M_(n + b, i) == 1)
+			    ); print(a);
+			a
+			)
+		    then i else continue
+		    )
+		);
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(newP); 
+	    for k in keys(eZ) do (print(k);
+		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
+		); print("done subset:" | toString(s));
+	    );
+	)
+    else (
+	for s in subs do (
+	    newP := convexHull M;--finish...
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(newP); 
+	    eZ#s = eZ;
+	    for k in keys(eZ) do (print(k);
+		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
+		); print("done subset:" | toString(s));		    
+	    );
+	);
+    eZtoric
+    )
+
+--For a complete intersection of hypersurfaces, Y, in a torus.
+computeHodgeDeligneTorusCI = method();
+computeHodgeDeligneTorusCI (List, ZZ) := (Ps, n) -> (
+    r := #Ps;
+    M := manyPolyhedraToLargeMatrix(Ps);
+    eZtoric := computeHodgeDeligneAffineAndTorus(M, n, r, cheap => true); print("eZtoric#(0, 0) = " | eZtoric#(0,0));
+    eZCI := new MutableHashTable from {};
+    for p from 0 to n - r do (
+	for q from 0 to n - r do (print("(p, q) = " | toString(p, q));
+	        if p == q then (
+		    eZCI#(p, q) = (-1)^(n + p) * binomial(n, p) - eZtoric#(p + r - 1, q + r - 1)
+		    )
+		else (
+		     eZCI#(p, q) = -eZtoric#(p, q)
+		     )
+	    );
+	);
+    new HashTable from eZCI
+    )
 
 
 -* Documentation section *-
@@ -249,12 +360,46 @@ TEST ///
   assert (eZbar ===  new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (2,0) => 1, (1,1) => 20, (0,2) => 1, (2,1) => 0, (1,2) => 0, (2,2) => 1})
 ///
 
+TEST ///
+  topes = kreuzerSkarke 3
+  Q = cyPolytope topes_50
+  assert(hh^(1,1) Q == 3)
+  assert(hh^(1,2) Q == 73)
+  PM = polytope(Q, "M")
+  vertices PM
+  isReflexive PM
+  (eZ, eZbar, eZfaces) = computeHodgeDeligne(PM);
+  assert(eZbar === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (1,1) => 3, (2,0) => 0, (0,2) => 0, (3,0) => -1, (2,1) => -73, (0,3) => -1, (1,2) => -73, (1,3) => 0, (2,2) => 3,
+      (3,1) => 0, (2,3) => 0, (3,2) => 0, (3,3) => 1})
+
+  Q = cyPolytope topes_70
+  assert(hh^(1,1) Q == 3)
+  assert(hh^(1,2) Q == 75)
+  PM = polytope(Q, "M")
+  vertices PM
+  isReflexive PM
+  (eZ, eZbar, eZfaces) = computeHodgeDeligne(PM);
+  assert(eZbar === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (1,1) => 3, (2,0) => 0, (0,2) => 0, (3,0) => -1, (2,1) => -73, (0,3) => -1, (1,2) => -73, (1,3) => 0, (2,2) => 3,
+      (3,1) => 0, (2,3) => 0, (3,2) => 0, (3,3) => 1})
+
+  matrix for i from 0 to 3 list (
+      for j from 0 to 3 list(
+	  (-1)^(i + j) * eZbar#(i,j)
+	  )
+      )
+///
 
 TEST ///
   P = convexHull transpose matrix {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {-1, 0, 0}, {0, -1, 0}, {0, 0, -1}}
   (eZ, eZbar, eZfaces) = computeHodgeDeligne(P)
   assert (eZ === new HashTable from {(0,0) => 5, (1,0) => 0, (0,1) => 0, (2,0) => 1, (1,1) => 0, (0,2) => 1, (2,2) => 1})
   assert (eZbar === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (2,0) => 1, (1,1) => 8, (0,2) => 1, (2,1) => 0, (1,2) => 0, (2,2) => 1})
+///
+
+TEST ///
+  Q1 = 2 * stdSimplex(5)
+  Q2 = 3 * stdSimplex(5)
+  --computeHodgeDeligneTorusCI({Q1,Q2},5)
 ///
 
 
