@@ -35,7 +35,7 @@ TEST ///
   basisIndices Q2
   (basisIndices Q2)/(x -> if instance(x, ZZ) then x else x#0)//unique//sort
   netList annotatedFaces Q2
-  rays Q2 ==== {{-1, -1, 1, -1}, 
+  rays Q2 === {{-1, -1, 1, -1}, 
       {-1, -1, 1, 1}, 
       {-1, -1, 2, -1}, 
       {-1, 0, 1, -1}, 
