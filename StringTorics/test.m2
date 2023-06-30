@@ -1,3 +1,58 @@
+TEST ///
+  -- XX TODO: being worked on now 29 June 2023
+  -- Checking the methods for CYPolytope's
+  -- We eventually want to test this for: favorable, non-favorable, torsion V.
+
+-*
+  restart
+  needsPackage "StringTorics"
+*-
+  debug needsPackage "StringTorics"
+  
+  tope = KSEntry "4 13  M:34 13 N:12 10 H:7,29 [-44] id:40
+   1   0   0   0   0  -2  -2   1   2   1   2   2  -2
+   0   1   0   0   0   2   1  -1  -2  -2   0  -2   0
+   0   0   1  -1   0  -1   0  -1   1   0   1  -1   1
+   0   0   0   0   1   1   2   1  -2  -1  -2   0   0
+   "
+  Q = cyPolytope(tope, ID => 40)  
+  assert isFavorable Q
+  basisIndices Q
+  transpose matrix degrees Q
+
+  nonfavTope = KSEntry "4 7  M:28 7 N:11 7 H:7,27 [-40] id:9
+   1   0   3   0  -1  -3  -6
+   0   1   2   0   0  -2  -5
+   0   0   4   1   0  -2  -8
+   0   0   0   2   2   2  -4
+   "
+
+  Q2 = cyPolytope nonfavTope   
+  assert not isFavorable Q2
+  assert(hh^(1,1) Q2 == 7)
+  assert(hh^(1,2) Q2 == 27)
+  -- the following will need to change...
+  basisIndices Q2
+  (basisIndices Q2)/(x -> if instance(x, ZZ) then x else x#0)//unique//sort
+  netList annotatedFaces Q2
+  rays Q2 ==== {{-1, -1, 1, -1}, 
+      {-1, -1, 1, 1}, 
+      {-1, -1, 2, -1}, 
+      {-1, 0, 1, -1}, 
+      {-1, 3, -1, 0}, 
+      {1, 0, -1, 0}, 
+      {3, -1, -2, 1}, 
+      {-1, -1, 1, 0}, 
+      {1, -1, 0, 0}, 
+      {-1, 1, 0, 0}}
+  Xs = findAllCYs Q2; -- what if I only want the NTFE ones?  FIX.
+  vertices polytope(Q2, "M")
+  vertices polytope(Q2, "N") -- notice these are NOT in the order of the rays of Q2!
+  transpose matrix degrees Q2
+  
+  transpose matrix rays Q2
+///
+
 ///
   -- Checking on the interface of the package.
 -*
