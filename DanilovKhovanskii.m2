@@ -63,7 +63,6 @@ ehrhartNumeratorQuicker Polyhedron := P -> (
     lint := for i from 1 to floor(d / 2) list (
 	#interiorLatticePoints(i * P)
 	);
-    print(l, lint);
     prepend(1, for i from 1 to d list (
 	if i <= ceiling(d / 2) then (
 	    sum for j from max(0, i - d - 1) to i list (-- print(i, j);
@@ -152,15 +151,15 @@ computeHodgeDeligne Polyhedron := opts -> P -> (--P := X#"polytope data";
 	)
     else if d == 1 then (--print("dim(Z) = 0"); --hypersurface in 1-dimension is a collection of points
 	eZ#(0,0) = #latticePoints(P) - 1;
-	eZbar#(0,0) = #latticePoints(P) - 1; print(eZ#(0,0), eZbar#(0,0));
+	eZbar#(0,0) = #latticePoints(P) - 1; -- print(eZ#(0,0), eZbar#(0,0));
 	return (new HashTable from eZ, new HashTable from eZbar, new HashTable from {})
 	);-- print("not 0 or 1");
     
     --Begin by computing eZ of the varieties corresponding to each face of P.
     --This is known by induction.
     eZfaces := new MutableHashTable from opts.FaceInfo;
-    print(opts.FaceInfo); print(eZfaces);
-    print("eZfaces: " | #eZfaces | " , keys(eZfaces): " | #(keys eZfaces));
+    -- print(opts.FaceInfo); print(eZfaces);
+    -- print("eZfaces: " | #eZfaces | " , keys(eZfaces): " | #(keys eZfaces));
     if #(keys eZfaces) == 0 then (--print("no face info");
 	verts := entries transpose vertices P;-- print(verts);
 	vIndices := new HashTable from for i from 0 to #verts - 1 list i => verts#i;
@@ -173,17 +172,17 @@ computeHodgeDeligne Polyhedron := opts -> P -> (--P := X#"polytope data";
 	    --print(eZfaces#(Pfaces#(d - 1)#i#0));
 	    );-- print("done 1");
 	for n from 2 to d - 1 do (
-	    Fs := facesAsPolyhedra(d - n, P); print("n = " | n | ", Fs: " | #Fs);
+	    Fs := facesAsPolyhedra(d - n, P); -- print("n = " | n | ", Fs: " | #Fs);
     	    for i from 0 to #Fs - 1 do (
 		eZfaces2 := new HashTable from flatten for j from 1 to dim Fs#i - 1 list (--print(Pfaces#n#i);
 		    flatten for k from 1 to n - 1 list (
-			for l from 0 to #(Pfaces#(d - k)) - 1 list (print(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0, isSubset(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0));
+			for l from 0 to #(Pfaces#(d - k)) - 1 list (-- print(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0, isSubset(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0));
 			    if isSubset(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0) and eZfaces#?(Pfaces#(d - k)#l#0) then Pfaces#(d - k)#l#0 => eZfaces#(Pfaces#(d - k)#l#0) else continue
 			    )
 			)
 	            --for k in keys eZfaces list (print(k, Pfaces#(d - n)#i#0);
 		    --if isSubset(k, Pfaces#(d - n)#i#0) then (print("yes"); k => eZfaces#k) else continue
-		    ); print("face ready"); print(eZfaces2);
+		    ); -- print("face ready"); print(eZfaces2);
 		e := computeHodgeDeligne(Fs#i, FaceInfo => eZfaces2);
 	    	eZfaces#(Pfaces#(d - n)#i#0) = e#0;-- print(e);
 		); print("done " | n);
