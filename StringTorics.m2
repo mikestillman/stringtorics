@@ -1,3 +1,14 @@
+-- TODO: 12 June 2023
+--   add in CICY list (bit vague, as we don't handle well CI in toric yet)
+--   create h11=4 database as a single file?
+--   what about h11=5, 6, 7?
+--   add in flop code
+--   understand Constantin-Lukas flop arguments in CICY paper(s).
+--   handle torsion in Pic V
+--   handle Pic group in non-favorables?
+--   compute Hesse form of a cubic in 3 variables
+
+
 -- TODO (Aug 2022)
 -- some notes:
 --  KSEntry --> Matrix
@@ -34,8 +45,8 @@
 
 newPackage(
         "StringTorics",
-        Version => "0.5+", 
-        Date => "18 Dec 2022",
+        Version => "0.6", 
+        Date => "12 June 2023",
         Authors => {
             {Name => "Mike Stillman", 
             Email => "mike@math.cornell.edu", 

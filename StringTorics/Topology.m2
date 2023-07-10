@@ -31,6 +31,342 @@ topologicalData(CalabiYauInToric, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
         }
     )
 
+------------------------------------
+-- Separating a set of topologies --
+------------------------------------
+-- two types of routines:
+--  separate
+--  combine (takes a TopologySet or a list, and combines ones that are the same
+--     (adding in matrices that show this).
+--     note: if two sets are combined, we need to multiply all the matrices of one set by the new change of basis matrix.
+TopologySet = new Type of MutableHashTable
+
+topologySet = method()
+topologySet(List, HashTable) := TopologySet => (labels, Xs) -> (
+    new TopologySet from {
+        "Sets" => {for k in labels list {k}},
+        "CYHash" => Xs
+        }
+    )
+
+separateIfDifferent = method()
+separateIfDifferent(TopologySet, Function) := (T, fun) -> (
+    -- fun takes a CalabiYauInToric, and returns some value.
+    -- if fun X1 =!= fun X2, then X1 and X2 are distinct topologies.
+    -- if the same, then nothing is asserted.
+    Xs := T#"CYHash";
+    -- the 'flatten' on the next line makes one list of all definitely distinct topologies
+    newsets := flatten for L in T#"Sets" list (
+        -- L is a list of labels, all are equivalent (so maybe only one, but always >= 1).
+        P := partition(lab -> fun Xs#(first lab), L);
+        values P
+        );
+    new TopologySet from {
+        "Sets" => newsets,
+        "CYHash" => T#"CYHash"
+        }
+    )
+
+combineIfSame = method()
+combineIfSame(TopologySet, Function) := (T, fun) -> (
+    -- fun takes a CalabiYauInToric, and returns some value.
+    -- if fun X1 === fun X2, then X1 and X2 are the same topology
+    -- if different, then nothing is asserted.
+    Xs := T#"CYHash";
+    -- the 'flatten' on the next line makes one list of all definitely distinct topologies
+    newsets := for L in T#"Sets" list (
+        -- L is a list of labels, all are equivalent (so maybe only one, but always >= 1).
+        P := partition(lab -> fun Xs#(first lab), L);
+        (values P)/flatten
+        );
+    new TopologySet from {
+        "Sets" => newsets,
+        "CYHash" => T#"CYHash"
+        }
+    )
+
+separateByGV = method()
+separateByGV TopologySet := T -> (
+    Xs := T#"CYHash";
+    newSets := for Ls in T#"Sets" list (
+        L1s := Ls/first; -- these are the ones we want to split up
+        Indices := hashTable for i from 0 to #Ls-1 list first Ls#i => i;
+        << "----------------" << endl;
+        print L1s;
+        print Indices;
+        << "----------------" << endl;
+        P := partitionByTopology(L1s, Xs, 15);
+        newlist := for k in keys P list {k}|(P#k);
+        newlist
+        -- what is the best way to get the ones that are the same into the same set?
+        );
+    new TopologySet from {
+        "CYHash" => Xs,
+        "Sets" => newSets
+        }
+    )
+
+combineSet = (Ls, binfun) -> (
+    -- binfun(X1,X2) should return a matrix if these are the same topology, null if we don't know.
+    -- note: the number of newsets is identical.  We might just be coalescing elements in one set.
+    -- NOTE: currently the matrix is lost, we need to be able to keep it!
+    upnode := new MutableList from 0..#Ls-1;
+    nodesize := new MutableList from (#Ls : 1);
+    find := x -> (
+        root := x;
+        while upnode#root != root do root = upnode#root;
+        while upnode#x != root do (
+            par := upnode#x;
+            upnode#x = root; 
+            x = par;
+            );
+        root
+        );
+    union := (x,y) -> (
+        x = find x;
+        y = find y;
+        if x === y then return;
+        if nodesize#x  < nodesize#y then (
+            (x,y) = (y,x);
+            );
+        upnode#y = x;
+        nodesize#x = nodesize#x + nodesize#y;
+        nodesize#y = 0;
+        );
+    for i from 0 to #Ls - 2 do 
+      for j from i+1 to #Ls - 1 do (
+          aij := binfun(Ls#i,Ls#j);
+          if aij =!= null then union(i,j);
+          );
+    P := partition(x -> find x, toList(0..#Ls-1));
+    for p in values P list (for p1 in p list Ls#p1)
+    )
+
+doit = (T) -> (
+    Xs := T#"CYHash";
+    combineSet((T#"Sets"#0), (lab1,lab2) -> (
+            X1 := Xs#(first lab1);
+            X2 := Xs#(first lab2);
+            c2Form X1 == c2Form X2 and cubicForm X1 == cubicForm X2
+            ))
+    )
+
+info TopologySet := T -> (
+    << "Total number of objects considered:         " << T#"Sets"/(x -> (x/length//sum))//sum << endl;
+    << "Number of known different topologies:       " << #T#"Sets" << endl;
+    << "Maximum possible # of different topologies: " <<  T#"Sets"/(x -> length x)//sum << endl;
+    << "Largest number in one set:                  " << T#"Sets"/(x -> (x/length//max))//max << endl;
+    )
+
+///
+  -- Analyze h11=3 examples
+restart
+debug needsPackage "StringTorics"
+  R = ZZ[a,b,c]
+  RQ = QQ (monoid R);
+  (Qs, Xs) = readCYDatabase("../m2-examples/foo-cys-ntfe-h11-3.dbm", Ring => R);
+  
+  -- First, let's only consider those with torsion free class group.
+   torsions = for k in keys Qs list (
+      istor := prune coker matrix rays Qs#k != ZZ^3;
+      if istor then k else continue
+      )
+
+  allXs = sort select(keys Xs, x -> not member(x#0, torsions))
+  allT = topologySet(allXs, Xs);
+
+  allT1 = combineIfSame(allT, X -> (c2Form X, cubicForm X))
+  info allT1 
+
+  elapsedTime allT2 = separateIfDifferent(allT1, invariantsAll) -- 17 sec
+  info allT2
+
+  elapsedTime allT3 = separateByGV allT2 -- 44 sec
+  info allT3
+
+  onestocheck = for x in allT3#"Sets" list if #x == 1 then continue else (
+      x/first
+      )
+  
+  flatten for x in onestocheck list (
+      flatten for y in subsets(x, 2) list (
+        print y;
+        ans := getEquivalenceIdeal(y#0, y#1, Xs);
+        print ans;
+        ans
+        )
+      )
+  
+///  
+  
+///
+restart
+debug needsPackage "StringTorics"
+  R = ZZ[a,b,c,d]
+  RQ = QQ (monoid R);
+  (Qs, Xs) = readCYDatabase("mike-ntfe-h11-4.dbm", Ring => R);
+
+  allT = topologySet(sort keys Xs, Xs);
+  #allT#"Sets" == 1
+  #allT#"Sets"#0 == 1994
+  info allT
+
+  allT1 = combineIfSame(allT, X -> (c2Form X, cubicForm X))
+  -- only 14 are the same as any other, and if two are the same, they also have same hh^(1,2).
+  -- (checked this explicitly).
+  info allT1 -- note very few are the same!
+  netList allT1#"Sets"
+  for x in allT1#"Sets" list (x/length)//tally
+
+  elapsedTime allT2 = separateIfDifferent(allT1, invariantsAll) -- 270 sec
+  elapsedTime allT3 = separateByGV allT2 -- 870 sec
+  info allT3
+
+  for x in allT3#"Sets" list if #x == 1 then continue else (
+      x/first
+      )
+  onestocheck = {
+      {(163, 2), (163, 3)}, 
+      {(811, 0), (882, 3)}, 
+      {(387, 1), (387, 3)}, 
+      {(339, 1), (337, 1)}, 
+      {(1001, 0), (982, 0)}, 
+      {(436, 1), (433, 1)}, 
+      {(364, 0), (344, 1)}, 
+      {(1094, 2), (1090, 2)}, 
+      {(246, 0), (249, 1)}, 
+      {(1147, 0), (1146, 0)}, 
+      {(436, 0), (433, 0)}, 
+      {(831, 0), (806, 0)}, 
+      {(1121, 0), (1122, 0)}, 
+      {(1067, 0), (1076, 0)}, 
+      {(930, 6), (927, 2)}, 
+      {(981, 0), (997, 0)}, 
+      {(364, 1), (377, 0)}, 
+      {(455, 0), (451, 0)}, 
+      {(403, 0), (408, 2)}, 
+      {(1090, 0), (1094, 0)}, 
+      {(714, 0), (707, 0), (695, 5), (709, 0)}, 
+      {(991, 0), (998, 3)}, 
+      {(1002, 1), (979, 0), (1005, 4)}, 
+      {(716, 3), (705, 0)}, 
+      {(851, 0), (814, 0), (810, 0)}, 
+      {(1123, 0), (1124, 0)}, 
+      {(478, 1), (473, 0)}, 
+      {(1085, 0), (1082, 0), (1086, 0)}, 
+      {(334, 1), (329, 1)}, 
+      {(316, 0), (322, 0)}, 
+      {(1004, 0), (994, 0)}, 
+      {(265, 1), (250, 0), (254, 5), (228, 1)}, 
+      {(647, 0), (645, 0)}, 
+      {(529, 0), (510, 0)}, 
+      {(935, 4), (915, 0)}, 
+      {(628, 0), (653, 3)}, 
+      {(943, 0), (958, 0)}, 
+      {(329, 0), (334, 0)}, 
+      {(319, 0), (321, 0), (302, 0)}, 
+      {(875, 0), (854, 0)}, 
+      {(1183, 2), (1182, 0)}, 
+      {(449, 2), (419, 0)}, 
+      {(383, 0), (356, 1)}, 
+      {(250, 1), (213, 1)}, 
+      {(938, 3), (933, 0)}, 
+      {(1082, 5), (1077, 3)}, 
+      {(668, 1), (649, 1), (626, 0)}, 
+      {(80, 3), (72, 0), (80, 6)}, 
+      {(616, 0), (606, 0)}, 
+      {(540, 0), (545, 0)}, 
+      {(331, 0), (337, 0), (339, 2)}, 
+      {(397, 0), (350, 0)}, 
+      {(900, 0), (901, 0)}, 
+      {(930, 1), (927, 8)}, 
+      {(559, 0), (577, 0)}, 
+      {(938, 10), (933, 4)}, 
+      {(931, 0), (932, 2)}, 
+      {(884, 0), (820, 0)}, 
+      {(650, 3), (656, 1), (630, 0)}, 
+      {(976, 0), (989, 0)}, 
+      {(552, 0), (551, 2)}, 
+      {(924, 0), (937, 0)}}
+
+  176 == # flatten for x in onestocheck list flatten for y in subsets(x,2) list y
+  
+  flatten for x in onestocheck list (
+      flatten for y in subsets(x, 2) list (
+        print y;
+        ans := getEquivalenceIdeal(y#0, y#1, Xs);
+        print ans;
+        ans
+        )
+      )
+  select(oo, i -> numgens i > 1)
+  getEquivalenceIdeal((163, 2), (163, 3), Xs)
+  getEquivalenceIdeal((1123,0),(1124,0), Xs)
+
+  lab1 = (163,2)
+  lab2 = (163,3)
+  X1 = Xs#lab1;
+  X2 = Xs#lab2;
+  LF1 = (c2Form X1, cubicForm X1);
+  LF2 = (c2Form X2, cubicForm X2);
+  RQ = QQ (monoid ring LF1_0);
+  (A,phi) = genericLinearMap RQ;
+  T = target phi;
+  B = ring A;
+  LF1' = LF1/(f -> sub(f, T));
+  LF2' = LF2/(f -> sub(f, T));
+  I0 = sub(ideal last coefficients(phi LF1'_0 - LF2'_0), B);
+  A0 = A % I0;
+  phi0 = map(T, T, A0);
+  I1 = sub(ideal last coefficients (phi0 LF1'_1 - LF2'_1), B)
+  gens gb(I0 + I1)
+
+  select(allT3#"Sets", x -> #x > 1)
+  -- now we need to check that (hopefully) each set is not homeomorphic to any other set.
+  -- It seems that now an ansatz might work?
+  
+  TbyH12s = separateIfDifferent(allT, X -> hh^(1,2) X);
+  info TbyH12s
+  #TbyH12s#"Sets"
+  for x in TbyH12s#"Sets" list #x
+  
+  
+  smallset = select(sort keys Xs, lab -> hh^(1,2) Xs#lab == 148) -- 
+  T = topologySet(sort smallset, Xs)
+  allTsame = combineIfSame(T, X -> (c2Form X, cubicForm X))
+  info allTsame
+  elapsedTime T1 = separateIfDifferent(allTsame, X -> invariantsAll X)
+  info T1
+  netList T1#"Sets"
+  T2 = separateByGV T1
+          
+///
+
+  getEquivalenceIdealHelper = (LF1, LF2, A, phi) -> (
+      T := target phi;
+      B := ring A;
+      LF1' := LF1/(f -> sub(f, T));
+      LF2' := LF2/(f -> sub(f, T));
+      I0 := sub(ideal last coefficients(phi LF1'_0 - LF2'_0), B);
+      A0 := A % I0;
+      phi0 := map(T, T, A0);
+      trim(I0 + sub(ideal last coefficients (phi0 LF1'_1 - LF2'_1), B))
+      )
+
+  getEquivalenceIdeal = method()
+  getEquivalenceIdeal(Thing, Thing, HashTable) := Ideal => (lab1, lab2, Xs) -> (
+      X1 := Xs#lab1;
+      X2 := Xs#lab2;
+      LF1 := (c2Form X1, cubicForm X1);
+      LF2 := (c2Form X2, cubicForm X2);
+      RQ := QQ (monoid ring LF1_0);
+      (A,phi) := genericLinearMap RQ;
+      getEquivalenceIdealHelper(LF1, LF2, A, phi)
+      )
+
+------------------------------------
+
+
 factors = method()
 factors RingElement := (F) -> (
      facs := factor F;
@@ -96,6 +432,17 @@ invariants CalabiYauInToric := List => X -> (
     badp = if badp === {} then 0 else sub(first badp, ZZ);
     ptcounts := for p in {2, 3, 5, 7, 11} list pointCount(F, p);
     {h11, h12, ptcounts, badp, (trim content L)_0, (trim content F)_0, #facs, d, nc}
+    )
+
+invariants0 = method()
+invariants0 CalabiYauInToric := List => X -> (
+    L := c2Form X;
+    F := cubicForm X;
+    h11 := hh^(1,1) X;
+    h12 := hh^(1,2) X;
+    contentL := (trim content L)_0;
+    contentF := (trim content F)_0;
+    {h11, h12} |  {contentL, contentF}
     )
 
 invariants1 = method()
@@ -268,7 +615,7 @@ invariantsAll(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
     inv3 := sort for c in decompose sing_2 ideal(LQ, FQ) list {codim c, degree c};
     inv4 := betti res saturate sing_1 ideal FQ;
     -- inverse system of FQ
-    inv5 := betti res inverseSystem FQ; -- not clear this one is worthwhile
+--    inv5 := betti res inverseSystem FQ; -- not clear this one is worthwhile
     -- integer parts of singular loci.
     conductF := integerPart saturate sing_1 ideal F;
     conductLF := integerPart saturate sing_2 ideal(L,F);
@@ -283,7 +630,7 @@ invariantsAll(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
      "comps sing FQ" => inv2, 
      "comps sing LFQ" => inv3, 
      "bettti sing LFQ" => inv4,
-     "betti inv F" => inv5,
+--     "betti inv F" => inv5,
      "conduct(F)" => inv6,
      "conduct(L,F)}" => inv7,
      "hessian shape" => inv8,
@@ -344,7 +691,6 @@ partitionByTopology List := LGVs -> (
     )
 
 partitionByTopology(List, HashTable, ZZ) := (Ls, Xs, degreelimit) -> (
-    -- LGVs is a list of X => gvPartition.
     -- output: a hashtable, keys are labels, values are lists of {label, matrix}
     labels := Ls;
     if #Ls === 1 then return hashTable {Ls#0 => {}};
