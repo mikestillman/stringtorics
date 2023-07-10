@@ -9,7 +9,7 @@ newPackage(
     DebuggingMode => true
     )
 
-export {"stdVector", "manyMatricesToLargeMatrix", "manyPolyhedraToLargeMatrix", "manyPolyhedraToLargeOne", "ehrhartNumerator", "computeSumqeZ", "eZ2hZ", "computeHodgeDeligne", "FaceInfo"}
+export {"Cheap", "vdot", "torusFactor",  "stdVector", "manyMatricesToLargeMatrix", "manyPolyhedraToLargeMatrix", "manyPolyhedraToLargeOne", "ehrhartNumerator", "ehrhartNumeratorQuicker", "computeSumqeZ", "eZ2hZ", "computeHodgeDeligne", "FaceInfo"}
 
 -* Code section *-
 stdVector = method();--index from 0
@@ -42,8 +42,8 @@ manyPolyhedraToLargeOne List := Ps -> (
 ehrhartNumerator = method();
 ehrhartNumerator Polyhedron := P -> (
     d := dim P;
-    x := getSymbol "x";
-    R := QQ[x];
+    t := getSymbol "t";
+    R := QQ[t];
     f := 1 + sum for i from 1 to d list (
 	a := #latticePoints(i * P);
 	a * R_0^i
@@ -54,10 +54,32 @@ ehrhartNumerator Polyhedron := P -> (
 	)
     )
 
-computeSumqeZ = method();--from 4.6 of Danilov and Khovanskii [though that may need a factor of (-1)^d in front of \psi_{d+1}(\Delta)]
-computeSumqeZ (Polyhedron, ZZ) := (P, p) -> (
+ehrhartNumeratorQuicker = method();
+ehrhartNumeratorQuicker Polyhedron := P -> (
     d := dim P;
-    psi := ehrhartNumerator(P);
+    l := prepend(1, for i from 1 to ceiling(d / 2) list (
+	#latticePoints(i * P)
+	));
+    lint := for i from 1 to floor(d / 2) list (
+	#interiorLatticePoints(i * P)
+	);
+    prepend(1, for i from 1 to d list (
+	if i <= ceiling(d / 2) then (
+	    sum for j from max(0, i - d - 1) to i list (-- print(i, j);
+		(-1)^(i - j) * binomial(d + 1, i - j) * l#(j)
+		)
+	    )
+	else (
+	    sum for j from max(1, i - d - 1) to d + 1 - i list (-- print(i, j);
+		(-1)^(d + 1 - i - j) * binomial(d + 1, d + 1 - i - j) * lint#(j - 1)
+		)		
+	    )
+	))
+    )
+
+computeSumqeZ = method();--from 4.6 of Danilov and Khovanskii [though that may need a factor of (-1)^d in front of \psi_{d+1}(\Delta)]
+computeSumqeZ (Polyhedron, List, ZZ) := (P, psi, p) -> (
+    d := dim P;
     --ehrhart(P) computes lattice points in first d dilations to figure out polynomial, so just find lattice points
     (-1)^(d - 1) * ((-1)^p * binomial(d, p + 1) + psi_(p+1))
     )
@@ -83,9 +105,41 @@ getSparseeZ (HashTable, Sequence) := (eZ, pq) -> (
     if eZ#?pq then eZ#pq else 0
     )
 
+vdot = method();
+vdot (List, List) := (a, b) -> if #a == #b then (
+    sum for i from 0 to #a-1 list a#i*b#i) else (error "Lengths not compatible.")
+
+liftToQQ = method();
+liftToQQ Matrix := M -> (
+    matrix for i from 0 to numrows(M) - 1 list (
+	for j from 0 to numcols(M) - 1 list (
+	    lift(M_(i, j), QQ)
+	    )
+	)
+    )
+
+torusFactor = method();
+torusFactor Polyhedron := P -> (
+    spanP := affineHull P;
+    t := numrows vertices P - dim spanP;--dimension of torus factor = ambient dimension - dim P
+    T := gens ker transpose linSpace spanP;--orthogonal complement to spanP
+    vs := entries vertices P;
+    M := transpose matrix for v in entries vertices P list (
+	u := v;
+	for i from 0 to numcols T - 1 do (
+	    w := entries T_i;
+	    w = sqrt(1 / vdot(w, w)) * w; print("w = " | toString(w));
+	    u = u - vdot(u, w) * w;
+	    ); print("u = " | toString(u));
+	u
+	);
+    M = liftToQQ(M);
+    S := convexHull M;
+    (S, t)
+    )
+
 computeHodgeDeligne = method(Options => {FaceInfo => new HashTable from {}});
 computeHodgeDeligne Polyhedron := opts -> P -> (--P := X#"polytope data";
-    --Will return both the Hodge numbers and the Hodge-Deligne numbers, in that order.
     d := dim P; print("dim = "| d);
     eZ := new MutableHashTable;
     eZbar := new MutableHashTable;
@@ -97,14 +151,16 @@ computeHodgeDeligne Polyhedron := opts -> P -> (--P := X#"polytope data";
 	)
     else if d == 1 then (--print("dim(Z) = 0"); --hypersurface in 1-dimension is a collection of points
 	eZ#(0,0) = #latticePoints(P) - 1;
-	eZbar#(0,0) = #latticePoints(P) - 1; print(eZ#(0,0), eZbar#(0,0));
+	eZbar#(0,0) = #latticePoints(P) - 1; -- print(eZ#(0,0), eZbar#(0,0));
 	return (new HashTable from eZ, new HashTable from eZbar, new HashTable from {})
 	);-- print("not 0 or 1");
     
     --Begin by computing eZ of the varieties corresponding to each face of P.
     --This is known by induction.
     eZfaces := new MutableHashTable from opts.FaceInfo;
-    if #eZfaces == 0 then (--print("no face info");
+    -- print(opts.FaceInfo); print(eZfaces);
+    -- print("eZfaces: " | #eZfaces | " , keys(eZfaces): " | #(keys eZfaces));
+    if #(keys eZfaces) == 0 then (--print("no face info");
 	verts := entries transpose vertices P;-- print(verts);
 	vIndices := new HashTable from for i from 0 to #verts - 1 list i => verts#i;
 	oneFaces := facesAsPolyhedra(d - 1, P);
@@ -116,20 +172,20 @@ computeHodgeDeligne Polyhedron := opts -> P -> (--P := X#"polytope data";
 	    --print(eZfaces#(Pfaces#(d - 1)#i#0));
 	    );-- print("done 1");
 	for n from 2 to d - 1 do (
-	    Fs := facesAsPolyhedra(d - n, P);-- print(class(Fs));
+	    Fs := facesAsPolyhedra(d - n, P); -- print("n = " | n | ", Fs: " | #Fs);
     	    for i from 0 to #Fs - 1 do (
 		eZfaces2 := new HashTable from flatten for j from 1 to dim Fs#i - 1 list (--print(Pfaces#n#i);
-		    flatten for k from n + 1 to d - 1 list (
-			for l from 0 to #(Pfaces#k) - 1 list (--print(Pfaces#k#l#0);
-			    if isSubset(Pfaces#k#l#0, Pfaces#(d - n)#i) and eZfaces#?(Pfaces#k#l#0) then Pfaces#k#l#0 => eZfaces#(Pfaces#k#l#0) else continue
+		    flatten for k from 1 to n - 1 list (
+			for l from 0 to #(Pfaces#(d - k)) - 1 list (-- print(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0, isSubset(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0));
+			    if isSubset(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0) and eZfaces#?(Pfaces#(d - k)#l#0) then Pfaces#(d - k)#l#0 => eZfaces#(Pfaces#(d - k)#l#0) else continue
 			    )
 			)
 	            --for k in keys eZfaces list (print(k, Pfaces#(d - n)#i#0);
 		    --if isSubset(k, Pfaces#(d - n)#i#0) then (print("yes"); k => eZfaces#k) else continue
-		    ); print("face ready");
+		    ); -- print("face ready"); print(eZfaces2);
 		e := computeHodgeDeligne(Fs#i, FaceInfo => eZfaces2);
 	    	eZfaces#(Pfaces#(d - n)#i#0) = e#0;-- print(e);
-		);-- print("done "|n);
+		); print("done " | n);
 	    );
 	);-- print"faces done";--Hodge-Deligne numbers of the face.
     
@@ -156,8 +212,9 @@ computeHodgeDeligne Polyhedron := opts -> P -> (--P := X#"polytope data";
     
     --The last remaining number, eZ#(p, d - 1 - p), is then the difference Sum_q eZ#(p, q) - Sum_{q != d - 1 - p} eZ#(p, q).
     --Sum_q eZ#(p, q) can be calculated from the number of lattice points in the interior of each face.
+    psi := ehrhartNumeratorQuicker(P);
     for p from 0 to d - 1 do (
-	eZ#(p, d - 1 - p) = computeSumqeZ(P, p) - sum (
+	eZ#(p, d - 1 - p) = computeSumqeZ(P, psi, p) - sum (
 	    for q from 0 to d - 1 list (
 	    	if q == d - 1 - p then continue else getSparseeZ(eZ, (p, q))
 	    	)
@@ -179,7 +236,7 @@ computeHodgeDeligne CalabiYauInToric := X -> computeHodgeDeligne(convexHull tran
 --Not tested.
 computeHodgeDeligneInPToric = method();
 computeHodgeDeligneInPToric (Polyhedron, List) := (P, whichFaces) -> (
-    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(P);
+    (eZ, eZbar, eZfaces) := computeHodgeDeligne(P);
     eZtoric := new MutableHashTable from {};
     for k in keys eZfaces do (
 	eZtoric#k = eZ#k + sum for f in whichFaces list getSparseeZ(eZfaces#f, k);
@@ -188,26 +245,26 @@ computeHodgeDeligneInPToric (Polyhedron, List) := (P, whichFaces) -> (
     )
 
 --For a hypersurface in T^n x C^r.
---cheap option can be (but is not currently) used for complete intersections.
---not cheap option not finished yet.
-computeHodgeDeligneAffineAndTorus = method(Options => {cheap => false});
+--Cheap option can be (but is not currently) used for complete intersections.
+--not Cheap option not finished yet.
+computeHodgeDeligneAffineAndTorus = method(Options => {Cheap => false});
 computeHodgeDeligneAffineAndTorus (Polyhedron, ZZ, ZZ) := opts -> (P, n, r) -> (
     eZtoric := new MutableHashTable from {};
     subs := subsets(r);
-    if opts.cheap then ( print("cheap");
-	for s in subs do (
+    if opts.Cheap then ( print("Cheap");
+	for s in subs do (--lambda_j == 0 <-> j in s
 	    vs := vertices P; print(vs);
 	    newP := convexHull vs_(for i from 0 to numcols vs - 1 list (
 		    if (a := true;
-			for b in s do (
-			    a = (a and vs_(n + b, i) == 1)
-			    ); print(a);
+			for j in s do (--column i must have not have std vector e_j
+			    a = (a and vs_(n + j, i) == 1)
+			    ); print(i, a);
 			a
 			)
 		    then i else continue
 		    )
 		);
-	    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(newP); 
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP); 
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
 		); print("done subset:" | toString(s));
@@ -217,35 +274,35 @@ computeHodgeDeligneAffineAndTorus (Polyhedron, ZZ, ZZ) := opts -> (P, n, r) -> (
 	for s in subs do (
 	    vs := vertices P; print(vs);
 	    newP := P;--finish...
-	    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(newP); 
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP); 
 	    eZ#s = eZ;
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
 		); print("done subset:" | toString(s));	    
 	    );
 	);
-    eZtoric
+    new HashTable from eZtoric
     )
 
 --For a hypersurface in T^n x C^r. Takes a matrix instead of a polyhedron.
---cheap option is currently the routine used for complete intersections.
---not cheap option not finished yet.
+--Cheap option is currently the routine used for complete intersections.
+--not Cheap option not finished yet.
 computeHodgeDeligneAffineAndTorus (Matrix, ZZ, ZZ) := opts -> (M, n, r) -> (
     eZtoric := new MutableHashTable from {};
     subs := subsets(r);
-    if opts.cheap then (print("cheap");
-	for s in subs do (
+    if opts.Cheap then (print("Cheap");
+	for s in subs do (--lambda_j == 0 <-> j in s
 	    newP := convexHull M_(for i from 0 to numcols M - 1 list (
 		    if (a := true;
-			for b in s do (
-			    a = (a and M_(n + b, i) == 1)
-			    ); print(a);
+			for j in s do (--column i must have not have std vector e_j
+			    a = (a and M_(n + j, i) == 0)
+			    ); print(i, a);
 			a
 			)
 		    then i else continue
 		    )
 		);
-	    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(newP); 
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP); 
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
 		); print("done subset:" | toString(s));
@@ -254,22 +311,22 @@ computeHodgeDeligneAffineAndTorus (Matrix, ZZ, ZZ) := opts -> (M, n, r) -> (
     else (
 	for s in subs do (
 	    newP := convexHull M;--finish...
-	    (eZ, eZbar, eZfaces) := computeHodgeDeligneQuick(newP); 
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP); 
 	    eZ#s = eZ;
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
 		); print("done subset:" | toString(s));		    
 	    );
 	);
-    eZtoric
+    new HashTable from eZtoric
     )
 
 --For a complete intersection of hypersurfaces, Y, in a torus.
 computeHodgeDeligneTorusCI = method();
 computeHodgeDeligneTorusCI (List, ZZ) := (Ps, n) -> (
     r := #Ps;
-    M := manyPolyhedraToLargeMatrix(Ps);
-    eZtoric := computeHodgeDeligneAffineAndTorus(M, n, r, cheap => true); print("eZtoric#(0, 0) = " | eZtoric#(0,0));
+    M := manyPolyhedraToLargeMatrix(Ps); print(M);
+    eZtoric := computeHodgeDeligneAffineAndTorus(M, n, r, Cheap => true); print("eZtoric#(0, 0) = " | eZtoric#(0,0));
     eZCI := new MutableHashTable from {};
     for p from 0 to n - r do (
 	for q from 0 to n - r do (print("(p, q) = " | toString(p, q));
@@ -337,8 +394,9 @@ TEST /// -* [insert short title for this test] *-
 
 TEST ///
   P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
-  assert (computeSumqeZ(P, 0) == -8)
-  assert (computeSumqeZ(P, 1) == 0)
+  psi = ehrhartNumerator(P)
+  assert (computeSumqeZ(P, psi, 0) == -8)
+  assert (computeSumqeZ(P, psi, 1) == 0)
   (eZ, eZbar, eZfaces) = computeHodgeDeligne(P)
   assert (eZ === new HashTable from {(0,0) => -7, (1,0) => -1, (0,1) => -1, (1,1) => 1})
   assert (eZbar === new HashTable from {(0,0) => 1, (1,0) => -1, (0,1) => -1, (1,1) => 1})
@@ -351,9 +409,10 @@ TEST ///
   isReflexive PM
   latticePoints PM
   faces(1,PN)
-  assert (computeSumqeZ(PM, 0) == 33)
-  assert (computeSumqeZ(PM, 1) == 27)
-  assert (computeSumqeZ(PM, 2) == 2)
+  psi = ehrhartNumerator(PM)
+  assert (computeSumqeZ(PM, psi, 0) == 33)
+  assert (computeSumqeZ(PM, psi, 1) == 27)
+  assert (computeSumqeZ(PM, psi, 2) == 2)
   (eZ, eZbar, eZfaces) = computeHodgeDeligne(PM)
   -- assert eZ === new HashTable from {(0,0) => 19, (1,0) => 7, (0,1) => 7, (2,0) => 1, (1,1) => 14, (0,2) => 1, (2,2) => 1})
   assert (eZ === new HashTable from {(0,0) => 20, (1,0) => 12, (0,1) => 12, (2,0) => 1, (1,1) => 15, (0,2) => 1, (2,2) => 1})
@@ -361,7 +420,7 @@ TEST ///
 ///
 
 TEST ///
-  topes = kreuzerSkarke 3
+  topes = kreuzerSkarke 3;
   Q = cyPolytope topes_50
   assert(hh^(1,1) Q == 3)
   assert(hh^(1,2) Q == 73)
@@ -379,7 +438,7 @@ TEST ///
   vertices PM
   isReflexive PM
   (eZ, eZbar, eZfaces) = computeHodgeDeligne(PM);
-  assert(eZbar === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (1,1) => 3, (2,0) => 0, (0,2) => 0, (3,0) => -1, (2,1) => -73, (0,3) => -1, (1,2) => -73, (1,3) => 0, (2,2) => 3,
+  assert(eZbar === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (1,1) => 3, (2,0) => 0, (0,2) => 0, (3,0) => -1, (2,1) => -75, (0,3) => -1, (1,2) => -75, (1,3) => 0, (2,2) => 3,
       (3,1) => 0, (2,3) => 0, (3,2) => 0, (3,3) => 1})
 
   matrix for i from 0 to 3 list (
@@ -397,9 +456,15 @@ TEST ///
 ///
 
 TEST ///
+  d = 3
+  Q1 = 2 * stdSimplex(d)--not full dimensional
+  Q2 = 3 * stdSimplex(d)
+  --computeHodgeDeligneTorusCI({Q1, Q2}, d)
   Q1 = 2 * stdSimplex(5)
   Q2 = 3 * stdSimplex(5)
-  --computeHodgeDeligneTorusCI({Q1,Q2},5)
+  --eZCI = computeHodgeDeligneTorusCI({Q1, Q2}, 5)
+  --assert(eZCI === new HashTable from {(0,0) => 58, (1,0) => 0, (0,1) => 0, (1,1) => 105, (0,2) => 0, (2,0) => 0, (3,0) => 0, (0,3) => 0, (2,1) => 40, (1,2) => 40, (3,1) => 5, (1,3) => 5,
+  --    (2,2) => -16, (3,2) => 20, (2,3) => 20, (3,3) => 14})
 ///
 
 
