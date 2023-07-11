@@ -9,7 +9,21 @@ newPackage(
     DebuggingMode => true
     )
 
-export {"Cheap", "vdot", "torusFactor",  "stdVector", "manyMatricesToLargeMatrix", "manyPolyhedraToLargeMatrix", "manyPolyhedraToLargeOne", "ehrhartNumerator", "ehrhartNumeratorQuicker", "computeSumqeZ", "eZ2hZ", "computeHodgeDeligne", "FaceInfo"}
+export {"Cheap",
+    "vdot",
+    "torusFactor",
+     "stdVector",
+     "manyMatricesToLargeMatrix",
+     "manyPolyhedraToLargeMatrix",
+     "manyPolyhedraToLargeOne",
+     "ehrhartNumerator",
+     "ehrhartNumeratorQuicker",
+     "computeSumqeZ",
+     "eZ2hZ",
+     "computeHodgeDeligne",
+     "computeHdogeDeligneAffineAndTorus",
+     "computeHodgeDeligneTorusCI",
+     "FaceInfo"}
 
 -* Code section *-
 stdVector = method();--index from 0
@@ -20,11 +34,11 @@ stdVector (ZZ, ZZ) := (n, i) -> (
 manyMatricesToLargeMatrix = method();
 manyMatricesToLargeMatrix List := Ms -> (
     r := #Ms;
-    matrix transpose flatten for i from 0 to r - 1 list (
+    transpose matrix prepend(for i from 1 to numrows(Ms#0) + r list 0, flatten for i from 0 to r - 1 list (
 	for j from 0 to numcols(Ms#i) - 1 list (
 	    entries((Ms#i)_j) | stdVector(r, i)
 	    )
-	)
+	))
     )
 
 manyPolyhedraToLargeMatrix = method();
@@ -302,7 +316,7 @@ computeHodgeDeligneAffineAndTorus (Matrix, ZZ, ZZ) := opts -> (M, n, r) -> (
 		    then i else continue
 		    )
 		);
-	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP); 
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP); print(eZ);
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
 		); print("done subset:" | toString(s));
@@ -321,9 +335,17 @@ computeHodgeDeligneAffineAndTorus (Matrix, ZZ, ZZ) := opts -> (M, n, r) -> (
     new HashTable from eZtoric
     )
 
---For a complete intersection of hypersurfaces, Y, in a torus.
+--For a complete intersection of hypersurfaces, Y, in a torus, T^n.
 computeHodgeDeligneTorusCI = method();
-computeHodgeDeligneTorusCI (List, ZZ) := (Ps, n) -> (
+computeHodgeDeligneTorusCI List := Ps -> (
+    a := true;
+    nr := numrows vertices Ps#0;
+    for P in Ps do (
+	if not class(P) === Polyhedron then a = false
+	else if not numrows vertices P == nr then a = false else continue
+	);
+    if not a then error("Polyhedra do not sit in the same lattice. Make sure their vertex matrices have the same number of rows.");
+    n := nr;
     r := #Ps;
     M := manyPolyhedraToLargeMatrix(Ps); print(M);
     eZtoric := computeHodgeDeligneAffineAndTorus(M, n, r, Cheap => true); print("eZtoric#(0, 0) = " | eZtoric#(0,0));
@@ -334,11 +356,11 @@ computeHodgeDeligneTorusCI (List, ZZ) := (Ps, n) -> (
 		    eZCI#(p, q) = (-1)^(n + p) * binomial(n, p) - eZtoric#(p + r - 1, q + r - 1)
 		    )
 		else (
-		     eZCI#(p, q) = -eZtoric#(p, q)
+		     eZCI#(p, q) = -eZtoric#(p + r - 1, q + r - 1)
 		     )
 	    );
 	);
-    new HashTable from eZCI
+    (new HashTable from eZCI, eZtoric)
     )
 
 
@@ -465,6 +487,53 @@ TEST ///
   --eZCI = computeHodgeDeligneTorusCI({Q1, Q2}, 5)
   --assert(eZCI === new HashTable from {(0,0) => 58, (1,0) => 0, (0,1) => 0, (1,1) => 105, (0,2) => 0, (2,0) => 0, (3,0) => 0, (0,3) => 0, (2,1) => 40, (1,2) => 40, (3,1) => 5, (1,3) => 5,
   --    (2,2) => -16, (3,2) => 20, (2,3) => 20, (3,3) => 14})
+///
+
+TEST ///
+  P2 = convexHull transpose matrix {{0,0},{2,0},{0,2}}
+  P3 = convexHull transpose matrix {{0,0},{3,0},{0,3}}
+  PP = transpose matrix {{0,0,0,0},{0,0,1,0},{2,0,1,0},{0,2,1,0},{0,0,0,1},{3,0,0,1},{0,3,0,1}}
+  P = P3
+  d = dim P
+  for i from 0 to d - 1 do (
+      print("codim = " | i);
+      fs := faces(i, P);
+      Fs := facesAsPolyhedra(i, P);
+      for j from 0 to #fs - 1 do (
+          print(fs#j#0, ehrhartNumeratorQuicker(Fs#j), ehrhartNumerator(Fs#j));
+	  for k from 1 to d - i do (
+	      print(k | ": " | #latticePoints(k * Fs#j))
+	      );
+    	  );
+      )
+  (eZCI, eZtoric) = computeHodgeDeligneTorusCI({P2, P3})
+  assert(eZCI === new HashTable from {(0,0) => 6})
+///
+
+TEST ///
+  P2 = convexHull transpose matrix {{0,0,0},{1,0,0},{0,1,0}}
+  P1 = convexHull transpose matrix {{0,0,0}, {0,0,1}}
+  Q1 = P2 + P1
+  Q2 = 2*P2 + 3*P1
+  (eZCI, eZtoric) = computeHodgeDeligneTorusCI({Q1, Q2})
+  assert(eZCI#(0, 1) == -3)
+  assert(eZCI#(1, 0) == -3)
+  
+  V1 = toricProjectiveSpace(1)
+  dim(V1)
+  V2 = toricProjectiveSpace(2)
+  dim(V2)
+  V = V1 ** V2
+  dim(V)
+  rays(V)
+  HH^0(V, OO_V(3, 2))
+  Q1 = polytope(3 * V_0 + 2 * V_2)
+  #latticePoints(Q1)
+  Q2 = polytope(V_0 + V_2)
+  computeHodgeDeligneTorusCI({Q1, Q2})
+  assert(eZCI#(0, 1) == -3)
+  assert(eZCI#(1, 0) == -3)
+  HH^0(V, OO_V(1, 1))
 ///
 
 
