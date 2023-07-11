@@ -124,17 +124,84 @@ getKeyPair String := Sequence => str -> (
     toSequence result
     )
 
+findTwoFaceInteriorDivisors = method()
+findTwoFaceInteriorDivisors CYPolytope := List => Q -> (
+    -- returns a list of:
+    -- {i, {g, ind}}
+    -- {i:nonfavorable divisor index, {g:genus of 2-face, ind:index of 2-face in annotatedFaces Q}}
+    A := annotatedFaces Q;
+    on1skeleton := set sort unique flatten for x in A list if x#0 <= 1 then x#2 else continue;
+    A2 := positions(A, x -> x#0 == 2 and x#3 > 0 and x#4 > 0);
+    flatten for a in A2 list (
+        thisface := A#a; -- note thisface#2 is the list of all lattice point indices on this face.
+                          --      thisface#4 is the genus of this face.
+        nonfavs := sort toList(set thisface#2 - on1skeleton);
+        for x in nonfavs list {x, {thisface#4, a}}
+        )
+    )
+
+-- choosing basis indices: if any non-favorable rays, try to choose them!
+-- then we can simply replace that generator with the g+1 that sum to it.
+
+findSuitableSet = (setstotry, Z) -> (
+    for g in setstotry do if abs det(Z_g) == 1 then return g;
+    null
+    )
+
+-- This has been subsumed below?
+-- computeBasis = method()
+-- computeBasis CYPolytope := List => Q -> (
+--     -- first find 2-face interiors with g>0.
+--     -- our plan is to find a basis including these, so that we can 
+--     -- easily just replace them with the divisors of the form (i, j), 0 <= j <= g, for i non-favorable.
+--     nonfavsList := findTwoFaceInteriorDivisors Q;
+--     nonfavs := for f in nonfavsList list f#0; -- list of indices of non-favorable divisors.
+--     M := transpose matrix rays Q;
+--     Z := transpose LLL syz M;
+--     rest := sort toList(set(0..numcols Z-1) - set nonfavs);
+--     setstotry := for f in subsets(rest, numrows Z - #nonfavs) list (f | nonfavs); -- really want to do these 1 by 1...?
+--     good := findSuitableSet(setstotry, Z);
+--     if good === null then error "rats: cannot find basis set including all the non-favorables";
+--     H := hashTable nonfavsList;
+--     flatten for i in good list if not H#?i then i else (
+--         g := H#i#0; -- genus of the 2-face
+--         for j from 0 to g list (i,j)
+--         )
+--     )
+
 cySetGLSM = method()
-cySetGLSM CYPolytope := (cyData) -> (
-    if cyData.cache#?"glsm" then return;
-    mLP := transpose matrix cyData#"rays";
-    D := transpose syz mLP;
-    p := findFirstUnitVectors D; -- TODO: p,q computation can be slow!
-    q := findInvertibleSubmatrix(D, p);
-    if q === null then error ("oops, can't find a good GLSM matrix"); -- hasn't happened yet. HAS NOW!!
-    GLSM := (D_q)^-1 * D;
-    cyData.cache#"glsm" = entries transpose GLSM;
-    cyData.cache#"basis indices" = q
+-- Delete this version?
+-- cySetGLSM CYPolytope := (cyData) -> (
+--     if cyData.cache#?"glsm" then return;
+--     mLP := transpose matrix cyData#"rays";
+--     D := transpose syz mLP;
+--     p := findFirstUnitVectors D; -- TODO: p,q computation can be slow!
+--     q := findInvertibleSubmatrix(D, p);
+--     if q === null then error ("oops, can't find a good GLSM matrix"); -- hasn't happened yet. HAS NOW!!
+--     GLSM := (D_q)^-1 * D;
+--     cyData.cache#"glsm" = entries transpose GLSM;
+--     cyData.cache#"basis indices" = q
+--     )
+cySetGLSM CYPolytope := Q -> (
+    if Q.cache#?"glsm" then return;
+    mLP := transpose matrix rays Q;
+    D := transpose syz mLP; -- use LLL?
+    -- D := transpose LLL syz M; -- which line should we use?
+    nonfavsList := findTwoFaceInteriorDivisors Q;
+    -- TODO: should nonfavsList be stashed into Q?
+    nonfavs := for f in nonfavsList list f#0; -- list of indices of non-favorable divisors.
+    rest := sort toList(set(0..numcols D-1) - set nonfavs);
+    setstotry := for f in subsets(rest, numrows D - #nonfavs) list (f | nonfavs); -- really want to do these 1 by 1...?
+    good := findSuitableSet(setstotry, D);
+    if good === null then error "rats: cannot find basis set including all the non-favorables";
+    H := hashTable nonfavsList;
+    basind := flatten for i in good list if not H#?i then i else (
+        g := H#i#0; -- genus of the 2-face
+        for j from 0 to g list (i,j)
+        );
+    GLSM := (D_good)^-1 * D;
+    Q.cache#"basis indices" = basind;
+    Q.cache#"glsm" = entries transpose GLSM;
     )
 
 cySetH11H21 = cyData -> (
