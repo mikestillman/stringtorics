@@ -12,6 +12,7 @@ newPackage(
 export {"Cheap",
     "vdot",
     "torusFactor",
+<<<<<<< HEAD
     "stdVector",
     "manyMatricesToLargeMatrix",
     "manyPolyhedraToLargeMatrix",
@@ -24,6 +25,20 @@ export {"Cheap",
     "computeHdogeDeligneAffineAndTorus",
     "computeHodgeDeligneTorusCI",
     "FaceInfo"}
+=======
+     "stdVector",
+     "manyMatricesToLargeMatrix",
+     "manyPolyhedraToLargeMatrix",
+     "manyPolyhedraToLargeOne",
+     "ehrhartNumerator",
+     "ehrhartNumeratorQuicker",
+     "computeSumqeZ",
+     "eZ2hZ",
+     "computeHodgeDeligne",
+     "computeHdogeDeligneAffineAndTorus",
+     "computeHodgeDeligneTorusCI",
+     "FaceInfo"}
+>>>>>>> origin/master
 
 -* Code section *-
 stdVector = method();--index from 0
@@ -351,8 +366,12 @@ computeHodgeDeligneAffineAndTorus (Matrix, ZZ, ZZ) := opts -> (M, n, r) -> (
 		    then i else continue
 		    )
 		);
+<<<<<<< HEAD
 	    D := n + r - #s;--work in T^n x C^(r - #s)
 	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D}); print(eZ);
+=======
+	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP); print(eZ);
+>>>>>>> origin/master
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
 		); print("done subset:" | toString(s));
@@ -533,6 +552,7 @@ TEST ///
 TEST ///
   P2 = convexHull transpose matrix {{0,0},{2,0},{0,2}}
   P3 = convexHull transpose matrix {{0,0},{3,0},{0,3}}
+<<<<<<< HEAD
   PP = convexHull transpose matrix {{0,0,0,0},{0,0,1,0},{2,0,1,0},{0,2,1,0},{0,0,0,1},{3,0,0,1},{0,3,0,1}}
   Q = manyPolyhedraToLargeOne({P2, P3})
   Q2 = convexHull (vertices Q)_{0,1,2,3}
@@ -545,6 +565,9 @@ TEST ///
   (eZ, eZbar, eZfaces) = computeHodgeDeligne(Q, FaceInfo => {true, new HashTable, 4})
   assert(eZ === new HashTable from {(0,0) => -15, (0,1) => -1, (1,0) => -1, (2,0) => 0, (1,1) => 1, (0,2) => 0, (3,0) => 0, (2,1) => 0, (0,3) => 0, (1,2) => 0,
       (2,2) => -4, (3,3) => 1})
+=======
+  PP = transpose matrix {{0,0,0,0},{0,0,1,0},{2,0,1,0},{0,2,1,0},{0,0,0,1},{3,0,0,1},{0,3,0,1}}
+>>>>>>> origin/master
   P = P3
   d = dim P
   for i from 0 to d - 1 do (
