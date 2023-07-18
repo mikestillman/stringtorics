@@ -21,7 +21,7 @@ export {"Cheap",
     "computeSumqeZ",
     "eZ2hZ",
     "computeHodgeDeligne",
-    "computeHdogeDeligneAffineAndTorus",
+    "computeHodgeDeligneAffineAndTorus",
     "computeHodgeDeligneTorusCI",
     "FaceInfo"}
 
@@ -71,11 +71,13 @@ ehrhartNumerator Polyhedron := P -> (
 ehrhartNumeratorQuicker = method();
 ehrhartNumeratorQuicker Polyhedron := P -> (
     d := dim P;
+    Ps := for i from 1 to ceiling(d / 2) list i * P;
     l := prepend(1, for i from 1 to ceiling(d / 2) list (
-	#latticePoints(i * P)
+	#latticePoints(Ps#(i - 1))
 	));
+    --if isReflexive
     lint := for i from 1 to floor(d / 2) list (
-	#interiorLatticePoints(i * P)
+	#interiorLatticePoints(Ps#(i - 1))
 	);
     prepend(1, for i from 1 to d list (
 	if i <= ceiling(d / 2) then (
@@ -321,7 +323,8 @@ computeHodgeDeligneAffineAndTorus (Polyhedron, ZZ, ZZ) := opts -> (P, n, r) -> (
     else (
 	for s in subs do (
 	    vs := vertices P; print(vs);
-	    newP := P;--finish...
+	    H := {};
+	    newP := intersection(P, H);--finish...
 	    D := n + r - #s;--work in T^n x C^(r - #s)
 	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D}); 
 	    eZ#s = eZ;
@@ -422,17 +425,35 @@ Headline
 Usage
 Inputs
 Outputs
-Consequences
-  Item
 Description
   Text
   Example
-  CannedExample
-  Code
-  Pre
-ExampleFiles
-Contributors
-References
+Caveat
+SeeAlso
+///
+
+doc///
+Key
+  computeHodgeDeligne
+Headline
+  compute the Hodge-Deligne polynomial of a hypersurface in a torus.
+Usage
+  computeHodgeDeligne(P)
+Inputs
+  P:Polyhedron
+    A lattice polytope
+Outputs
+  :Sequence
+    Of three HashTables $e_Z$, $e_{\bar{Z}}$, and all of the $e_{Z_\Gamma}$ for $\Gamma \leq P$ a face
+Description
+  Text
+    The Hodge-Deligne polynomial encodes information 
+  Example
+    P = convexHull matrix {{-1, 4, -1, -1, 0, -1}, {-1, -1, 4, 0, -1, -1}, {-1, -1, -1, 1, 1, 1}}
+    latticePoints(P)
+    (eZ, eZbar, eZfaces) = computeHodgeDeligne(P)
+    eZ
+    eZbar
 Caveat
 SeeAlso
 ///
@@ -442,6 +463,7 @@ TEST /// -* [insert short title for this test] *-
   R = QQ[x]
   P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
   eNum = ehrhartNumerator(P)
+  eNum2 = ehrhartNumeratorQuicker(P)
   f = sum for i from 0 to #eNum - 1 list (
       eNum#i * x^i
       )
@@ -545,7 +567,7 @@ TEST ///
   (eZ, eZbar, eZfaces) = computeHodgeDeligne(Q, FaceInfo => {true, new HashTable, 4})
   assert(eZ === new HashTable from {(0,0) => -15, (0,1) => -1, (1,0) => -1, (2,0) => 0, (1,1) => 1, (0,2) => 0, (3,0) => 0, (2,1) => 0, (0,3) => 0, (1,2) => 0,
       (2,2) => -4, (3,3) => 1})
-  P = P3
+  P = PP
   d = dim P
   for i from 0 to d - 1 do (
       print("codim = " | i);
@@ -586,6 +608,21 @@ TEST ///
   assert(eZCI#(0, 1) == -3)
   assert(eZCI#(1, 0) == -3)
   HH^0(V, OO_V(1, 1))
+///
+
+TEST///
+  topes = kreuzerSkarke(3);
+  Q = cyPolytope topes_25
+  X = makeCY Q
+  V = ambient X
+  isSimplicial V
+  #rays V
+  D = sum for i from 0 to 6 list V_i
+  P = polytope D
+  isReflexive P
+  computeHodgeDeligne(P)
+  --appears to give h^(1,1) = 2
+  --compare with topes_50 in previous example with correct result
 ///
 
 
