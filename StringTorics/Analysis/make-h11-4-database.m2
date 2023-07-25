@@ -7,7 +7,7 @@
   DB4 = "../Databases/cys-ntfe-h11-4.dbm"
   topes = kreuzerSkarke(4, Limit => 5000); -- 1197 of these
   assert(#topes == 1197)
-  elapsedTime createCYDatabase(DB4, topes)
+  elapsedTime createCYDatabase(DB4, topes) -- 906 seconds
   -- Let's find which are not favorable, not torsion free.
   
   Qs = readCYPolytopes DB4;
@@ -17,7 +17,7 @@
       << "---- doing k = " << k << endl;
       Q := Qs#k;
       elapsedTime addToCYDatabase(DB4, Q, NTFE => true);
-      );
+      ); -- 133 sec
 
 
   nonfavorables = for k in sort keys Qs list if not isFavorable Qs#k then k else continue

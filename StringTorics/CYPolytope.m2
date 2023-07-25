@@ -201,6 +201,7 @@ cySetGLSM CYPolytope := Q -> (
         );
     GLSM := (D_good)^-1 * D;
     Q.cache#"basis indices" = basind;
+    Q.cache#"toric basis indices" = good;
     Q.cache#"glsm" = entries transpose GLSM;
     )
 

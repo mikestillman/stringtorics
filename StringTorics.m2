@@ -149,6 +149,7 @@ export {
 
     -- Topology
     "topologicalData",
+    "isEquivalent",
     "invariants",
     "mapIsIsomorphism",
     "partitionByTopology",

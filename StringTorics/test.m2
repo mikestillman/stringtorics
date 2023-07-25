@@ -18,7 +18,16 @@ TEST ///
   Q = cyPolytope(tope, ID => 40)  
   assert isFavorable Q
   basisIndices Q
+  Q.cache#"toric basis indices"
+  Q.cache#"basis indices"
   transpose matrix degrees Q
+  X = makeCY Q
+  toricIntersectionNumbers X
+  intersectionNumbers X
+  assert(c2 X === {-4, 10, 12, 10, 18, 0, 10})
+  cubicForm X
+  c2Form X
+  assert(ring cubicForm X === ring c2Form X)
 
   nonfavTope = KSEntry "4 7  M:28 7 N:11 7 H:7,27 [-40] id:9
    1   0   3   0  -1  -3  -6
@@ -32,10 +41,12 @@ TEST ///
   assert(hh^(1,1) Q2 == 7)
   assert(hh^(1,2) Q2 == 27)
   -- the following will need to change...
-  basisIndices Q2
-  (basisIndices Q2)/(x -> if instance(x, ZZ) then x else x#0)//unique//sort
+  assert(basisIndices Q2 === {0, 1, 2, 3, 4, (9, 0), (9, 1)}) -- this could change if the algorithm changes.
+  Q2.cache#"toric basis indices" === {0, 1, 2, 3, 4, 9}
+  findTwoFaceInteriorDivisors Q2
   netList annotatedFaces Q2
-  rays Q2 === {{-1, -1, 1, -1}, 
+  assert(
+      rays Q2 === {{-1, -1, 1, -1}, 
       {-1, -1, 1, 1}, 
       {-1, -1, 2, -1}, 
       {-1, 0, 1, -1}, 
@@ -45,12 +56,22 @@ TEST ///
       {-1, -1, 1, 0}, 
       {1, -1, 0, 0}, 
       {-1, 1, 0, 0}}
+      )
   Xs = findAllCYs Q2; -- what if I only want the NTFE ones?  FIX.
+  #Xs
+  (netList toricIntersectionNumbers Xs#0, netList intersectionNumbers Xs#0)
+  c2 Xs#0 -- fix me
+  intersectionNumbers Xs#0 -- fix me
+  ring cubicForm Xs#0 === ring c2Form Xs#0
+  c2Form Xs#0
+  
   vertices polytope(Q2, "M")
   vertices polytope(Q2, "N") -- notice these are NOT in the order of the rays of Q2!
   transpose matrix degrees Q2
   
   transpose matrix rays Q2
+  
+  cubicForm Xs#0
 ///
 
 ///

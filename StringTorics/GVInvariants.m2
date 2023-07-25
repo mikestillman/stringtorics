@@ -126,7 +126,7 @@ gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
     -- OK, now we have computed everything we need.  Write it to a file
     infile := opts.FilePrefix | "-input";
     outfile := opts.FilePrefix | "-output";
-    infile << gvInput(mori, heft, transpose degrees ring ambient X, intersectionnums,
+    infile << gvInput(mori, heft, transpose degrees X, intersectionnums,
         opts.DegreeLimit, opts.Precision) << close;
     inputLine := opts.Executable | " <" | infile | " >" | outfile;
     print inputLine;
@@ -143,6 +143,8 @@ gvCone CalabiYauInToric := Cone => opts -> X -> (
 
 partitionGVConeByGV = method(Options => options gvInvariants)
 partitionGVConeByGV CalabiYauInToric := HashTable => opts -> X -> (
+    -- return null if we cannot computr GV invariants (i.e. if non-favorable).
+    if not isFavorable cyPolytope X then return null;
     gv := gvInvariants(X, opts); -- TODO: stash this?
     C := posHull transpose matrix ((keys gv)/toList);
     gvX := entries transpose rays C;

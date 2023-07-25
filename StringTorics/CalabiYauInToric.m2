@@ -40,6 +40,20 @@ CYDataCache = {
     "toric intersection numbers" => {value, toString, List}
     }
 
+setCYIntersectionRing = (X, R) -> (
+    -- X is a CalabiYauInToric
+    -- R is a polynomial ring, or null (if not, an error is raised).
+    n := hh^(1,1) X;
+    if R =!= null then (
+        if not instance(R, PolynomialRing) or numgens R != n then 
+            error ("expected polynomial ring with "|n|" variables");
+        X.cache#"pic ring" = R;
+        )
+    else (
+        a := getSymbol "a";
+        X.cache#"pic ring" = ZZ[a_1..a_n];
+        );
+    )
 cyData = method(Options => {ID => null, Ring => null})
 cyData(CYPolytope, List) := opts -> (Q, triang) -> (
     X := new CalabiYauInToric from {
@@ -48,9 +62,10 @@ cyData(CYPolytope, List) := opts -> (Q, triang) -> (
         "triangulation" => triang
         };
     if opts.ID =!= null then X.cache#"id" = opts.ID;
-    if opts#Ring =!= null then X.cache#"pic ring" = opts#Ring; -- Note: we should check that it is over ZZ, has h^(1,1) variables
+    setCYIntersectionRing(X, opts#Ring);
     X
     )
+
 cyData(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
     -- F is a function which takes an id of a CYPolytope and returns the object.
     L := lines str;
@@ -75,7 +90,7 @@ cyData(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
         if fields#?k then X.cache#k = readFcn fields#k;
         );
     if opts.ID =!= null then X.cache#"id" = opts.ID; -- just for compatibility with other constructors...
-    if opts#Ring =!= null then X.cache#"pic ring" = opts#Ring; -- Note: we should check that it is over ZZ, has h^(1,1) variables
+    setCYIntersectionRing(X, opts#Ring);
     X
     )
 

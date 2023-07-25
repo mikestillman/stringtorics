@@ -16,21 +16,43 @@ topologicalData CalabiYauInToric := TopologicalDataOfCY3 => X -> (
 
 -- this is the older, alternate version of this function.
 -- this is to be removed.
-topologicalData(CalabiYauInToric, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
-    V := ambient X;
-    Q := X#"polytope data";
-    P := polytope Q;
-    data := elapsedTime topologyOfCY3(V, basisIndices X);
-    -- this data above computes intersection numbers for all toric divisors. 
-    -- So we consider only the ones whose indices are contained in basis indices:
-    new TopologicalDataOfCY3 from {
-        "h11" => elapsedTime hh^(1,1) Q,
-        "h21" => elapsedTime hh^(2,1) Q,
-        "c2" => sub(data_3, vars RZ),
-        "cubic intersection form" => sub(data_2, vars RZ)
-        }
-    )
+-- topologicalData(CalabiYauInToric, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
+--     V := ambient X;
+--     Q := X#"polytope data";
+--     P := polytope Q;
+--     data := elapsedTime topologyOfCY3(V, basisIndices X);
+--     -- this data above computes intersection numbers for all toric divisors. 
+--     -- So we consider only the ones whose indices are contained in basis indices:
+--     new TopologicalDataOfCY3 from {
+--         "h11" => elapsedTime hh^(1,1) Q,
+--         "h21" => elapsedTime hh^(2,1) Q,
+--         "c2" => sub(data_3, vars RZ),
+--         "cubic intersection form" => sub(data_2, vars RZ)
+--         }
+--     )
 
+isEquivalent = method()
+isEquivalent(Sequence, Sequence, Matrix) := Boolean => (LF1, LF2, A) -> (
+    (L1,F1) := LF1;
+    (L2,F2) := LF2;
+    R := ring L1;
+    if R =!= ring F1 or R =!= ring L2 or R =!= ring F2 then 
+        error "excepted c2 and cubic forms to be in the same ring";
+    phi := map(R, R, A);
+    phi L1 == L2 and phi F1 == F2
+    )
+isEquivalent(CalabiYauInToric, CalabiYauInToric, Matrix) := Boolean => (X1, X2, A) -> (
+    -- X1, X2 are CalabiYauInToric's (of the same h11 = h11(X1) = h11(X2)).
+    -- A is an h11 x h11 matrix over ZZ, with determinant 1 or -1.
+    -- if the topological data of X1, X2 are equivalent via A, then true is returned.
+    T1 := topologicalData X1;
+    T2 := topologicalData X2;
+    if hh^(1,2) X1 =!= hh^(1,2) X2 then return false;
+    if hh^(1,1) X1 =!= hh^(1,1) X2 then return false;
+    LF1 := (c2Form X1, cubicForm X1);
+    LF2 := (c2Form X2, cubicForm X2);
+    isEquivalent(LF1, LF2, A)
+    )
 ------------------------------------
 -- Separating a set of topologies --
 ------------------------------------
@@ -41,6 +63,8 @@ topologicalData(CalabiYauInToric, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
 --     note: if two sets are combined, we need to multiply all the matrices of one set by the new change of basis matrix.
 TopologySet = new Type of MutableHashTable
 
+-- TODO XXX: T#"Sets"#i is a list of {lab, {lab2, map2}, {lab3,map3}, ...}
+--           mapj is a matrix over the integers of size h11 x h11.
 topologySet = method()
 topologySet(List, HashTable) := TopologySet => (labels, Xs) -> (
     new TopologySet from {
@@ -78,6 +102,7 @@ combineIfSame(TopologySet, Function) := (T, fun) -> (
         -- L is a list of labels, all are equivalent (so maybe only one, but always >= 1).
         P := partition(lab -> fun Xs#(first lab), L);
         (values P)/flatten
+        -- TODO XXX: the previous line should add in identity maps
         );
     new TopologySet from {
         "Sets" => newsets,
@@ -85,8 +110,9 @@ combineIfSame(TopologySet, Function) := (T, fun) -> (
         }
     )
 
-separateByGV = method()
-separateByGV TopologySet := T -> (
+-- REMOVE THIS ONE: use combineByGV...
+separateByGV = method(Options => {DegreeLimit => 15})
+separateByGV TopologySet := opts -> T -> (
     Xs := T#"CYHash";
     newSets := for Ls in T#"Sets" list (
         L1s := Ls/first; -- these are the ones we want to split up
@@ -95,7 +121,7 @@ separateByGV TopologySet := T -> (
         print L1s;
         print Indices;
         << "----------------" << endl;
-        P := partitionByTopology(L1s, Xs, 15);
+        P := partitionByTopology(L1s, Xs, opts.DegreeLimit);
         newlist := for k in keys P list {k}|(P#k);
         newlist
         -- what is the best way to get the ones that are the same into the same set?
@@ -106,6 +132,37 @@ separateByGV TopologySet := T -> (
         }
     )
 
+combineListByGV = method(Options => {DegreeLimit => 15})
+combineListByGV(List, HashTable) := opts -> (Ls, Xs) -> (
+    if #Ls === 1 then Ls
+    else (
+        L1s := Ls/first; -- these are the ones we want to split up
+        L1rest := hashTable for L in Ls list (
+            {first L, drop(L, 1)}
+            );
+        -- print L1s;
+        -- << "----------------" << endl;
+        P := partitionByTopology(L1s, Xs, opts.DegreeLimit);
+        newlist := for k in keys P list (
+            {k} | P#k | L1rest#k | flatten for x in P#k list L1rest#(first x)
+            );
+--        if #(keys P) > 1 then error "debug me";
+        newlist
+    ))
+
+combineByGV = method(Options => {DegreeLimit => 15})
+combineByGV TopologySet := opts -> T -> (
+    Xs := T#"CYHash";
+    newSets := for Ls in T#"Sets" list (
+        combineListByGV(Ls, Xs, DegreeLimit => opts.DegreeLimit)
+        );
+    new TopologySet from {
+        "CYHash" => Xs,
+        "Sets" => newSets
+        }
+    )
+
+-- REMOVE?  This is the start of a union-find algorithm.  But we are not using it, I think.
 combineSet = (Ls, binfun) -> (
     -- binfun(X1,X2) should return a matrix if these are the same topology, null if we don't know.
     -- note: the number of newsets is identical.  We might just be coalescing elements in one set.
@@ -349,19 +406,19 @@ debug needsPackage "StringTorics"
       LF2' := LF2/(f -> sub(f, T));
       I0 := sub(ideal last coefficients(phi LF1'_0 - LF2'_0), B);
       A0 := A % I0;
-      phi0 := map(T, T, A0);
+      phi0 := map(T, T, transpose A0);
       trim(I0 + sub(ideal last coefficients (phi0 LF1'_1 - LF2'_1), B))
       )
 
   getEquivalenceIdeal = method()
-  getEquivalenceIdeal(Thing, Thing, HashTable) := Ideal => (lab1, lab2, Xs) -> (
+  getEquivalenceIdeal(Thing, Thing, HashTable) := Sequence => (lab1, lab2, Xs) -> (
       X1 := Xs#lab1;
       X2 := Xs#lab2;
       LF1 := (c2Form X1, cubicForm X1);
       LF2 := (c2Form X2, cubicForm X2);
       RQ := QQ (monoid ring LF1_0);
       (A,phi) := genericLinearMap RQ;
-      getEquivalenceIdealHelper(LF1, LF2, A, phi)
+      (getEquivalenceIdealHelper(LF1, LF2, A, phi), A)
       )
 
 ------------------------------------
@@ -703,9 +760,11 @@ partitionByTopology(List, HashTable, ZZ) := (Ls, Xs, degreelimit) -> (
         << "trying " << i << endl;
         prev := keys distinctTops;
         isFound := false;
+        if GVi === null then prev = {}; -- we cannot use GV with non-favorables currently.
         for j in prev do (
             Xj := hashXs#j;
             GVj := GVs#j;
+            if GVj === null then continue;  -- we cannot use GV with non-favorables currently.
             -- compare CY's i, j
             Ms := findLinearMaps(GVj, GVi);
             if Ms === {} then continue;
