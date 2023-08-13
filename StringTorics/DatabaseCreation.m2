@@ -34,6 +34,7 @@ createCYDatabase(String, List) := (dbfilename, topes) -> (
         basisIndices V; -- compute them
         isFavorable V; -- compute h11, h21, favorability.
         annotatedFaces V; -- compute annotated faces
+        automorphisms V;
         -- now write it
         F#(toString lab) = dump V;
         );
@@ -50,6 +51,30 @@ addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
         << "  " << #(keys H) << " NTFE triangulations" << endl;
         Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
         -- let's relabel these Xs
+        );
+    F := openDatabaseOut dbfilename;
+    for X in Xs do (
+        computeIntersectionNumbers X; -- this should load all of the data we want
+        F#(toString label X) = dump X;
+        );
+    close F;    
+    )
+
+addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
+    -- This version also finds "moriConeCap" which is a cone containing the actual mori cone: it is the
+    -- intersection of all mori cones coming from triangulations equivalent to the given one.
+    elapsedTime Xs := findAllCYs Q; -- TODO: check: is findALlCYs still correct.
+    << "  " << #Xs << " triangulations total" << endl;
+    if opts.NTFE then (
+        elapsedTime H := partition(restrictTriangulation, Xs);
+        << "  " << #(keys H) << " NTFE triangulations" << endl;
+        Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
+        Xs = for k in keys H list (
+            X := H#k#0;
+            setToricMoriConeCap(X, H#k);
+            X
+            )
+        -- let's relabel these Xs?
         );
     F := openDatabaseOut dbfilename;
     for X in Xs do (

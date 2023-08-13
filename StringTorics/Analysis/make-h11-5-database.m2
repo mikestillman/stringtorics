@@ -18,7 +18,7 @@
   elapsedTime for k in keys Qs do (    
       << "---- doing k = " << k << endl;
       Q := Qs#k;
-      elapsedTime addToCYDatabase(DB4, Q, NTFE => true);
+      elapsedTime addToCYDatabase(DB5, Q, NTFE => true);
       );
 
 

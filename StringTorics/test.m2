@@ -94,7 +94,7 @@ TEST ///
   aX = abstractVariety(X, base(a,b,c,d,e))
   intersectionRing aX -- defines integral.
   intersectionRing V -- defines integral.
-  topX = topologicalData(X, RZ)
+  topX = topologicalData X
   cubicForm topX
   isFavorable cyPolytope X
   
@@ -1518,7 +1518,9 @@ TEST ///
   topes = kreuzerSkarke(3, Limit => 50);    
   Q = cyPolytope(topes_30, ID => 30)
   Ts = findAllFRSTs Q
-  Xs = for i from 0 to #Ts-1 list cyData(Q, Ts#i, ID => i)
+  RZ = ZZ[a,b,c]
+  Xs = for i from 0 to #Ts-1 list cyData(Q, Ts#i, ID => i, Ring => RZ)
+  assert(#Xs == #Ts)
   vertices polytope Q
   label Q
   assert((for X in Xs list label X) === {(30, 0), (30, 1)})
@@ -1534,7 +1536,7 @@ TEST ///
   assert(hh^(1,1) X == 3)
   assert(hh^(1,2) X == 69)
 
-  elapsedTime T = topologicalData(X, ZZ[a,b,c])
+  elapsedTime T = topologicalData X
   hh^(1,1) T
   hh^(1,2) T
 
@@ -1543,6 +1545,7 @@ TEST ///
   partitionGVConeByGV(X, DegreeLimit => 40)
   hilbertBasis gvCone(X, DegreeLimit => 20)
   gv = gvInvariants(X, DegreeLimit => 30);
+  
 ///  
 
 
@@ -1570,12 +1573,13 @@ TEST ///
   dump cyPolytope X
   elapsedTime restrictTriangulation X
 
-  dim X  
+  assert(dim X  == 3)
+  assert isFavorable X
   rays X
   max X
   V = ambient X -- give the normal toric variety.  Works now, sort of. Problems though: TODO: cache it, allow options? degrees might be different...
-  rays V === rays X
-  max V === max X
+  assert(rays V === rays X)
+  assert(max V === max X)
   
   intersectionNumbers X  
   toricIntersectionNumbers X
@@ -1583,7 +1587,7 @@ TEST ///
   cubicForm X
   c2Form X
       
-  elapsedTime topologicalData(X, RZ) -- cache this result?
+  elapsedTime topologicalData X -- cache this result?
   
   ambient X -- give the normal toric variety.  Works now.
   aX = abstractVariety X -- give the abstract variety.  -- TODO: should stash the value...?

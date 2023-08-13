@@ -297,13 +297,13 @@ toRingElement(List, Ring) := (f, RZ) -> (
 
 c2Form = method()
 c2Form CalabiYauInToric := RingElement => X -> (
-    RZ := X.cache#"pic ring"; -- FIXME: if not there, it should create the ring.  Need a function: picardRing?
+    RZ := picardRing X;
     ((vars RZ) * transpose matrix {c2 X})_(0,0)
     )
 
 cubicForm = method()
 cubicForm CalabiYauInToric := RingElement => X -> (
-    RZ := X.cache#"pic ring"; -- FIXME: if not there, it should create the ring.  Need a function: picardRing?
+    RZ := picardRing X;
     toRingElement(intersectionNumbers X, RZ)
     )
 

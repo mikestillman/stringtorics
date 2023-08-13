@@ -8,7 +8,8 @@ restart
 debug needsPackage "StringTorics" -- the debug is because some functions are not yet exported.
   -- list of these functions:
   
-DB3 = "../Databases/cys-ntfe-h11-3.dbm"
+DB3 = "../Databases/test2-cys-ntfe-h11-3.dbm"
+DB3 = "../StringTorics/Databases/test2-cys-ntfe-h11-3.dbm"
 
 R = ZZ[a,b,c]
 RZ = R
@@ -29,6 +30,10 @@ nonfavorableCYs = sort select(keys Xs, lab -> member(first lab, nonfavorables))
 assert(torsionCYs == {(0, 0), (9, 0), (10, 0), (55, 0), (62, 0)})
 assert(nonfavorableCYs == {(232,0)})
 
+-- how many of these have nonfavorable dual polytopes
+-- these are the ones that are not nec general in moduli
+select(sort keys Qs, lab -> (ans := not isFavorable polar Qs#lab; print ans; ans))
+
 ---------------------------------------------------------------
 -- Next step: How many of these 306 are distinct topologies? --
 ---------------------------------------------------------------
@@ -37,44 +42,84 @@ assert(nonfavorableCYs == {(232,0)})
   info allT -- 306 possibly different topologies
   
   allT1 = combineIfSame(allT, X -> (c2Form X, cubicForm X))
-
-  identicals = sort first for x in allT1#"Sets" list (
-      for x1 in x list if #x1 > 1 then x1 else continue
-      )
-  -- Question: are there any torsions or nonfavorables in here?
-  -- Torsions: none on this list.
-  -- Nonfavorables: none on this list.
-
+  equivalences allT1
   info allT1 
-  allT1#"Sets"#0/length//tally -- 21 of these are identical to others, 
-    -- leaving 285 possibly different tops
-  select(allT1#"Sets"#0, x -> #x > 1) -- these have the duplicates
-  
-  elapsedTime allT2 = separateIfDifferent(allT1, invariantsAll) -- 18 seconds
 
+  elapsedTime allT2 = separateIfDifferent(allT1, invariantsAll) -- 18 seconds
   info allT2 
-  -- With all Xs:
-  -- This divides the 306 (really, 285) topologies into 173 different groups, each group 
-  -- consisting of CY3's with the same invariants (in invariantsAll).
-  #allT2#"Sets" == 173
-  allT2#"Sets"/length//tally -- 108 of these have a unique CY3 in them (so these are not equivalent to anything else)
-  -- Tally{1 => 110}
-  --       2 => 39
-  --       3 => 16
-  --       4 => 5
-  --       5 => 1
-  --      10 => 1
-  --      14 => 1
-  
-  -- The largest set has 14 potentially the same topology
-  
+  netList representatives allT2
+  equivalences allT2
+
   -- We have two ways to proceed here.
 
   -- VERSION #1: use GV invariants to find equivalences
-  -- TODO: I think this removes the duplicates found equivalent in allT1.  Fix that.
-  --   But the result still 
-  elapsedTime allT3a = combineByGV(allT2, DegreeLimit => 5); -- HERE XXX
+  elapsedTime allT3a = combineByGV(allT2, DegreeLimit => 5); -- 14 sec
+    info allT3a
+    netList representatives allT3a
+  elapsedTime allT3b = combineByGV(allT3a, DegreeLimit => 10); -- 4.4 sec
+    info allT3b
+    netList representatives allT3b
+    equivalences allT3b
+  allT3 = allT3b
+
+  for x in representatives allT3 list (
+      if #x != 2 then continue;
+      ans := x => findIsomorphism((toSequence x)/(lab -> Xs#lab));
+      print ans;
+      ans
+      )
+
+  for x in representatives allT3 list (
+      if #x == 2 then continue;
+      tries := subsets(x, 2);
+      for t in tries list (
+        ans := t => findIsomorphism((toSequence t)/(lab -> Xs#lab));
+        print ans;
+        )
+      )
+
+
+  -- find all 186 representatives.  If possible (it is), choose favorable, and
+  -- also if possible choose Q s.t. polar Q is favorable (i.e. no missing complex structure.
   
+  for s in allT3#"Sets" list for L in s list (
+      newa := for a in L list if instance(a, List) then first a else a;
+      qs := newa/first//unique//sort;
+      j := select(qs, lab -> isFavorable polar Qs#lab);
+      if #j == 0 then newa#0 else (
+        j1 := position(newa, lab -> first lab == j#0);
+        newa#j1
+        )
+      )
+  
+
+    Ts = for lab in allXs list (
+        X := Xs#lab;
+        lab => {c2Form X, cubicForm X, hh^(1,1) X, hh^(1,2) X}
+        );
+    assert(#Ts == 306)
+    hashTs = hashTable Ts;
+    keyTs = Ts/first//sort -- 306 of these.
+
+    reps = representatives allT3    
+    partitionH113sByTopology(reps#11, hashTs, RQ)
+
+    (A, phi) = genericLinearMap RQ
+    findMaps(hashTs#(232,0), hashTs#(233,0), A, phi, RQ)
+    equivs = equivalences(allT3, IgnoreSingles=>false)
+    result = flatten for L in representatives(allT3, IgnoreSingles=>false) list (
+        newset0 := partitionH113sByTopology(L, hashTs, RQ);
+        for x in keys newset0 list (
+            -- we include x, and its value, and for each element in there, attach its rest also.
+            val := newset0#x;
+            {{x}|val|equivs#x|for v in val list equivs#(first v)}
+            )
+        )
+    new TopologySet from {
+        "Sets" => result,
+        "CYHash" => allT3#"CYHash"
+        }
+
   -- here we check that the equivalent ones are really equivalent.
   equivs = sort flatten for x in allT3a#"Sets" list (
       y1 := for y in x list if #y > 1 then y else continue;

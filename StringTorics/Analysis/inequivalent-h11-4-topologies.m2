@@ -8,6 +8,7 @@
 restart
 debug needsPackage "StringTorics" -- the debug is because some functions are not yet exported.
 DB4 = "../Databases/cys-ntfe-h11-4.dbm"
+DB4 = "../StringTorics/Databases/cys-ntfe-h11-4.dbm"
 
 R = ZZ[a,b,c,d]
 RQ = QQ (monoid R);
@@ -20,6 +21,9 @@ RQ = QQ (monoid R);
       )
    nonfavorables = for k in keys Qs list (
        if not isFavorable Qs#k then k else continue
+      )
+   favorablesXs = sort for k in keys Xs list (
+       if not isFavorable Qs#(first k) then continue else k
       )
    #torsions == 6
    #nonfavorables == 12
@@ -54,160 +58,18 @@ RQ = QQ (monoid R);
 -- (15,0), (12,0) -- have equivalent c2, cubic forms, not equivalent to any other in Xs
 -- These are distinct from all others at the invariant level.
 
-factorsByType = method()
-factorsByType RingElement := HashTable => F -> (
-    facs := factors F;
-    faclist := for fx in facs list (fx#0, sum first exponents fx#1, fx#1);
-    H := partition(x -> {x#0, x#1}, faclist);
-    hashTable for k in keys H list k => for x in H#k list x_2
-    )   
-
-factorsByDegree = method()
-factorsByDegree RingElement := HashTable => F -> (
-    facs := factors F;
-    faclist := for fx in facs list (sum first exponents fx#1, fx#1);
-    H := partition(x -> x#0, faclist);
-    hashTable for k in keys H list k => for x in H#k list x_1
-    )   
-///
-  X1 = Xs#(796,0)
-  X2 = Xs#(798,1)
-  F1 = cubicForm X1
-  F2 = cubicForm X2
-  L1 = c2Form X1
-  L2 = c2Form X2
-
-  facs1 = factorsByType det hessian F1
-  facs2 = factorsByType det hessian F2
-  facs1 = factorsByDegree det hessian F1
-  facs2 = factorsByDegree det hessian F2
-
-  RZ = R
-  (A,phi) = genericLinearMap RQ
-  T = source phi
-  Ps = permutations facs2#{1,1}
-  trythem = () -> (
-    A0ZZ := null;
-    for p in Ps do (
-      (A0, phi0, J0) := linearEquationConstraints(A, phi, 
-          prepend({sub(L1, T), sub(L2, T)},
-            for j from 0 to #facs1#{1,1} - 1 list {sub(facs1#{1,1}#j, T), sub(p#j, T)}),
-          {});
-      -- if A0 is over ZZ, invertible, then we return it.
-      mapshouldwork := try (
-            A0ZZ = lift(A0, ZZ);
-            print (A0, A0ZZ);
-            abs det A0ZZ === 1
-          ) else false;
-      if mapshouldwork then (
-          if mapIsIsomorphism(transpose A0ZZ, X1, X2) then 
-              return A0ZZ;
-          );
-      )
-  )
-
-  trythem()      
-
-  findEquivalenceViaHessians = method()
-  findEquivalenceViaHessians(CalabiYauInToric, CalabiYauInToric) := (X1, X2) -> (
-      F1 := cubicForm X1;
-      F2 := cubicForm X2;
-      L1 := c2Form X1;
-      L2 := c2Form X2;
-      facs1 := factorsByType det hessian F1;
-      facs2 := factorsByType det hessian F2;
-      RZ := ring F1;
-      RQ := QQ (monoid RZ);
-      (A,phi) := genericLinearMap RQ;
-      T := source phi;
-      Ps := permutations facs2#{1,1};
-      possibleSigns := flatten for i1 in {1,-1} list flatten for i2 in {-1,1} list flatten for i3 in {-1,1} list for i4 in {-1,1} list {i1,i2,i3,i4};
-      trythem = () -> (
-          A0ZZ := null;
-          for sgn in possibleSigns do
-          for p in Ps do (
-              (A0, phi0, J0) := linearEquationConstraints(A, phi, 
-                  prepend({sub(L1, T), sub(L2, T)},
-                      for j from 0 to #facs1#{1,1} - 1 list {sub(facs1#{1,1}#j, T), sgn#j * sub(p#j, T)}),
-                  {});
-              print A0;
-              -- if A0 is over ZZ, invertible, then we return it.
-              mapshouldwork := try (
-                  A0ZZ = lift(A0, ZZ);
-                  abs det A0ZZ === 1
-                  ) else false;
-              if mapshouldwork then (
-                  if mapIsIsomorphism(transpose A0ZZ, X1, X2) then 
-                  return A0ZZ;
-                  );
-              )
-          );
-      trythem()
-      )
-
-  findEquivalenceViaHessians(CalabiYauInToric, CalabiYauInToric) := (X1, X2) -> (
-      F1 := cubicForm X1;
-      F2 := cubicForm X2;
-      L1 := c2Form X1;
-      L2 := c2Form X2;
-      facs1 := factorsByDegree det hessian F1;
-      facs2 := factorsByDegree det hessian F2;
-      RZ := ring F1;
-      RQ := QQ (monoid RZ);
-      (A,phi) := genericLinearMap RQ;
-      T := source phi;
-      Ps := permutations facs2#1;
-      possibleSigns := flatten for i1 in {1,-1} list flatten for i2 in {-1,1} list flatten for i3 in {-1,1} list for i4 in {-1,1} list {i1,i2,i3,i4};
-      trythem = () -> (
-          A0ZZ := null;
-          for sgn in possibleSigns do
-          for p in Ps do (
-              (A0, phi0, J0) = linearEquationConstraints(A, phi, 
-                  prepend({sub(F1, T), sub(F2, T)},
-                  prepend({sub(L1, T), sub(L2, T)},
-                      for j from 0 to #facs1#1 - 1 list {sub(facs1#1#j, T), sgn#j * sub(p#j, T)})),
-                  {});
-              << A0 << endl << endl;
-              -- if A0 is over ZZ, invertible, then we return it.
-              mapshouldwork := try (
-                  A0ZZ = lift(A0, ZZ);
-                  abs det A0ZZ === 1
-                  ) else false;
-              if mapshouldwork then (
-                  if mapIsIsomorphism(transpose A0ZZ, X1, X2) then 
-                  return A0ZZ;
-                  );
-              )
-          );
-      trythem()
-      )
-
-findEquivalenceViaHessians(Xs#(796,0), Xs#(798,1))
-findEquivalenceViaHessians(Xs#(796,1), Xs#(795,1)) -- doesn't find one? I think these cannot be equivalent.
-ret = findEquivalenceViaHessians(Xs#(800,0), Xs#(844,0)) -- SAME
-(803, 0)
-factor det hessian cubicForm Xs#(803,0)
-factor det hessian cubicForm Xs#(807,0)
-ret = findEquivalenceViaHessians(Xs#(803,0), Xs#(807,0)) -- SAME
-ret = findEquivalenceViaHessians(Xs#(1071,0), Xs#(1059,0)) -- SAME
-       (1134, 0), -- potentially same as (1136,0)?
-       
-ret = findEquivalenceViaHessians(Xs#(1134,0), Xs#(1136,0)) -- SAME
-ret = findEquivalenceViaHessians(Xs#(1135,0), Xs#(1139,0)) -- SAME
-///
 ---------------------------------------------------------------
 -- Next step: How many of these 2014 are distinct topologies? --
 ---------------------------------------------------------------
   allXs = sort keys Xs
+  allXs = favorablesXs
   --allXs = torsionfrees -- these are the ones we consider
   allT = topologySet(allXs, Xs);
   info allT -- 2014 possibly different topologies
   
   allT1 = combineIfSame(allT, X -> (c2Form X, cubicForm X))
-
-  identicals = sort first for x in allT1#"Sets" list (
-      for x1 in x list if #x1 > 1 then x1 else continue
-      )
+  info allT1
+  
   -- Question: are there any torsions or nonfavorables in here?
   -- Torsions: none on this list.
   -- Nonfavorables: (1059, 0), (1060, 0), (1064, 0), (1065, 0) are all the same (on the nose).
@@ -217,11 +79,13 @@ ret = findEquivalenceViaHessians(Xs#(1135,0), Xs#(1139,0)) -- SAME
   netList select(allT1#"Sets"#0, x -> #x > 1) -- there are 1945 seemingly different (69 are same as some other one).
   
   elapsedTime allT2 = separateIfDifferent(allT1, invariantsAll) -- 260 seconds
+  elapsedTime allT2 = separateIfDifferent(allT, invariantsAll) -- 260 seconds
 
   for x in allT2#"Sets" list (
       if any(flatten x, y -> member(first y, nonfavorables)) then x else continue
       )
   info allT2
+  representatives allT2
   #allT2#"Sets" == 1130
   allT2#"Sets"/length//tally
 
@@ -231,12 +95,284 @@ ret = findEquivalenceViaHessians(Xs#(1135,0), Xs#(1139,0)) -- SAME
     -- Number of known different topologies:       1130
     -- Maximum possible # of different topologies: 1251
     -- Largest number in one set:                  51
-  elapsedTime allT3b = combineByGV(allT3a, DegreeLimit => 15); -- 
-  elapsedTime allT3c = combineByGV(allT3b, DegreeLimit => 20); -- 
-
-  elapsedTime allT3 = combineByGV(allT3c, DegreeLimit => 25); -- 
+  elapsedTime allT3b = combineByGV(allT3a, DegreeLimit => 15); -- 101 sec
+  info allT3b
+    -- Total number of objects considered:         2014
+    -- Number of known different topologies:       1130
+    -- Maximum possible # of different topologies: 1213
+    -- Largest number in one set:                  51
+  netList representatives allT3b -- these are ones that we need to check
+  elapsedTime allT3c = combineByGV(allT3b, DegreeLimit => 20); -- 637 sec
+  info allT3c
+    -- Total number of objects considered:         2014
+    -- Number of known different topologies:       1130
+    -- Maximum possible # of different topologies: 1205
+    -- Largest number in one set:                  51
+  netList representatives allT3c -- these are ones that we need to check
+  elapsedTime allT3 = combineByGV(allT3c, DegreeLimit => 25); -- 3106 sec
   info allT3
-  -- Let it run at this point. XXX overnight run.
+    -- Total number of objects considered:         2014
+    -- Number of known different topologies:       1130
+    -- Maximum possible # of different topologies: 1200
+    -- Largest number in one set:                  51
+
+  -- This is from allT3c, for favorables ONLY.
+  setsToCheck = {{(72, 0), (80, 3), (80, 6)}, 
+      {(163, 2), (163, 3)}, 
+      {(213, 2), (250, 0), (265, 1), (280, 1)}, 
+      {(246, 0), (249, 1)}, 
+      {(250, 1), (254, 1)}, 
+      {(302, 0), (319, 0), (321, 0)}, 
+      {(316, 0), (322, 0)}, 
+      {(329, 0), (334, 0)}, 
+      {(329, 1), (334, 3)}, 
+      {(331, 0), (337, 0), (339, 2)}, 
+      {(337, 1), (339, 1)}, 
+      {(344, 0), (364, 1)}, 
+      {(344, 1), (364, 0)}, 
+      {(350, 0), (397, 0)}, 
+      {(356, 1), (357, 0)}, 
+      {(387, 1), (387, 3)}, 
+      {(402, 0), (403, 0)}, 
+      {(419, 0), (449, 2)}, 
+      {(433, 0), (436, 0)}, 
+      {(433, 1), (436, 1)}, 
+      {(451, 0), (455, 0)}, 
+      {(473, 0), (478, 0)}, 
+      {(540, 0), (571, 0)}, 
+      {(551, 2), (552, 0)}, 
+      {(559, 0), (577, 0)}, 
+      {(624, 0), (626, 0)}, 
+      {(628, 0), (653, 3)}, 
+      {(630, 0), (650, 3), (656, 1)}, 
+      {(645, 0), (647, 0)}, 
+      {(695, 5), (707, 0), (714, 0)}, 
+      {(705, 0), (716, 3)}, 
+      {(811, 0), (857, 0)}, 
+      {(814, 0), (851, 0)}, 
+      {(820, 0), (884, 0)}, 
+      {(915, 0), (935, 4)}, 
+      {(916, 0), (932, 2)}, 
+      {(924, 0), (937, 0)}, 
+      {(927, 4), (930, 0)}, 
+      {(927, 8), (930, 2)}, 
+      {(933, 0), (938, 3)}, 
+      {(933, 4), (938, 10)}, 
+      {(943, 0), (958, 0)}, 
+      {(974, 0), (993, 1)}, 
+      {(976, 0), (989, 0)}, 
+      {(979, 0), (1002, 1), (1005, 4)}, 
+      {(991, 0), (998, 3)}, 
+      {(994, 0), (1004, 0)}, 
+      {(1061, 0), (1067, 0)}, 
+      {(1077, 0), (1082, 0), (1086, 0)}, 
+      {(1077, 3), (1082, 5)}, 
+      {(1090, 0), (1094, 0)}, 
+      {(1090, 2), (1094, 2)}, 
+      {(1121, 0), (1122, 0)}, 
+      {(1123, 0), (1124, 0)}, 
+      {(1146, 0), (1147, 0)}, 
+      {(1182, 0), (1183, 2)}}
+
+  -- what about the unfavorables?  We need to check the following:
+  -- note: (1155, 0) is unfavorable, but is in its own equiv class.
+  unfavorableToCheck = {
+      {(796, 1), (795, 0)},
+      {(796, 0), (798, 1)},
+      {(800, 0), (846, 0)},
+      {(803, 0), (807, 0)},
+      {(1059, 0), (1067, 0), (1071, 0)},
+      {(1134, 0), (1137, 0)},
+      {(1135, 0), (1140, 0)},
+      {(1151, 0), (1153, 0), (1154, 0)}, -- first 2 are unfavorable
+      {(1155, 1), (1168, 0)}
+      }
+
+  -- a smaller set to check (from allT3), 51 sets here, only favorables.
+  setsToCheck = {
+      {(72, 0), (80, 3), (80, 6)}, -- ALL DISTINCT
+      {(163, 2), (163, 3)}, -- DISTINCT
+      {(213, 2), (250, 0), (265, 1), (280, 1)}, -- ALL DISTINCT
+      {(246, 0), (249, 1)}, -- DISTINCT
+      {(250, 1), (254, 1)}, -- DISTINCT
+      {(302, 0), (319, 0), (321, 0)}, -- ALL DISTINCT
+      {(316, 0), (322, 0)}, -- DISTINCT
+      {(329, 0), (334, 0)}, -- DISTINCT
+      {(329, 1), (334, 3)}, -- TODO (I THINK: DISTINCT.  The proof is almost there, maybe not quite).
+      {(331, 0), (337, 0), (339, 2)}, -- ALL DISTINCT
+      {(337, 1), (339, 1)}, -- DISTINCT
+      {(344, 0), (364, 1)}, -- DISTINCT
+      {(344, 1), (364, 0)}, -- DISTINCT
+      {(350, 0), (397, 0)}, -- DISTINCT
+      {(356, 1), (357, 0)}, -- DISTINCT
+      {(387, 1), (387, 3)}, -- DISTINCT
+      {(402, 0), (403, 0)}, -- DISTINCT
+      {(419, 0), (449, 2)}, -- DISTINCT
+      {(433, 0), (436, 0)}, -- DISTINCT
+      {(433, 1), (436, 1)}, -- DISTINCT
+      {(451, 0), (455, 0)}, -- DISTINCT
+      {(473, 0), (478, 0)}, -- DISTINCT
+      {(540, 0), (571, 0)}, -- DISTINCT
+      {(551, 2), (552, 0)}, -- DISTINCT
+      {(559, 0), (577, 0)}, -- DISTINCT
+      {(624, 0), (626, 0)}, -- DISTINCT
+      {(628, 0), (653, 3)}, -- ISOMORPHIC
+      {(630, 0), (650, 3), (656, 1)}, -- DISTINCT
+      {(695, 5), (707, 0), (714, 0)}, -- DISTINCT
+      {(705, 0), (716, 3)}, -- DISTINCT (slightly harder one)
+      {(811, 0), (857, 0)}, -- DISTINCT
+      {(814, 0), (851, 0)}, -- DISTINCT
+      {(820, 0), (884, 0)}, -- DISTINCT
+      {(915, 0), (935, 4)}, -- DISTINCT
+      {(916, 0), (932, 2)}, -- DISTINCT
+      {(924, 0), (937, 0)}, -- DISTINCT
+      {(927, 4), (930, 0)}, -- DISTINCT
+      {(927, 8), (930, 2)}, -- DISTINCT
+      {(933, 0), (938, 3)},  -- DISTINCT
+      {(933, 4), (938, 10)}, -- DISTINCT
+      {(943, 0), (958, 0)}, -- DISTINCT
+      {(974, 0), (993, 1)}, -- DISTINCT
+      {(976, 0), (989, 0)}, -- DISTINCT
+      {(979, 0), (1002, 1), (1005, 4)}, -- DISTINCT
+      {(991, 0), (998, 3)}, -- DISTINCT
+      {(994, 0), (1004, 0)}, -- DISTINCT
+      {(1077, 0), (1082, 0), (1086, 0)},  -- 2 DISTINCT HERE
+      {(1077, 3), (1082, 5)}, -- DISTINCT
+      {(1090, 0), (1094, 0)}, -- DISTINCT
+      {(1090, 2), (1094, 2)}, -- DISTINCT
+      {(1146, 0), (1147, 0)}} -- ISOMORPHIC
+    -- hilbertBasisGenerators toricMoriCone(ambient Xs#(1182,0), basisIndices);
+    -- heft := if opts.Heft =!= null then opts.Heft else (
+    --   sum entries transpose rays dualCone posHull transpose matrix mori
+
+  setsToCheck#0/(lab -> gvInvariantsAndCone(Xs#lab, 5, DegreeLimit => 20))
+  sort flatten setsToCheck
+  netList for lab in oo list factorsByType det hessian cubicForm Xs#lab
+-- i58 :   netList representatives allT3b -- these are ones that we need to check
+--       +---------+---------+---------+--------+
+-- o58 = |(72, 0)  |(80, 3)  |(80, 6)  |        |
+--       +---------+---------+---------+--------+
+--       |(163, 2) |(163, 3) |         |        |
+--       +---------+---------+---------+--------+
+--       |(213, 2) |(250, 0) |(265, 1) |(280, 1)|
+--       +---------+---------+---------+--------+
+--       |(246, 0) |(249, 1) |         |        |
+--       +---------+---------+---------+--------+
+--       |(250, 1) |(254, 1) |         |        |
+--       +---------+---------+---------+--------+
+--       |(302, 0) |(319, 0) |(321, 0) |        |
+--       +---------+---------+---------+--------+
+--       |(316, 0) |(322, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(329, 0) |(334, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(329, 1) |(334, 3) |         |        |
+--       +---------+---------+---------+--------+
+--       |(331, 0) |(337, 0) |(339, 2) |        |
+--       +---------+---------+---------+--------+
+--       |(337, 1) |(339, 1) |         |        |
+--       +---------+---------+---------+--------+
+--       |(344, 0) |(364, 1) |         |        |
+--       +---------+---------+---------+--------+
+--       |(344, 1) |(364, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(350, 0) |(397, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(356, 1) |(357, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(387, 1) |(387, 3) |         |        |
+--       +---------+---------+---------+--------+
+--       |(402, 0) |(403, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(419, 0) |(449, 2) |         |        |
+--       +---------+---------+---------+--------+
+--       |(433, 0) |(436, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(433, 1) |(436, 1) |         |        |
+--       +---------+---------+---------+--------+
+--       |(451, 0) |(455, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(473, 0) |(478, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(510, 0) |(529, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(540, 0) |(571, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(551, 2) |(552, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(559, 0) |(577, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(606, 0) |(616, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(624, 0) |(626, 0) |(668, 1) |        |
+--       +---------+---------+---------+--------+
+--       |(628, 0) |(653, 3) |         |        |
+--       +---------+---------+---------+--------+
+--       |(630, 0) |(650, 3) |(656, 1) |        |
+--       +---------+---------+---------+--------+
+--       |(645, 0) |(647, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(695, 5) |(707, 0) |(709, 0) |(714, 0)|
+--       +---------+---------+---------+--------+
+--       |(705, 0) |(716, 3) |         |        |
+--       +---------+---------+---------+--------+
+--       |(806, 0) |(831, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(810, 0) |(814, 0) |(851, 0) |        |
+--       +---------+---------+---------+--------+
+--       |(811, 0) |(857, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(820, 0) |(884, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(900, 0) |(901, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(915, 0) |(935, 4) |         |        |
+--       +---------+---------+---------+--------+
+--       |(916, 0) |(932, 2) |         |        |
+--       +---------+---------+---------+--------+
+--       |(924, 0) |(937, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(927, 4) |(930, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(927, 8) |(930, 2) |         |        |
+--       +---------+---------+---------+--------+
+--       |(933, 0) |(938, 3) |         |        |
+--       +---------+---------+---------+--------+
+--       |(933, 4) |(938, 10)|         |        |
+--       +---------+---------+---------+--------+
+--       |(943, 0) |(958, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(974, 0) |(993, 1) |         |        |
+--       +---------+---------+---------+--------+
+--       |(976, 0) |(989, 0) |         |        |
+--       +---------+---------+---------+--------+
+--       |(979, 0) |(1002, 1)|(1005, 4)|        |
+--       +---------+---------+---------+--------+
+--       |(991, 0) |(998, 3) |         |        |
+--       +---------+---------+---------+--------+
+--       |(994, 0) |(1004, 0)|         |        |
+--       +---------+---------+---------+--------+
+--       |(1061, 0)|(1067, 0)|         |        |
+--       +---------+---------+---------+--------+
+--       |(1077, 0)|(1082, 0)|(1086, 0)|        |
+--       +---------+---------+---------+--------+
+--       |(1077, 3)|(1082, 5)|         |        |
+--       +---------+---------+---------+--------+
+--       |(1090, 0)|(1094, 0)|         |        |
+--       +---------+---------+---------+--------+
+--       |(1090, 2)|(1094, 2)|         |        |
+--       +---------+---------+---------+--------+
+--       |(1121, 0)|(1122, 0)|         |        |
+--       +---------+---------+---------+--------+
+--       |(1123, 0)|(1124, 0)|         |        |
+--       +---------+---------+---------+--------+
+--       |(1146, 0)|(1147, 0)|         |        |
+--       +---------+---------+---------+--------+
+--       |(1182, 0)|(1183, 2)|         |        |
+--       +---------+---------+---------+--------+
+
+  -- XXX
+  
   -- Next steps:
   --  Are the torsions all on their own?
   --  How many nonfavorables are still around? (most, I would guess...)
@@ -474,3 +610,20 @@ for a in tryAtLargerDegreeLimit list (
     << "#### " << a << " " << ans << endl;
     a => ans
     )
+
+------------------------------------------
+-- Finding good invariants ---------------
+------------------------------------------
+info allT
+
+allTtry1 = separateIfDifferent(allT, invariants0) -- simply c(F), c(L), h11, h12.
+info allTtry1 -- 201 different buckets for these invariants.
+
+-- Now try hessian factors and content.
+hessianInv = X -> factorShape det hessian cubicForm X
+allTtry2 = separateIfDifferent(allTtry1, hessianInv) -- simply shape of hessian, content.
+info allTtry2 -- this breaks the 201 into 627, maxsize=29
+
+-- Now try components of singular loci
+allTtry3 = separateIfDifferent(allTtry2, invariants3) -- singular info and content of singular locus
+info allTtry3 -- 
