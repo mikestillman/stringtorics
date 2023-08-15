@@ -8,8 +8,9 @@ restart
 debug needsPackage "StringTorics" -- the debug is because some functions are not yet exported.
   -- list of these functions:
   
-DB3 = "../Databases/test2-cys-ntfe-h11-3.dbm"
-DB3 = "../StringTorics/Databases/test2-cys-ntfe-h11-3.dbm"
+--DB3 = "../Databases/test2-cys-ntfe-h11-3.dbm"
+--DB3 = "../StringTorics/Databases/test2-cys-ntfe-h11-3.dbm"
+DB3 = "../Databases/cys-ntfe-h11-3.dbm"
 
 R = ZZ[a,b,c]
 RZ = R
@@ -40,7 +41,17 @@ select(sort keys Qs, lab -> (ans := not isFavorable polar Qs#lab; print ans; ans
   allXs = sort keys Xs
   allT = topologySet(allXs, Xs);
   info allT -- 306 possibly different topologies
-  
+
+  -- allT = separateIfDifferent(allT, invariantsH11H12)
+  -- info allT
+
+  -- allT = separateIfDifferent(allT, hubschInvariants)
+  -- info oo
+
+  -- PC = pointCounter RZ;
+  -- allT = separateIfDifferent(allT, pointCounts_PC)
+  -- info allT
+
   allT1 = combineIfSame(allT, X -> (c2Form X, cubicForm X))
   equivalences allT1
   info allT1 

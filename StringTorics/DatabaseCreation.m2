@@ -19,47 +19,53 @@ hodgeNumbers KSEntry := (ks) -> (
         value substring(str, ans#2#0, ans#2#1))
     )
 
-createCYDatabase = method()
+combineCYDatabases = method()
+combineCYDatabases(Database, Database) := (db1, db2) -> (
+    -- appends all keys of db2 to db1
+    for k in keys db2 do db1#k = db2#k;
+    )
+combineCYDatabases(String, String) := (dbname1, dbname2) -> (
+    -- appends all keys of db2 to db1
+    db1 := openDatabaseOut dbname1;
+    db2 := openDatabase dbname2;
+    combineCYDatabases(db1, db2);
+    close db1;
+    close db2;
+    )
+combineCYDatabases List := (dbL) -> (
+    -- either all elements are String filename's or are databases.
+    for i from 1 to #dbL-1 do combineCYDatabases(dbL#0, dbL#i)
+    )
 
-createCYDatabase(String, List) := (dbfilename, topes) -> (
-    -- open data base file
+addToCYDatabase = method(Options => {NTFE => true, "CYs" => true})
+
+-- This function adds the CYPolytope 'ks' to the database, if it is not there yet.
+-- Actually, it only looks at the ID label in the 'ks' entry, not at the polytope itself.
+-- Under default conditions, all NTFE triangulations are found, and all corresponding CY's
+-- are placed into the data base.
+-- This function returns the CYPolytope found or created.
+addToCYDatabase(String, KSEntry) := CYPolytope => opts -> (dbfilename, ks) -> (
+    lab := label ks;
     F := openDatabaseOut dbfilename;
-    -- loop through topes, create CYPolytope, populate it, write it to data base.
-    elapsedTime for i from 0 to #topes - 1 do elapsedTime (
-        lab := label topes_i;
-        if lab === null then lab = i; -- else print "using label";
+    if not F#?(toString lab) then (
         << "computing for polytope " << lab << endl;
-        V := cyPolytope(topes#i, ID => lab); -- note that the polytope data is really that of the dual to topes#i.
+        Q := cyPolytope(ks, ID => lab); -- note that the polytope data is really that of the dual to topes#i.
         -- now fill it with data we want
-        basisIndices V; -- compute them
-        isFavorable V; -- compute h11, h21, favorability.
-        annotatedFaces V; -- compute annotated faces
-        automorphisms V;
+        basisIndices Q; -- compute them
+        isFavorable Q; -- compute h11, h21, favorability.
+        annotatedFaces Q; -- compute annotated faces
+        automorphisms Q;
         -- now write it
-        F#(toString lab) = dump V;
-        );
+        F#(toString lab) = dump Q;
+        )
+    else
+        Q = cyPolytope F#(toString lab);
     close F;
+    if opts#"CYs" then addToCYDatabase(dbfilename, Q, NTFE => opts.NTFE);
+    Q
     )
 
-addToCYDatabase = method(Options => {NTFE => false})
-
-addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
-    elapsedTime Xs := findAllCYs Q; -- TODO: check: is findALlCYs still correct.
-    << "  " << #Xs << " triangulations total" << endl;
-    if opts.NTFE then (
-        elapsedTime H := partition(restrictTriangulation, Xs);
-        << "  " << #(keys H) << " NTFE triangulations" << endl;
-        Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
-        -- let's relabel these Xs
-        );
-    F := openDatabaseOut dbfilename;
-    for X in Xs do (
-        computeIntersectionNumbers X; -- this should load all of the data we want
-        F#(toString label X) = dump X;
-        );
-    close F;    
-    )
-
+-- This only adds the CY's coming from Q.
 addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
     -- This version also finds "moriConeCap" which is a cone containing the actual mori cone: it is the
     -- intersection of all mori cones coming from triangulations equivalent to the given one.
@@ -83,11 +89,91 @@ addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
         );
     close F;    
     )
-addToCYDatabase(String, Database, ZZ) := opts -> (dbfilename, topesDB, i) -> (
-    <<  "-- doing polytope " << i << endl;
-    Q := cyPolytope(topesDB#(toString i), ID => i);
-    addToCYDatabase(dbfilename, Q, opts);
+
+addToCYDatabase(String, List) := opts ->(dbfilename, topes) -> (
+    for tope in topes do addToCYDatabase(dbfilename, tope, opts);
     )
+
+createCYDatabase = method(Options => {
+        Limit => 100000,
+        NTFE => true,
+        "CYs" => true})
+createCYDatabase(String, ZZ, List) := opts -> (dbfileprefix, h11, range) -> (
+    topes := kreuzerSkarke(h11, Limit => opts.Limit);
+    (lo, hi) := toSequence range;
+    hi = hi-1;
+    filename := dbfileprefix | "-range-"|lo|"-"|hi|".dbm";
+    addToCYDatabase(filename, topes_{lo..hi}, NTFE => opts.NTFE, "CYs" => opts#"CYs")
+    )
+-- createCYDatabase = method()
+
+-- createCYDatabase(String, List) := (dbfilename, topes) -> (
+--     -- open data base file
+--     F := openDatabaseOut dbfilename;
+--     -- loop through topes, create CYPolytope, populate it, write it to data base.
+--     elapsedTime for i from 0 to #topes - 1 do elapsedTime (
+--         lab := label topes_i;
+--         if lab === null then lab = i; -- else print "using label";
+--         << "computing for polytope " << lab << endl;
+--         V := cyPolytope(topes#i, ID => lab); -- note that the polytope data is really that of the dual to topes#i.
+--         -- now fill it with data we want
+--         basisIndices V; -- compute them
+--         isFavorable V; -- compute h11, h21, favorability.
+--         annotatedFaces V; -- compute annotated faces
+--         automorphisms V;
+--         -- now write it
+--         F#(toString lab) = dump V;
+--         );
+--     close F;
+--     )
+
+
+-- addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
+--     elapsedTime Xs := findAllCYs Q; -- TODO: check: is findALlCYs still correct.
+--     << "  " << #Xs << " triangulations total" << endl;
+--     if opts.NTFE then (
+--         elapsedTime H := partition(restrictTriangulation, Xs);
+--         << "  " << #(keys H) << " NTFE triangulations" << endl;
+--         Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
+--         -- let's relabel these Xs
+--         );
+--     F := openDatabaseOut dbfilename;
+--     for X in Xs do (
+--         computeIntersectionNumbers X; -- this should load all of the data we want
+--         F#(toString label X) = dump X;
+--         );
+--     close F;    
+--     )
+
+-- addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
+--     -- This version also finds "moriConeCap" which is a cone containing the actual mori cone: it is the
+--     -- intersection of all mori cones coming from triangulations equivalent to the given one.
+--     elapsedTime Xs := findAllCYs Q; -- TODO: check: is findALlCYs still correct.
+--     << "  " << #Xs << " triangulations total" << endl;
+--     if opts.NTFE then (
+--         elapsedTime H := partition(restrictTriangulation, Xs);
+--         << "  " << #(keys H) << " NTFE triangulations" << endl;
+--         Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
+--         Xs = for k in keys H list (
+--             X := H#k#0;
+--             setToricMoriConeCap(X, H#k);
+--             X
+--             )
+--         -- let's relabel these Xs?
+--         );
+--     F := openDatabaseOut dbfilename;
+--     for X in Xs do (
+--         computeIntersectionNumbers X; -- this should load all of the data we want
+--         F#(toString label X) = dump X;
+--         );
+--     close F;    
+--     )
+
+-- addToCYDatabase(String, Database, ZZ) := opts -> (dbfilename, topesDB, i) -> (
+--     <<  "-- doing polytope " << i << endl;
+--     Q := cyPolytope(topesDB#(toString i), ID => i);
+--     addToCYDatabase(dbfilename, Q, opts);
+--     )
 
 readCYDatabase = method(Options => {Ring => null})
 readCYDatabase String := Sequence => opts -> (dbname) -> (
