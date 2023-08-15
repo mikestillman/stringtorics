@@ -3,6 +3,63 @@
 
   restart
   needsPackage "StringTorics"
+  createCYDatabase("../Databases/test-cys-ntfe-h11-3", 3, {0, 10})
+  createCYDatabase("../Databases/test-cys-ntfe-h11-3", 3, {10,20})
+  createCYDatabase("../Databases/test-cys-ntfe-h11-3", 3, {20,30})
+  createCYDatabase("../Databases/test-cys-ntfe-h11-3", 3, {30,36})
+  select(readDirectory("../Databases"), s -> match("range", s) and match("h11-3", s))
+  (Xs, Qs) = readCYDatabase   "../Databases/test12-cys-ntfe-h11-3.dbm"
+
+  -- TODO: ask Dan about running in different processes a number of these M2's.  What is the best way?
+  --       ask Dan: maybe have special character sequence, e.g. @lo@ such that inside a string this is replaced by the string value of (in this case) 'lo'.
+  makeDirectory("./Foo"|"3")
+  lo = 0;
+  hi = 0;
+  total = 244;
+  nper = 10;
+  for i from 0 to 9 do (
+      lo = hi;
+      num = ceiling(total/nper);
+      hi = lo+num;
+      if hi > total then hi = total;
+      exec := ///M2 -e 'needsPackage "StringTorics"' -e 'prefix = "./Foo3/test-h11-3"' -e 'range={///|lo|///,///|hi|///}' -e 'createCYDatabase(prefix,3,range)' -e 'exit 0' &///;
+      print exec;
+      run exec;
+      )
+  -- Separate function perhaps:
+  createdFiles = sort for s in select(readDirectory("./Foo3"), s -> match("range", s) and match("h11-3", s)) list ("./Foo3/"|s)
+  combineCYDatabases({"../Databases/test14-cys-ntfe-h11-3.dbm"} | createdFiles)
+
+
+  topes = kreuzerSkarke(3, Limit => 1000);
+  assert(#topes == 244)
+  DBNAME = "../Databases/test-cys-ntfe-h11-3.dbm"
+  elapsedTime addToCYDatabase(DBNAME, topes) -- 224 seconds
+
+  restart
+  needsPackage "StringTorics"
+  topes = kreuzerSkarke(3, Limit => 1000);
+  assert(#topes == 244)
+  DBNAME = "../Databases/test-cys-ntfe-h11-3.dbm"
+  elapsedTime addToCYDatabase(DBNAME, topes) -- 224 seconds
+
+-- Query the results
+  restart
+  needsPackage "StringTorics"
+  DBNAME = "../Databases/test-cys-ntfe-h11-3.dbm"
+  R = ZZ[a,b,c]
+  RQ = QQ (monoid R);
+  (Qs, Xs) = readCYDatabase(DBNAME, Ring => R);
+  
+
+  restart
+  needsPackage "StringTorics"
+  topes = kreuzerSkarke(3, Limit => 1000);
+  assert(#topes == 244)
+  elapsedTime createCYDatabase("../Databases/cys-ntfe-h11-3.dbm", topes) -- 104 sec
+
+  restart
+  needsPackage "StringTorics"
   topes = kreuzerSkarke(3, Limit => 1000);
   assert(#topes == 244)
   elapsedTime createCYDatabase("../Databases/cys-ntfe-h11-3.dbm", topes) -- 104 sec

@@ -106,6 +106,7 @@ export {
     "latticePointHash",
     "interiorLatticePointList",
     "annotatedFaces",
+    "automorphisms",
 
     -- current triangulation code
     "findAllFRSTs",
@@ -188,6 +189,7 @@ export {
     "readCYDatabase",
     "readCYs",
     "readCYPolytopes",
+    "combineCYDatabases",
 
     -- Cohomology
     "toricCohomologySetup",

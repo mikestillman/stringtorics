@@ -62,8 +62,8 @@ doc ///
       (reflexive) 4D-polytopes and the resulting Calabi Yau hypersurfaces.
     Text
       @UL {
-          TO createCYDatabase,
           TO addToCYDatabase,
+          TO combineCYDatabases,
           TO readCYDatabase,
           TO readCYPolytopes,
           TO readCYs
@@ -953,12 +953,12 @@ doc ///
 ------------------------------------------------
 doc ///
   Key
-    (createCYDatabase, String, List)
-    createCYDatabase
+    addToCYDatabase
+    (addToCYDatabase, String, List)
   Headline
-    create a database file and populate it with CYPolytope's
+    create or append to a database file and populate it with CYPolytope's and possibly CalabiYauInToric's
   Usage
-    createCYDatabase(filename, topes)
+    addToCYDatabase(filename, topes)
   Inputs
     filename:String
       the desired name of the data base file.  If the file doesn't exist it is created,
@@ -966,6 +966,11 @@ doc ///
       is modified
     topes:List
       of @ofClass KSEntry@'s, a list of Kreuzer-Skarke type entries for some polytopes
+    "CYs" => Boolean
+      if true, then also all Calabi Yau hypersurfaces are computed and added to the database.
+    NTFE => Boolean
+      if true, then triangulations which are identical on the set of 2-faces are considered the
+      same, and only one is placed into the data base.
   Consequences
     Item
       For each polytope corresponding to an entry in the {\tt topes} list, 
@@ -985,15 +990,15 @@ doc ///
     Example
       filename = "foo-remove-me.dbm"
       if fileExists filename then removeFile filename
-      topes = kreuzerSkarke(2, Limit => 3)
-      createCYDatabase(filename, topes)
+      topes = kreuzerSkarke(2, Limit => 4)
+      addToCYDatabase(filename, topes_{1,2,3})
     Example
       F = openDatabase filename
       F#"1"
-      V = cyPolytope F#"1"
-      hh^(1,1) V
-      hh^(1,2) V
-      isFavorable V
+      Q = cyPolytope F#"1"
+      hh^(1,1) Q
+      hh^(1,2) Q
+      isFavorable Q
     Text
       As a data base file, all keys of {\tt F} are strings, and the values are strings too.
     Example
@@ -1015,7 +1020,6 @@ doc ///
 --     (addToCYDatabase, String, Database, ZZ) do we want this one?
 ///
   Key
-    addToCYDatabase
     (addToCYDatabase, String, CYPolytope)
   Headline
     add data for every Calabi-Yau hypersurface coming from a given (reflexive) CYPolytope
@@ -1033,7 +1037,7 @@ doc ///
       filename = "foo-remove-me.dbm"
       if fileExists filename then removeFile filename
       topes = kreuzerSkarke(2, Limit => 3)
-      createCYDatabase(filename, topes)
+      addToCYDatabase(filename, topes, "CYs" => false)
     Text
     Example
       Qs = readCYPolytopes(filename)
