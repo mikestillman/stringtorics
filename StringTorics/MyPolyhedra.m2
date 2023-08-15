@@ -177,6 +177,185 @@ annotatedFaces(ZZ,Polyhedron) := List => (i,P1) -> (
       )
     )
 
+-- private function for `isomorphisms`
+findCombinatorialData = (aP, i) -> (
+    -- aP: List, coming from annotated faces.
+    -- i: integer index: for a given vertex.
+    -- returns: list, of
+    --  {genus, edges: genus => number, 2faces: {#vertices, genus} => number}, 3faces: {#vertices, genus} => ZZ
+    -- these are counts for all faces containing i
+    -- or, maybe one hash table, {#vertices, genus} => count
+    -- #vertices can be 1,2,3.
+    sort for x in aP list if member(i, x#1) then {x#0, #x#1, x#3, x#4} else continue
+    )
 
+-- private function for `isomorphisms`
+findPossibleMatchings = (matchings) -> (
+    -- matchings: List of (alpha, beta), alpha and beta lists of integers of the same length >= 1.
+    -- returns a list of {i1 => j1, ..., ir => jr}.
+    -- the possible matchings.
+    if #matchings === 0 then error "incorrect logic on my part, apparently";
+    hd := matchings#0;
+    hdmatchings0 := permutations(#hd#0);
+    hdmatchings := for p in hdmatchings0 list for i from 0 to #hd#0-1 list hd#0#i => hd#1#(p#i);
+    if #matchings === 1 then return hdmatchings;
+    tl := drop(matchings, 1);
+    restmatchings := findPossibleMatchings tl;
+    Ps := permutations hd#1;
+    flatten for p in hdmatchings list for q in restmatchings list (
+        sort join(p,q)
+        )
+    )
+
+///
+  findPossibleMatchings{({0,1,2}, {0,1,2})}
+  findPossibleMatchings{({0,3}, {0,1})}
+///
+
+checkPossibleMatching = (A, perm, verticesP, verticesQ) -> (
+    -- A is a n x n generic matrix over n^2 variables.
+    -- perm is a list {i1 => j1, ...} of indices into verticesP to indices into verticesQ
+    trim sum for ab in perm list (
+        a := transpose matrix{verticesP _ (first ab)};
+        b := transpose matrix{verticesP _ (last ab)};
+        ideal (A * a - b)
+        )
+    )
+
+matchings = method()
+matchings(List, List, ZZ) := (aP, aQ, nvertices) -> (
+    HP := partition(i -> findCombinatorialData(aP, i), toList(0..nvertices - 1));
+    HQ := partition(i -> findCombinatorialData(aQ, i), toList(0..nvertices - 1));
+    if sort keys HP =!= sort keys HQ then (
+        << "note: vertex data does not match" << endl;
+        return {};
+        );
+    if not all(keys HP, k -> #HP#k == #HQ#k) then (
+        << "note: vertex number data does not match" << endl;
+        return {};
+        );
+    matchings := for k in keys HP list (
+        HP#k, HQ#k
+        );
+    matchings
+    )
+
+isomorphisms = method()
+isomorphisms(Polyhedron, Polyhedron) := (P, Q) -> (
+    -- for now, we assume both are full dimensional?
+    vP := vertexList P;
+    vQ := vertexList Q;
+    n := #vP#0; -- TODO: check that all vP, vQ elements have the same length, n == dim P == dim Q
+    if #vP =!= #vQ then return {};
+    -- Step 1: get numerical invariants for each vertex.
+    aP := annotatedFaces P;
+    aQ := annotatedFaces Q;
+    HP := partition(i -> findCombinatorialData(aP, i), toList(0..#vP - 1));
+    HQ := partition(i -> findCombinatorialData(aQ, i), toList(0..#vQ - 1));
+    if sort keys HP =!= sort keys HQ then (
+        << "note: vertex data does not match" << endl;
+        return {};
+        );
+    if not all(keys HP, k -> #HP#k == #HQ#k) then (
+        << "note: vertex number data does not match" << endl;
+        return {};
+        );
+    matchings := for k in keys HP list (
+        HP#k, HQ#k
+        );
+    possibles := findPossibleMatchings matchings;
+    if #possibles > 1000 then (
+        << "#possibles == " << #possibles << endl;
+        return isomorphisms2(P, Q)
+        );
+    --return {possibles, matchings, HP, HQ};
+    t := getSymbol "t";
+    R := QQ[t_(0,0)..t_(n-1,n-1)];
+    A := genericMatrix(R, n, n);
+    As := for p in possibles list (
+        J := checkPossibleMatching(A, p,vP, vQ);
+        if J == 1 then continue; -- not an isomorphism!
+        A0 := A % J;
+        A0 = try lift(A0, ZZ) else null;
+        if A0 === null then continue;
+        (A0, p/last)
+        );
+    As
+    )
+
+-- private function for isomorphisms2
+partialPermutations = (elems, num) -> (
+    if num == 1 then return elems/(a -> {a});
+    flatten for i from 0 to #elems-1 list for p in partialPermutations(drop(elems,{i,i}), num-1)
+      list
+        prepend(elems#i, p)
+    )
+
+-- TODO: isomorphisms and isomorphisms2 should be combined in a smarter way:
+-- use the known matches to restrict the possible maps.
+-- then use this on only some of the vertices?
+-- Vague description because I don't know how best to fix it yet.
+isomorphisms2 = method()
+isomorphisms2(Polyhedron, Polyhedron) := (P, Q) -> (
+    -- here we don't bother with matchings.
+    -- instead we first find a set of n vertices which do not lie on a hyperplane.
+    -- and then we compute all possible matrices 
+    VP := vertexMatrix P;
+    VQ := vertexMatrix Q;
+    m := numcols VP;
+    HP := hashTable for i from 0 to m-1 list (vertexList P)#i => i;
+    HQ := hashTable for i from 0 to m-1 list (vertexList Q)#i => i;
+    if m =!= numcols VQ then return {};
+    n := numrows VP;
+    if n =!= numrows VQ then error "expected polytopes in the same space";
+    indepset := for p in subsets(#vertexList P, n) list if det VP_p != 0 then break p;
+    t := getSymbol "t";
+    R := QQ[t_(0,0)..t_(n-1,n-1)];
+    A := genericMatrix(R, n, n);
+    VP0 := VP_indepset;
+    for q in partialPermutations(splice{0..#vertexList Q - 1}, n) list (
+        J := trim ideal(A * VP0 - VQ_q);
+        if J == 1 then continue;
+        A0 := A % J;
+        A0 = try lift(A0, ZZ) else null;
+        if A0 === null then continue;
+        if abs(det A0) != 1 then continue;
+        newverts := entries transpose(A0 * VP);
+        if any(newverts, v -> not HQ#?v) then continue;
+        perm := for v in newverts list HQ#v;
+        (A0, perm)
+        )
+    )
+
+automorphisms = method()
+automorphisms Polyhedron := P -> isomorphisms(P, P)
+
+///
+  restart
+  debug needsPackage "StringTorics"
+  topes = kreuzerSkarke 3;
+  Q = cyPolytope topes_20
+  Q = cyPolytope topes_0
+  P = polytope(Q, "N")
+  vertexList P
+  annotatedFaces P
+
+  netList isomorphisms(P,P)
+  isomorphisms2(P,P)
+  first oo
+  netList oo
+
+  for tope in topes list (
+      Q := cyPolytope tope;
+      P := polytope(Q, "N");
+      ans := isomorphisms(P, P);
+      if ans == null then 
+        << "--- tope: " << label Q << " TOO LARGE FOR NOW" << endl;
+      else
+        << "--- tope: " << label Q << " #aut=" << #ans << " auts: " << netList ans << endl;
+      ans
+      );
+  
+///
 end--
 

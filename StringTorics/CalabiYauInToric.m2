@@ -37,20 +37,43 @@ CYDataCache = {
     "id" => {value, toString, ZZ},
     "c2" => {value, toString, List},
     "intersection numbers" => {value, toString, List},
-    "toric intersection numbers" => {value, toString, List}
+    "toric intersection numbers" => {value, toString, List},
+    "toric mori cone cap" => {value, toString, List}
     }
 
-cyData = method(Options => {ID => null, Ring => null})
-cyData(CYPolytope, List) := opts -> (Q, triang) -> (
+setCYIntersectionRing = (X, R) -> (
+    -- X is a CalabiYauInToric
+    -- R is a polynomial ring, or null (if not, an error is raised).
+    n := hh^(1,1) X;
+    if R =!= null then (
+        if not instance(R, PolynomialRing) or numgens R != n then 
+            error ("expected polynomial ring with "|n|" variables");
+        X.cache.PicardRing = R;
+        )
+    else (
+        a := getSymbol "a";
+        X.cache.PicardRing = ZZ[a_1..a_n];
+        );
+    )
+
+calabiYauInToric = method(Options => {ID => null, Ring => null})
+calabiYauInToric(CYPolytope, List) := CalabiYauInToric => opts -> (Q, triang) -> (
     X := new CalabiYauInToric from {
         symbol cache => new CacheTable,
         "polytope data" => Q,
         "triangulation" => triang
         };
     if opts.ID =!= null then X.cache#"id" = opts.ID;
-    if opts#Ring =!= null then X.cache#"pic ring" = opts#Ring; -- Note: we should check that it is over ZZ, has h^(1,1) variables
+    setCYIntersectionRing(X, opts#Ring);
     X
     )
+
+cyData = method(Options => options calabiYauInToric)
+cyData(CYPolytope, List) := opts -> (Q, triang) -> calabiYauInToric(Q, triang, opts)
+
+picardRing = method()
+picardRing CalabiYauInToric := X -> X.cache.PicardRing
+
 cyData(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
     -- F is a function which takes an id of a CYPolytope and returns the object.
     L := lines str;
@@ -75,7 +98,7 @@ cyData(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
         if fields#?k then X.cache#k = readFcn fields#k;
         );
     if opts.ID =!= null then X.cache#"id" = opts.ID; -- just for compatibility with other constructors...
-    if opts#Ring =!= null then X.cache#"pic ring" = opts#Ring; -- Note: we should check that it is over ZZ, has h^(1,1) variables
+    setCYIntersectionRing(X, opts#Ring);
     X
     )
 
@@ -105,6 +128,25 @@ makeCY CYPolytope := CalabiYauInToric => opts -> Q -> (
     cyData(Q, tri, opts)
     )    
 
+makeCY(List, List) := CalabiYauInToric =>  opts -> (pts, triangulation) -> (
+    -- We keep the translation around?
+    Q := cyPolytope pts;
+    -- now we need the translation from old vertices to new.
+    H := hashTable for i from 0 to #rays Q - 1 list (rays Q)#i => i;
+    mapping := hashTable for i from 0 to #pts-1 list (
+        p := pts#i;
+        if all(p,a -> a == 0) then continue; -- leave out the origin
+        if H#?p then i => H#p else 
+            error("lattice point found which is likely interior to a facet: "|(toString p))
+        );
+    tri := sort for t in triangulation list (
+        sort for t1 in drop(t,1) list mapping#t1
+        );
+    Q.cache#"vertex translation" = mapping;
+    cyData(Q, tri, opts)
+    )
+
+
 normalToricVariety CalabiYauInToric := opts -> X -> (
     if not X.cache.?NormalToricVariety then X.cache.NormalToricVariety = (
         Q := X#"polytope data";
@@ -130,7 +172,7 @@ triangulation CalabiYauInToric := Triangulation => opts -> X -> (
         rys := X#"polytope data"#"rays";
         d := #rys#0;
         B := (transpose matrix rys) | matrix{d:{0}};
-        X.cache#"triangulation" = triangulation(B, for t in X#"triangulation" list append(t, #rys));
+        X.cache#"triangulation" = triangulation(B, for t in X#"triangulation" list append(t, #rys)); -- TODO: BUG?? where is "triangulation" key? In cache??
         );
     X.cache#"triangulation"
     )
@@ -149,6 +191,8 @@ label CYPolytope := Q -> if Q.cache#?"id" then Q.cache#"id" else ""
 label CalabiYauInToric := X -> (label cyPolytope X, if X.cache#?"id" then X.cache#"id" else "")
 
 hh(Sequence, CalabiYauInToric) := (pq, X) -> hh^pq cyPolytope X
+
+isFavorable CalabiYauInToric := Boolean => X -> isFavorable cyPolytope X
 
 abstractVariety CalabiYauInToric := opts -> X -> (
     -- Store this with X.
@@ -215,4 +259,33 @@ equations CalabiYauInToric := List => X -> (
         {random(degree(-toricDivisor V), ring V)} -- TODO: (1) allow tuned equations, (2) do the random call more efficiently.
         );
     X.cache.Equations
+    )
+
+toricMoriCone = method()
+toricMoriConeCap = method()
+
+setToricMoriConeCap = method()
+setToricMoriConeCap(CalabiYauInToric, List) := List => (Y, Xs) -> (
+    -- does nothing if Y is not favorable
+    -- Xs are all of the CY3's equivalent to Y (including Y), but NO others.
+    --myNTFE := restrictTriangulation Y;
+    --myXs := select(Xs, X0 -> restrictTriangulation X0 === myNTFE);
+    if not isFavorable Y then null
+    else
+        Y.cache#"toric mori cone cap" = sort entries transpose rays dualCone posHull matrix{for X in Xs list rays dualCone toricMoriCone X}
+    )
+setToricMoriConeCap CalabiYauInToric := List => Y -> (
+    -- Xs are all of the CY3's equivalent to Y (including Y), possibly includes others too?
+    if not isFavorable Y then return null;
+    Q := cyPolytope Y;
+    Xs := findAllCYs Q;
+    myNTFE := restrictTriangulation Y;
+    myXs := select(Xs, X0 -> restrictTriangulation X0 === myNTFE);
+    Y.cache#"toric mori cone cap" = sort entries transpose rays dualCone posHull matrix{for X in myXs list rays dualCone toricMoriCone X};
+    )
+    
+toricMoriConeCap CalabiYauInToric := List => Y -> (
+    if not isFavorable Y then return null;
+    if not Y.cache#?"toric mori cone cap" then setToricMoriConeCap Y;
+    Y.cache#"toric mori cone cap"
     )

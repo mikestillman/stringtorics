@@ -34,6 +34,7 @@ createCYDatabase(String, List) := (dbfilename, topes) -> (
         basisIndices V; -- compute them
         isFavorable V; -- compute h11, h21, favorability.
         annotatedFaces V; -- compute annotated faces
+        automorphisms V;
         -- now write it
         F#(toString lab) = dump V;
         );
@@ -50,6 +51,30 @@ addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
         << "  " << #(keys H) << " NTFE triangulations" << endl;
         Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
         -- let's relabel these Xs
+        );
+    F := openDatabaseOut dbfilename;
+    for X in Xs do (
+        computeIntersectionNumbers X; -- this should load all of the data we want
+        F#(toString label X) = dump X;
+        );
+    close F;    
+    )
+
+addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
+    -- This version also finds "moriConeCap" which is a cone containing the actual mori cone: it is the
+    -- intersection of all mori cones coming from triangulations equivalent to the given one.
+    elapsedTime Xs := findAllCYs Q; -- TODO: check: is findALlCYs still correct.
+    << "  " << #Xs << " triangulations total" << endl;
+    if opts.NTFE then (
+        elapsedTime H := partition(restrictTriangulation, Xs);
+        << "  " << #(keys H) << " NTFE triangulations" << endl;
+        Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
+        Xs = for k in keys H list (
+            X := H#k#0;
+            setToricMoriConeCap(X, H#k);
+            X
+            )
+        -- let's relabel these Xs?
         );
     F := openDatabaseOut dbfilename;
     for X in Xs do (
@@ -95,6 +120,117 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
     close F;
     Xs
     )
+
+///
+  -- h11=4 database use, 19 June 2023.
+  -- XXX In construction
+-*
+  restart
+  needsPackage "StringTorics"
+*-
+  R = ZZ[a,b,c,d]
+  RQ = QQ (monoid R);
+  (Qs, Xs) = readCYDatabase("mike-ntfe-h11-4.dbm", Ring => R);
+  assert(#keys Qs == 1197) -- includes torsions and nonfavorables.
+  assert(#keys Xs == 1994) -- note, none of the torsion Qs are in here yet.
+  
+  peek Xs#(20,0).cache
+  ByH12 = partition(k -> hh^(1,2) Xs#k, keys Xs);
+  -- by H12 value, 1994 examples are split into 86 groups.
+  -- largest group is h12=64, at 195 in that group.
+  86 == # hashTable for x in keys ByH12 list x => #ByH12#x
+
+  -- Now let's divide by invariants to see how to separate them all.
+  debug StringTorics -- invariantsAll isn't exported!
+  elapsedTime IHall = partition(x -> elapsedTime invariantsAll x, values Xs);
+  -- 1126 different groups here.
+  assert(#keys IHall == 1126)
+  (values IHall)/(x -> #x)//tally
+  -- 723 different classes have exactly one element in them.
+  -- largest class is 51 elements.
+  -- of course, these all might be equivalent!  (Probably not, but who knows...)
+  --  Tally{1 => 723}
+            2 => 221
+            3 => 109
+            4 => 31
+            5 => 8
+            6 => 13
+            7 => 3
+            8 => 5
+            9 => 1
+            10 => 5
+            11 => 1
+            12 => 2
+            13 => 2
+            28 => 1
+            51 => 1
+  -- Now leave off inverse system invariant: get the same numbers.
+  -- How many of these can be determined to be equivalent?
+  -- Well, the 723 that are by themselves we can ignore.
+  set2 = select(values IHall, k -> #k > 1);
+  set3 = set2/(x -> (x/label//sort))
+  count = 0;
+  set4 = for Ls in set3 list (
+      << "--- doing " << count << " with " << Ls << endl;
+      count = count + 1;
+      ans := elapsedTime partitionByTopology(Ls, Xs, 15);
+      print ans;
+      ans
+      )
+  set5 = for x in set4 list (
+      for k in keys x list {k} | (x#k / first)
+      )
+  set5len = for x in set5 list (x/length)
+  #set5len
+  #select(set5len, x -> #x == 1) -- 340 of the 403 have one class.
+  -- 53 sets have 2 classes
+  --  8 sets have 3 classes
+  --  2 sets have 4 classes
+  -- so total number of topologies is likely:   723 + 340 + 53*2 + 8*3 + 2*4 = 1201
+  set6 = for x in set5 list (x/sort/first//sort)
+  set7 = sort select(set6, x -> #x > 1)
+  #set7 == 63  -- these are sets we still would like to separate by invariants of that is possible
+  -- range on number of topologies:
+  -- low end: 723 + 340 + 63 == 1126
+  --  hi end: 723 + 340 + 138 == 1201
+  for ks in set7 list netList transpose {for k in ks list factor det hessian cubicForm Xs#k}
+  for ks in set7 list netList transpose {for k in ks list factor cubicForm Xs#k}
+
+  -- Here we just play some and try to separate these
+  
+  -- Let's try to separate some of these now, and then we can try to automate it
+  -- XXX 19 June 2023.
+  (L1, F1) = (c2Form Xs#(1182,0), cubicForm Xs#(1182,0))
+  (L2, F2) = (c2Form Xs#(1183,2), cubicForm Xs#(1183,2))
+
+  (L1, F1) = (c2Form Xs#(1143,0), cubicForm Xs#(1143,0))
+  (L2, F2) = (c2Form Xs#(1145,0), cubicForm Xs#(1145,0))
+
+  (L1, F1) = (c2Form Xs#(1123,0), cubicForm Xs#(1123,0))
+  (L2, F2) = (c2Form Xs#(1124,0), cubicForm Xs#(1124,0))
+
+  (L1, F1) = (c2Form Xs#(1123,0), cubicForm Xs#(1123,0))
+  (L2, F2) = (c2Form Xs#(1124,0), cubicForm Xs#(1124,0))
+  
+  (A,phi) = genericLinearMap RQ
+  T = source phi;
+  I0 = sub(ideal last coefficients (phi sub(L1,T) - sub(L2,T)), ring A)
+  A0 = A % I0
+  phi0 = map(T,T,A0)
+  trim(I0 + sub(ideal last coefficients (phi0 sub(F1,T) - sub(F2,T)), ring A))
+
+
+  for k from 0 to #set7-1 list (
+      (lab1,lab2) = toSequence set7#k_{0,1}; -- only do the first 2.
+      I := getEquivalenceIdeal(lab1, lab2, Xs);
+      << "k = " << k << " ideal " << netList I_* << endl;
+      I
+      )
+  
+  (lab1,lab2) = toSequence set7#0_{0,1}
+  getEquivalenceIdeal(lab1,lab2, Xs)
+  getEquivalenceIdealHelper((L1,F1),(L2,F2),A,phi)
+///
     
 ///
   -- Example of construction of database for: h11=3, all h12's.

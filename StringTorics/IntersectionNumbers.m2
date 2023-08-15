@@ -50,10 +50,40 @@ intersectionNumbers = method()
 ------------------------
 
 -- toBasisIntersectionNumbers: An internal function for computeIntersectionNumbers
+-*
 toBasisIntersectionNumbers = (toricIntersectionNumbers, basIndices) -> (
     H := hashTable for i from 0 to #basIndices-1 list basIndices#i => i;
     for t in toricIntersectionNumbers list (
         if isSubset(t#0, basIndices) then t#0/(a -> H#a)//sort => t#1 else continue
+        )
+    )
+*-
+
+toBasisIntersectionNumbers = (toricIntersectionNumbers, basIndices, nonfavsHash) -> (
+    -- toricIntersectionNumbers: list of {i,j,k} => intersection number.
+    -- basIndices: list of divisors and nonfavorable divisors making up the basis for Pic X.
+    --   e.g. {0,1,2,(5,0),(5,1),(5,2)}
+    -- nonfavsHash: hashtable, keys are nonfavorable toric divisors (so integers), and the value
+    --   is the list {genus of 2-face, index of 2-face}.  This last is used to determine if two
+    --   nonfavorable toric divisors lie on the same 2-face (if not, they definitely have intersection 0).
+    -- Result: list of {i,j,k} => num, now they are all integers in the range 0..#basIndices-1.
+    --   and num is a non-zero integer.  All other triple intersections are zero.
+    allBasisDivisors := set sort unique (basIndices/(x -> if instance(x, ZZ) then x else x#0));
+    basisIndex := hashTable for i from 0 to #basIndices-1 list basIndices#i => i;
+    flatten for t in toricIntersectionNumbers list (
+        if not isSubset(t#0, allBasisDivisors) then continue else (
+            nonfavs := select(t#0, i -> nonfavsHash#?i);
+            if #nonfavs === 0 then {t#0/(a -> basisIndex#a)//sort => t#1}
+            else (
+                if nonfavs/(i -> nonfavsHash#i#1)//unique//length > 1 then continue;
+                g := nonfavsHash#(nonfavs#0)#0; -- they are all the same 2-face, so should all have the same genus.
+                for ell from 0 to g list (
+                    tnew := sort for t1 in t#0 list if nonfavsHash#?t1 then basisIndex#(t1,ell) else basisIndex#t1;
+                    if t#1 % (1+g) != 0 then error "internal error: logic is messed up here!";
+                    tnew => (t#1 // (1+g))
+                    )
+                )
+            )
         )
     )
 
@@ -97,14 +127,42 @@ computeToricIntersectionNumbers(Matrix, List) := (A, T2) -> (
 
 -- computeC2: An internal function for computeIntersectionNumbers
 computeC2 = method()
-computeC2(List, List) := (toricIntersectionNumbers, basIndices) -> (
+-- computeC2(List, List) := (toricIntersectionNumbers, basIndices) -> (
+--     topval := toricIntersectionNumbers/first/max//max;
+--     H := hashTable toricIntersectionNumbers;
+--     for a in basIndices list (
+--         -- add up all intersection numbers {a,i,j}, i<j
+--         sum flatten for i from 0 to topval list for j from i+1 to topval list (
+--             t := sort {a,i,j};
+--             if H#?t then H#t else continue
+--             )
+--         )
+--     )
+
+computeC2(List, List, HashTable) := (toricIntersectionNumbers, basIndices, nonfavsHash) -> (
     topval := toricIntersectionNumbers/first/max//max;
     H := hashTable toricIntersectionNumbers;
     for a in basIndices list (
         -- add up all intersection numbers {a,i,j}, i<j
-        sum flatten for i from 0 to topval list for j from i+1 to topval list (
-            t := sort {a,i,j};
-            if H#?t then H#t else continue
+        -- BUT: if a is (alpha,ell) is nonfavorableon 2-face with genus g, want {alpha,i,j}//(1+g)
+        if instance(a, ZZ) then (
+            sum flatten for i from 0 to topval list for j from i+1 to topval list (
+                t := sort {a,i,j};
+                if H#?t then H#t else continue
+                )
+            )
+        else (
+            -- here, a is non-favorable.
+            alpha := a#0;
+            g := nonfavsHash#alpha#0;
+            sum flatten for i from 0 to topval list for j from i+1 to topval list (
+                t := sort {alpha,i,j};
+                if H#?t then (
+                    if H#t % (1+g) != 0 then error "internal error: logic is wrong for nonfavorables";
+                    H#t // (1+g)
+                    )
+                else continue
+                )
             )
         )
     )
@@ -113,14 +171,17 @@ computeC2(List, List) := (toricIntersectionNumbers, basIndices) -> (
 computeIntersectionNumbers = method()
 computeIntersectionNumbers CalabiYauInToric := X -> (
     if not X.cache#?"toric intersection numbers" then  (
-        V := cyPolytope X;
-        basIndices := basisIndices V;
-        A := transpose matrix rays V;
+        Q := cyPolytope X;
+        basIndices := basisIndices Q;
+        A := transpose matrix rays Q;
+        nonfavs := hashTable findTwoFaceInteriorDivisors Q;
         T2 := restrictTriangulation X;
         result := computeToricIntersectionNumbers(A, T2);
         X.cache#"toric intersection numbers" = result;
-        X.cache#"intersection numbers" = toBasisIntersectionNumbers(result, basIndices);
-        X.cache#"c2" = computeC2(result, basIndices);
+        --X.cache#"intersection numbers" = toBasisIntersectionNumbers(result, Q.cache#"toric basis indices");
+        X.cache#"intersection numbers" = toBasisIntersectionNumbers(result, basIndices, nonfavs);
+        X.cache#"c2" = computeC2(result, basIndices, nonfavs);
+        --X.cache#"c2" = computeC2(result, basIndices);
         );
     --{result, toBasisIntersectionNumbers(result, basIndices)}
     )
@@ -236,13 +297,13 @@ toRingElement(List, Ring) := (f, RZ) -> (
 
 c2Form = method()
 c2Form CalabiYauInToric := RingElement => X -> (
-    RZ := X.cache#"pic ring"; -- FIXME: if not there, it should create the ring.  Need a function: picardRing?
+    RZ := picardRing X;
     ((vars RZ) * transpose matrix {c2 X})_(0,0)
     )
 
 cubicForm = method()
 cubicForm CalabiYauInToric := RingElement => X -> (
-    RZ := X.cache#"pic ring"; -- FIXME: if not there, it should create the ring.  Need a function: picardRing?
+    RZ := picardRing X;
     toRingElement(intersectionNumbers X, RZ)
     )
 

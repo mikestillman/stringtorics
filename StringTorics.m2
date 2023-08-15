@@ -76,6 +76,7 @@ export {
     -- Types defined here
     "CYPolytope", -- rename to CYReflexivePair?  How about CYPolytope?
     "CalabiYauInToric",
+    "CYToolsCY3", -- we should have a superclass for CalabiYauInToric, CYToolsCY3
     "TopologicalDataOfCY3",
 
     -- CYPolytope, CalabiYauInToric
@@ -89,6 +90,9 @@ export {
 
     "basisIndices",
     "restrictTriangulation", -- restrict triangulation to each 2-face
+    "picardRing",
+
+    "isFavorable",
 
     -- Extra polyhedral facilities, for lattice points and faces of a Polyhedron
     -- how much of this shoiuld be exported??
@@ -139,9 +143,12 @@ export {
     "cubicForm",
     "c2Form",
     "intersectionNumbersOfCY", -- possibly not for export
-    
-    -- gvInvariants
+
+    -- Cones of curves
     "toricMoriCone",
+    "toricMoriConeCap",
+        
+    -- gvInvariants
     "gvInvariants",
     "gvCone",
     "partitionGVConeByGV",
@@ -149,10 +156,20 @@ export {
 
     -- Topology
     "topologicalData",
+    "isEquivalent",
     "invariants",
     "mapIsIsomorphism",
     "partitionByTopology",
+
+    -- TopologySet's -- for determining equivalence
+    "TopologySet",
+    "topologySet",
+    "representatives",
+    "equivalences",
+    "IgnoreSingles",
+    "separateIfDifferent",
     
+        
     -- CompleteIntersectionInToric's
     "completeIntersection",
     "CompleteIntersectionInToric",
@@ -215,7 +232,8 @@ export {
     "hodgeOfCYToricDivisors",
     "h11OfCY",
     "h21OfCY",
-    "isFavorable",
+
+    
     -- new formula
     "hodgeVectorViaTheorem", -- TODO: is likely not correct currently.
     "tentativeHodgeVector", -- deprecated
@@ -239,7 +257,8 @@ export {
     "Mori",
     "Count",
     "Hodge",
-    "NTFE"
+    "NTFE",
+    "PicardRing"
     }
 
 --- kludge to access parts of the 'Core'
@@ -251,11 +270,12 @@ ReverseDictionary = value Core#"private dictionary"#"ReverseDictionary";
 -- New types -----------------------
 ------------------------------------
 
-TopologicalDataOfCY3 = new Type of HashTable
-  -- contains h11, h21, c2, cubic intersection form
+TopologicalDataOfCY3 = new Type of List
+  -- contains c2, cubic intersection form, h11, h12
 
 CYPolytope = new Type of HashTable
 CalabiYauInToric = new Type of HashTable
+CYToolsCY3 = new Type of HashTable
 
 LineBundle = new Type of HashTable
 lineBundle = method()
@@ -267,13 +287,23 @@ h11OfCY = method() -- deprecate this
 h21OfCY = method() -- deprecate this
 findAllFRSTs = method()
 
+-- Utility function
+dotProduct = method()
+dotProduct(List, List) := (v,w) -> (
+    if #v =!= #w then error "expected vectors of the same length";
+    sum for i from 0 to #v-1 list v#i * w#i
+    )
+
+
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
 load (currentFileDirectory | "StringTorics/CYPolytope.m2")
 load (currentFileDirectory | "StringTorics/CalabiYauInToric.m2")
 load (currentFileDirectory | "StringTorics/IntersectionNumbers.m2")
+load (currentFileDirectory | "StringTorics/Invariants.m2")
 load (currentFileDirectory | "StringTorics/Topology.m2")
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- has some util code, but not much.  TODO: clean that up.
 load (currentFileDirectory | "StringTorics/DatabaseCreation.m2")
+
 
   findAllConnectedStarFine = method()
   findAllConnectedStarFine Triangulation := (T) -> (
@@ -835,6 +865,9 @@ reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
 
 
 load (currentFileDirectory | "StringTorics/GVInvariants.m2")
+
+-- This file refers to many of the method names defined earlier, applied to CYToolsCY3
+load (currentFileDirectory | "StringTorics/CYTools.m2")
 
 beginDocumentation()
 

@@ -22,7 +22,8 @@ CYPolytopeCache = {
     "h21" => {value, toString, ZZ},
     "basis indices" => {value, toString, List},
     "glsm" => {value, toString, List},
-    "annotated faces" => {value, toString, List}
+    "annotated faces" => {value, toString, List},
+    "automorphisms" => {value, toString, List}
     }
 
 cyPolytope = method(Options => {ID => null})
@@ -201,6 +202,7 @@ cySetGLSM CYPolytope := Q -> (
         );
     GLSM := (D_good)^-1 * D;
     Q.cache#"basis indices" = basind;
+    Q.cache#"toric basis indices" = good;
     Q.cache#"glsm" = entries transpose GLSM;
     )
 
@@ -305,3 +307,13 @@ hh(Sequence, CYPolytope) := (pq, Q) -> (
         else 0
         )
     )
+
+automorphisms CYPolytope := Q -> (
+    if not Q.cache#?"automorphisms" then Q.cache#"automorphisms" = (
+        P := polytope(Q, "N");
+        auts := isomorphisms(P, P);
+        sort for x in auts list x#1
+        );
+    Q.cache#"automorphisms"
+    )
+
