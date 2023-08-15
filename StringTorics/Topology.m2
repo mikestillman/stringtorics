@@ -629,14 +629,7 @@ invariants List := (f) -> (
     {badp, (trim content f_0)_0, (trim content f_1)_0, #facs, d, nc, f_2, f_3}
     )
 
-allPoints = (p, n) -> (
-    -- all points in kk = ZZ//p in kk^n
-    pts := for a from 0 to p-1 list {a};
-    if n == 1 then return pts;
-    if n <= 0 then error "internal logic error";
-    b := allPoints(p, n-1);
-    flatten for a from 0 to p-1 list (b/(b1 -> prepend(a, b1)))
-    )
+
 
 pointCount = method()
 pointCount(RingElement, ZZ) := ZZ => (F, p) -> (
@@ -660,6 +653,9 @@ allPointMaps(ZZ, Ring) := (p, R) -> (
     pts := allPoints(p,N);
     for a in pts list map(K, R, a)
     )
+
+
+
 -- allPointMaps(ZZ, ZZ, Ring) := (p, n, R) -> (
 --     N := numgens R;
 --     K := GF(p,n);

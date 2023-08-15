@@ -299,6 +299,7 @@ load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
 load (currentFileDirectory | "StringTorics/CYPolytope.m2")
 load (currentFileDirectory | "StringTorics/CalabiYauInToric.m2")
 load (currentFileDirectory | "StringTorics/IntersectionNumbers.m2")
+load (currentFileDirectory | "StringTorics/Invariants.m2")
 load (currentFileDirectory | "StringTorics/Topology.m2")
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- has some util code, but not much.  TODO: clean that up.
 load (currentFileDirectory | "StringTorics/DatabaseCreation.m2")
