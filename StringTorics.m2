@@ -190,6 +190,7 @@ export {
     "readCYs",
     "readCYPolytopes",
     "combineCYDatabases",
+    "processCYPolytopes",
 
     -- Cohomology
     "toricCohomologySetup",

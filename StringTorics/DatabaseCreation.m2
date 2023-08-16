@@ -65,7 +65,34 @@ addToCYDatabase(String, KSEntry) := CYPolytope => opts -> (dbfilename, ks) -> (
     Q
     )
 
+processCYPolytopes = method()
+processCYPolytopes(String, ZZ, Sequence) := (dbfilenamePrefix, h11, lohi) -> (
+    elapsedTime topes := kreuzerSkarke(h11, Limit => 200000);
+    mytopes := take(topes, toList lohi);
+    dbname := dbfilenamePrefix | "-" | lohi#0 | "-" | lohi#1 | ".dbm";
+    elapsedTime createCYDatabase(dbname, mytopes);
+    )
+
+--addToCYDatabase = method(Options => {NTFE => false})
+
 -- This only adds the CY's coming from Q.
+addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
+    elapsedTime Xs := findAllCYs Q; -- TODO: check: is findALlCYs still correct.
+    << "  " << #Xs << " triangulations total" << endl;
+    if opts.NTFE then (
+        elapsedTime H := partition(restrictTriangulation, Xs);
+        << "  " << #(keys H) << " NTFE triangulations" << endl;
+        Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
+        -- let's relabel these Xs
+        );
+    F := openDatabaseOut dbfilename;
+    for X in Xs do (
+        computeIntersectionNumbers X; -- this should load all of the data we want
+        F#(toString label X) = dump X;
+        );
+    close F;    
+    )
+
 addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
     -- This version also finds "moriConeCap" which is a cone containing the actual mori cone: it is the
     -- intersection of all mori cones coming from triangulations equivalent to the given one.

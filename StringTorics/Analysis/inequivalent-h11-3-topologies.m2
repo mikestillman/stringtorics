@@ -6,16 +6,12 @@
 
 restart
 debug needsPackage "StringTorics" -- the debug is because some functions are not yet exported.
-  -- list of these functions:
-  
---DB3 = "../Databases/test2-cys-ntfe-h11-3.dbm"
---DB3 = "../StringTorics/Databases/test2-cys-ntfe-h11-3.dbm"
 DB3 = "../Databases/cys-ntfe-h11-3.dbm"
 
 R = ZZ[a,b,c]
 RZ = R
 RQ = QQ (monoid R);
-(Qs, Xs) = readCYDatabase(DB3, Ring => R);
+elapsedTime (Qs, Xs) = readCYDatabase(DB3, Ring => R);
 
 -- We collect the nontorsion, torsion, favorable, nonfavorable's.
    torsions = for k in keys Qs list (
