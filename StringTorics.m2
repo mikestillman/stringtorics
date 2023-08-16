@@ -87,7 +87,17 @@ export {
     
     "cyData",
     "makeCY",
-
+    "calabiYau", -- versions might include:
+       -- calabiYau(CYPolytope, Triangulation, Ring => RZ, Label => (a,i))
+       -- The following are all taking the CY3 from a database:
+       -- all take Ring as optional argument.
+       -- calabiYau(String, CYPolytope, Label) -- from database, given Q
+       -- calabiYau(String, Label) -- from database, uses Q from same database.
+       -- calabiYau(String, Function, Label) -- from database, uses Q from same database.
+       -- calabiYau(Database, CYPolytope, Label) -- from database, given Q.
+       -- calabiYau(Database, Label) -- from database, uses Q from same database.
+       -- calabiYau(Database, Function, Label) -- takes Q from Function, label.
+       
     "basisIndices",
     "restrictTriangulation", -- restrict triangulation to each 2-face
     "picardRing",

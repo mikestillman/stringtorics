@@ -234,6 +234,39 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
     Xs
     )
 
+cyPolytope(String, ZZ) := CYPolytope => opts -> (dbfilename, topeid) -> (
+    F := openDatabase dbfilename;
+    Q := cyPolytope(F, topeid, opts);
+    close F;
+    Q
+    )
+
+cyPolytope(Database, ZZ) := CYPolytope => opts -> (db, topeid) -> (
+    k := toString topeid;
+    if not db#?k then error("polytope with label "|k|" does not exist");
+    cyPolytope(db#k, opts)
+    )
+
+-- Check: this is not quite correct.
+calabiYau(Database, CYPolytope, Sequence) := CalabiYauInToric => opts -> (db, Q, lab) -> (
+    -- lab should be (polytopelab, triangulationlabel).
+    -- polytopelab should match label of Q.
+    if first lab =!= label Q then error "incorrect label";
+    k := toString lab;
+    if not db#?k then error("polytope with label "|k|" does not exist");
+    calabiYau(db#k, Q, opts)
+    )
+
+calabiYau(Database, Sequence) := CalabiYauInToric => opts -> (db, lab) -> (
+    -- lab should be (polytopelab, triangulationlabel).
+    -- first creates CYPolytope, and then CalabiYauInToric.
+    if #lab < 2 then error "expected well-formed label";
+    Q := cyPolytope(db, first lab);
+    k := toString lab;
+    if not db#?k then error("CY with label "|k|" does not exist");
+    calabiYau(db#k, Q, opts)
+    )
+
 ///
   -- h11=4 database use, 19 June 2023.
   -- XXX In construction
