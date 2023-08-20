@@ -74,7 +74,8 @@ cyData(CYPolytope, List) := opts -> (Q, triang) -> calabiYau(Q, triang, opts)
 picardRing = method()
 picardRing CalabiYauInToric := X -> X.cache.PicardRing
 
-cyData(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
+cyData(String, Function) :=
+calabiYau(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
     -- F is a function which takes an id of a CYPolytope and returns the CYPolytope
     -- The string is the value taken from a CY database .
     L := lines str;

@@ -161,6 +161,7 @@ export {
         
     -- gvInvariants
     "gvInvariants",
+    "gvRay",
     "gvCone",
     "partitionGVConeByGV",
     "findLinearMaps",

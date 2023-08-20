@@ -1604,4 +1604,42 @@ TEST ///
   -- TODO: add tests for line bundles on X, and their cohomology.
 ///
 
+TEST ///
+-*
+  restart
+  needsPackage "StringTorics"
+*-  
+  -- Testing interface for calabiYau, cyPolytope, in presence of databases.
+  DB = "Databases/cys-ntfe-h11-5.dbm"  
+  RZ = ZZ[x_0..x_4]
+  --elapsedTime (Qs, Xs) = readCYDatabase(DB, Ring => RZ); -- takes 13 seconds.
+  --# sort keys Xs == 13635
+  
+  -- reading examples direcly from the database
+  db = openDatabase DB
+  # sort keys db === 18625
+  X = calabiYau(db, (4782,0), Ring => RZ)
+  close db
+  Q = cyPolytope X
+  peek Q.cache
+  netList annotatedFaces cyPolytope X
 
+  Q = cyPolytope(DB, 4782)
+
+  db = openDatabase DB
+  Xlabs = select(keys db, lab -> (lab = value lab; instance(lab, Sequence) and lab#0 == 4510))
+  Xlabs = Xlabs/value
+  close db
+  X1 = calabiYau(DB, Xlabs#0, Ring => RZ)
+  X1' = calabiYau(DB, Xlabs#0, Ring => RZ)
+  X1 === X1'
+  cyPolytope X1 === cyPolytope X1'
+
+  Q = cyPolytope X1
+  X2 = calabiYau(DB, Xlabs#1, Ring => RZ)
+  Q2 = cyPolytope X2
+  Q === Q2
+  assert(Q.cache === Q2.cache)
+  automorphisms Q
+  netList restrictTriangulation X,  netList restrictTriangulation X2
+///
