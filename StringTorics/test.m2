@@ -18,7 +18,16 @@ TEST ///
   Q = cyPolytope(tope, ID => 40)  
   assert isFavorable Q
   basisIndices Q
+  Q.cache#"toric basis indices"
+  Q.cache#"basis indices"
   transpose matrix degrees Q
+  X = makeCY Q
+  toricIntersectionNumbers X
+  intersectionNumbers X
+  assert(c2 X === {-4, 10, 12, 10, 18, 0, 10})
+  cubicForm X
+  c2Form X
+  assert(ring cubicForm X === ring c2Form X)
 
   nonfavTope = KSEntry "4 7  M:28 7 N:11 7 H:7,27 [-40] id:9
    1   0   3   0  -1  -3  -6
@@ -32,10 +41,12 @@ TEST ///
   assert(hh^(1,1) Q2 == 7)
   assert(hh^(1,2) Q2 == 27)
   -- the following will need to change...
-  basisIndices Q2
-  (basisIndices Q2)/(x -> if instance(x, ZZ) then x else x#0)//unique//sort
+  assert(basisIndices Q2 === {0, 1, 2, 3, 4, (9, 0), (9, 1)}) -- this could change if the algorithm changes.
+  Q2.cache#"toric basis indices" === {0, 1, 2, 3, 4, 9}
+  findTwoFaceInteriorDivisors Q2
   netList annotatedFaces Q2
-  rays Q2 === {{-1, -1, 1, -1}, 
+  assert(
+      rays Q2 === {{-1, -1, 1, -1}, 
       {-1, -1, 1, 1}, 
       {-1, -1, 2, -1}, 
       {-1, 0, 1, -1}, 
@@ -45,12 +56,22 @@ TEST ///
       {-1, -1, 1, 0}, 
       {1, -1, 0, 0}, 
       {-1, 1, 0, 0}}
+      )
   Xs = findAllCYs Q2; -- what if I only want the NTFE ones?  FIX.
+  #Xs
+  (netList toricIntersectionNumbers Xs#0, netList intersectionNumbers Xs#0)
+  c2 Xs#0 -- fix me
+  intersectionNumbers Xs#0 -- fix me
+  ring cubicForm Xs#0 === ring c2Form Xs#0
+  c2Form Xs#0
+  
   vertices polytope(Q2, "M")
   vertices polytope(Q2, "N") -- notice these are NOT in the order of the rays of Q2!
   transpose matrix degrees Q2
   
   transpose matrix rays Q2
+  
+  cubicForm Xs#0
 ///
 
 ///
@@ -73,7 +94,7 @@ TEST ///
   aX = abstractVariety(X, base(a,b,c,d,e))
   intersectionRing aX -- defines integral.
   intersectionRing V -- defines integral.
-  topX = topologicalData(X, RZ)
+  topX = topologicalData X
   cubicForm topX
   isFavorable cyPolytope X
   
@@ -1497,7 +1518,9 @@ TEST ///
   topes = kreuzerSkarke(3, Limit => 50);    
   Q = cyPolytope(topes_30, ID => 30)
   Ts = findAllFRSTs Q
-  Xs = for i from 0 to #Ts-1 list cyData(Q, Ts#i, ID => i)
+  RZ = ZZ[a,b,c]
+  Xs = for i from 0 to #Ts-1 list cyData(Q, Ts#i, ID => i, Ring => RZ)
+  assert(#Xs == #Ts)
   vertices polytope Q
   label Q
   assert((for X in Xs list label X) === {(30, 0), (30, 1)})
@@ -1513,7 +1536,7 @@ TEST ///
   assert(hh^(1,1) X == 3)
   assert(hh^(1,2) X == 69)
 
-  elapsedTime T = topologicalData(X, ZZ[a,b,c])
+  elapsedTime T = topologicalData X
   hh^(1,1) T
   hh^(1,2) T
 
@@ -1522,6 +1545,7 @@ TEST ///
   partitionGVConeByGV(X, DegreeLimit => 40)
   hilbertBasis gvCone(X, DegreeLimit => 20)
   gv = gvInvariants(X, DegreeLimit => 30);
+  
 ///  
 
 
@@ -1549,12 +1573,13 @@ TEST ///
   dump cyPolytope X
   elapsedTime restrictTriangulation X
 
-  dim X  
+  assert(dim X  == 3)
+  assert isFavorable X
   rays X
   max X
   V = ambient X -- give the normal toric variety.  Works now, sort of. Problems though: TODO: cache it, allow options? degrees might be different...
-  rays V === rays X
-  max V === max X
+  assert(rays V === rays X)
+  assert(max V === max X)
   
   intersectionNumbers X  
   toricIntersectionNumbers X
@@ -1562,7 +1587,7 @@ TEST ///
   cubicForm X
   c2Form X
       
-  elapsedTime topologicalData(X, RZ) -- cache this result?
+  elapsedTime topologicalData X -- cache this result?
   
   ambient X -- give the normal toric variety.  Works now.
   aX = abstractVariety X -- give the abstract variety.  -- TODO: should stash the value...?
@@ -1579,4 +1604,42 @@ TEST ///
   -- TODO: add tests for line bundles on X, and their cohomology.
 ///
 
+TEST ///
+-*
+  restart
+  needsPackage "StringTorics"
+*-  
+  -- Testing interface for calabiYau, cyPolytope, in presence of databases.
+  DB = "Databases/cys-ntfe-h11-5.dbm"  
+  RZ = ZZ[x_0..x_4]
+  --elapsedTime (Qs, Xs) = readCYDatabase(DB, Ring => RZ); -- takes 13 seconds.
+  --# sort keys Xs == 13635
+  
+  -- reading examples direcly from the database
+  db = openDatabase DB
+  # sort keys db === 18625
+  X = calabiYau(db, (4782,0), Ring => RZ)
+  close db
+  Q = cyPolytope X
+  peek Q.cache
+  netList annotatedFaces cyPolytope X
 
+  Q = cyPolytope(DB, 4782)
+
+  db = openDatabase DB
+  Xlabs = select(keys db, lab -> (lab = value lab; instance(lab, Sequence) and lab#0 == 4510))
+  Xlabs = Xlabs/value
+  close db
+  X1 = calabiYau(DB, Xlabs#0, Ring => RZ)
+  X1' = calabiYau(DB, Xlabs#0, Ring => RZ)
+  X1 === X1'
+  cyPolytope X1 === cyPolytope X1'
+
+  Q = cyPolytope X1
+  X2 = calabiYau(DB, Xlabs#1, Ring => RZ)
+  Q2 = cyPolytope X2
+  Q === Q2
+  assert(Q.cache === Q2.cache)
+  automorphisms Q
+  netList restrictTriangulation X,  netList restrictTriangulation X2
+///

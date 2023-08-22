@@ -3,50 +3,127 @@
 -- (this appears to be equivalent to being diffeomorphic).
 
 topologicalData = method()
+-- topologicalData CalabiYauInToric := TopologicalDataOfCY3 => X -> (
+--     -- TODO: this does not consider torision in H_2(X, ZZ) or H_3(X, ZZ)
+--     << "calling topologicalData" << endl;
+--     elapsedTime new TopologicalDataOfCY3 from {
+--         "h11" => hh^(1,1) cyPolytope X,
+--         "h21" => hh^(2,1) cyPolytope X,
+--         "c2" => c2 X,
+--         "intersection numbers" => intersectionNumbers X
+--         }
+--     )
+
 topologicalData CalabiYauInToric := TopologicalDataOfCY3 => X -> (
     -- TODO: this does not consider torision in H_2(X, ZZ) or H_3(X, ZZ)
-    elapsedTime new TopologicalDataOfCY3 from {
-        "h11" => hh^(1,1) cyPolytope X,
-        "h21" => hh^(2,1) cyPolytope X,
-        "c2" => c2 X,
-        "intersection numbers" => intersectionNumbers X
+    new TopologicalDataOfCY3 from {
+        c2Form X,
+        cubicForm X,
+        hh^(1,1) X,
+        hh^(1,2) X
         }
     )
+    -- << "calling topologicalData" << endl;
+    -- elapsedTime new TopologicalDataOfCY3 from {
+    --     "h11" => hh^(1,1) cyPolytope X,
+    --     "h21" => hh^(2,1) cyPolytope X,
+    --     "c2" => c2 X,
+    --     "intersection numbers" => intersectionNumbers X
+    --     }
+    -- )
 
 
 -- this is the older, alternate version of this function.
 -- this is to be removed.
-topologicalData(CalabiYauInToric, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
-    V := ambient X;
-    Q := X#"polytope data";
-    P := polytope Q;
-    data := elapsedTime topologyOfCY3(V, basisIndices X);
-    -- this data above computes intersection numbers for all toric divisors. 
-    -- So we consider only the ones whose indices are contained in basis indices:
-    new TopologicalDataOfCY3 from {
-        "h11" => elapsedTime hh^(1,1) Q,
-        "h21" => elapsedTime hh^(2,1) Q,
-        "c2" => sub(data_3, vars RZ),
-        "cubic intersection form" => sub(data_2, vars RZ)
-        }
+-- topologicalData(CalabiYauInToric, Ring) := TopologicalDataOfCY3 => (X, RZ) -> (
+--     V := ambient X;
+--     Q := X#"polytope data";
+--     P := polytope Q;
+--     data := elapsedTime topologyOfCY3(V, basisIndices X);
+--     -- this data above computes intersection numbers for all toric divisors. 
+--     -- So we consider only the ones whose indices are contained in basis indices:
+--     new TopologicalDataOfCY3 from {
+--         "h11" => elapsedTime hh^(1,1) Q,
+--         "h21" => elapsedTime hh^(2,1) Q,
+--         "c2" => sub(data_3, vars RZ),
+--         "cubic intersection form" => sub(data_2, vars RZ)
+--         }
+--     )
+
+isEquivalent = method()
+isEquivalent(Sequence, Sequence, Matrix) := Boolean => (LF1, LF2, A) -> (
+    (L1,F1) := LF1;
+    (L2,F2) := LF2;
+    R := ring L1;
+    if R =!= ring F1 or R =!= ring L2 or R =!= ring F2 then 
+        error "excepted c2 and cubic forms to be in the same ring";
+    phi := map(R, R, A);
+    phi L1 == L2 and phi F1 == F2
+    )
+isEquivalent(CalabiYauInToric, CalabiYauInToric, Matrix) := Boolean => (X1, X2, A) -> (
+    -- X1, X2 are CalabiYauInToric's (of the same h11 = h11(X1) = h11(X2)).
+    -- A is an h11 x h11 matrix over ZZ, with determinant 1 or -1.
+    -- if the topological data of X1, X2 are equivalent via A, then true is returned.
+    if hh^(1,2) X1 =!= hh^(1,2) X2 then return false;
+    if hh^(1,1) X1 =!= hh^(1,1) X2 then return false;
+    LF1 := (c2Form X1, cubicForm X1);
+    LF2 := (c2Form X2, cubicForm X2);
+    isEquivalent(LF1, LF2, A)
     )
 
 ------------------------------------
 -- Separating a set of topologies --
 ------------------------------------
+-- This takes a set of labels (and matrices defining equivalences)
+-- "Sets" field: is a list of buckets.  Two topologies in different buckets are definitely not the same.
+-- Each bucket is a list of lists.
+--   Two topologies in one element of this list are definitely the same.
+--   Two topologies in different elements of this list are possibly the same possibly different.
 -- two types of routines:
---  separate
---  combine (takes a TopologySet or a list, and combines ones that are the same
+--  separate: this will only create new number of buckets (by separating buckets which are there.
+--  combine: this will only coalesce sets in any given bucket.
 --     (adding in matrices that show this).
---     note: if two sets are combined, we need to multiply all the matrices of one set by the new change of basis matrix.
+--     note: TODO: if two sets are combined, we need to multiply all the matrices of one set by the new change of basis matrix.
 TopologySet = new Type of MutableHashTable
 
+-- TODO XXX: T#"Sets"#i is a list of {lab, {lab2, map2}, {lab3,map3}, ...}
+--           mapj is a matrix over the integers of size h11 x h11.
 topologySet = method()
 topologySet(List, HashTable) := TopologySet => (labels, Xs) -> (
     new TopologySet from {
         "Sets" => {for k in labels list {k}},
         "CYHash" => Xs
         }
+    )
+
+info TopologySet := T -> (
+    << "Total number of objects considered:         " << T#"Sets"/(x -> (x/length//sum))//sum << endl;
+    << "Number of known different topologies:       " << #T#"Sets" << endl;
+    << "Maximum possible # of different topologies: " <<  T#"Sets"/(x -> length x)//sum << endl;
+    << "Largest number in one set:                  " << T#"Sets"/(x -> (x/length//max))//max << endl;
+    t := T#"Sets"/length//tally;
+    for i in keys t do (
+        if i == 1 then 
+            << "  Number of buckets with 1 class           " << t#1 << endl
+        else 
+            << "  Number of buckets with "|i|" classes         " << t#i << endl;
+            );
+    -- bigones := for i in keys t list if i >= 10 then t#i else continue;
+    -- if #bigones > 0 then
+    --   << "  Number of buckets with >= 10 classes     " << sum bigones << endl;
+    )
+
+representatives = method(Options => {IgnoreSingles => true})
+representatives TopologySet := opts -> T -> (
+    -- NOTE: ignores those with only one class in a bucket!
+    sort for t1 in T#"Sets" list if opts.IgnoreSingles and #t1 == 1 then continue else t1/first//sort
+    )
+equivalences = method(Options => {IgnoreSingles => true})
+equivalences TopologySet := opts -> T -> (
+    hashTable flatten for t1 in T#"Sets" list for t2 in t1 list (
+        if #t2 == 1 and opts.IgnoreSingles then continue;
+        (first t2) => drop(t2, 1)
+        )
     )
 
 separateIfDifferent = method()
@@ -78,6 +155,7 @@ combineIfSame(TopologySet, Function) := (T, fun) -> (
         -- L is a list of labels, all are equivalent (so maybe only one, but always >= 1).
         P := partition(lab -> fun Xs#(first lab), L);
         (values P)/flatten
+        -- TODO XXX: the previous line should add in identity maps
         );
     new TopologySet from {
         "Sets" => newsets,
@@ -85,20 +163,51 @@ combineIfSame(TopologySet, Function) := (T, fun) -> (
         }
     )
 
-separateByGV = method()
-separateByGV TopologySet := T -> (
+-- REMOVE THIS ONE: use combineByGV...
+separateByGV = method(Options => {DegreeLimit => 15})
+-- separateByGV TopologySet := opts -> T -> (
+--     Xs := T#"CYHash";
+--     newSets := for Ls in T#"Sets" list (
+--         L1s := Ls/first; -- these are the ones we want to split up
+--         Indices := hashTable for i from 0 to #Ls-1 list first Ls#i => i;
+--         << "----------------" << endl;
+--         print L1s;
+--         print Indices;
+--         << "----------------" << endl;
+--         P := partitionByTopology(L1s, Xs, opts.DegreeLimit);
+--         newlist := for k in keys P list {k}|(P#k);
+--         newlist
+--         -- what is the best way to get the ones that are the same into the same set?
+--         );
+--     new TopologySet from {
+--         "CYHash" => Xs,
+--         "Sets" => newSets
+--         }
+--     )
+
+combineBucketByGV = method(Options => {DegreeLimit => 15})
+combineBucketByGV(List, HashTable) := opts -> (Ls, Xs) -> (
+    if #Ls === 1 then Ls
+    else (
+        L1s := Ls/first; -- these are the ones we want to split up
+        L1rest := hashTable for L in Ls list (
+            {first L, drop(L, 1)}
+            );
+        -- print L1s;
+        -- << "----------------" << endl;
+        P := partitionByTopology(L1s, Xs, opts.DegreeLimit);
+        newlist := for k in keys P list (
+            {k} | P#k | L1rest#k | flatten for x in P#k list L1rest#(first x)
+            );
+--        if #(keys P) > 1 then error "debug me";
+        newlist
+    ))
+
+combineByGV = method(Options => {DegreeLimit => 15})
+combineByGV TopologySet := opts -> T -> (
     Xs := T#"CYHash";
     newSets := for Ls in T#"Sets" list (
-        L1s := Ls/first; -- these are the ones we want to split up
-        Indices := hashTable for i from 0 to #Ls-1 list first Ls#i => i;
-        << "----------------" << endl;
-        print L1s;
-        print Indices;
-        << "----------------" << endl;
-        P := partitionByTopology(L1s, Xs, 15);
-        newlist := for k in keys P list {k}|(P#k);
-        newlist
-        -- what is the best way to get the ones that are the same into the same set?
+        combineBucketByGV(Ls, Xs, DegreeLimit => opts.DegreeLimit)
         );
     new TopologySet from {
         "CYHash" => Xs,
@@ -106,57 +215,190 @@ separateByGV TopologySet := T -> (
         }
     )
 
-combineSet = (Ls, binfun) -> (
-    -- binfun(X1,X2) should return a matrix if these are the same topology, null if we don't know.
-    -- note: the number of newsets is identical.  We might just be coalescing elements in one set.
-    -- NOTE: currently the matrix is lost, we need to be able to keep it!
-    upnode := new MutableList from 0..#Ls-1;
-    nodesize := new MutableList from (#Ls : 1);
-    find := x -> (
-        root := x;
-        while upnode#root != root do root = upnode#root;
-        while upnode#x != root do (
-            par := upnode#x;
-            upnode#x = root; 
-            x = par;
-            );
-        root
-        );
-    union := (x,y) -> (
-        x = find x;
-        y = find y;
-        if x === y then return;
-        if nodesize#x  < nodesize#y then (
-            (x,y) = (y,x);
-            );
-        upnode#y = x;
-        nodesize#x = nodesize#x + nodesize#y;
-        nodesize#y = 0;
-        );
-    for i from 0 to #Ls - 2 do 
-      for j from i+1 to #Ls - 1 do (
-          aij := binfun(Ls#i,Ls#j);
-          if aij =!= null then union(i,j);
-          );
-    P := partition(x -> find x, toList(0..#Ls-1));
-    for p in values P list (for p1 in p list Ls#p1)
+
+findMapsFROMBELOW = (top1, top2, A, phi, RQ) -> (
+    TR := target phi;
+    n := numgens TR;
+    T := coefficientRing TR;
+    toTR := f -> sub(f, TR);
+    toQQ := f -> sub(f, RQ);
+    evalphi := (F,G) -> trim sub(ideal last coefficients((phi toTR F) - toTR G), T);
+    (L1, F1, h11, h12) := toSequence top1;
+    (L2, F2, l11, l12) := toSequence top2;    
+    RZ := ring L1;
+    if RZ =!= ring F1 or RZ =!= ring L2 or RZ =!= ring F2 then error "expected polynomials over the same ring";
+    if h11 != l11 or h12 != l12 then return null;
+    I := (evalphi(L1, L2) + evalphi(F1, F2));
+    if I == 1 then return null;
+    -- first see if there is a unique solution.
+    -- if codim I === n*n and degree I === 1 then (
+    --     A0 := A % I;
+    --     if support A0 === {} then (
+    --         A0 = lift(A0, QQ);
+    --         phi0 := map(RQ, RQ, transpose A0);
+    --         if phi0 toQQ L1 != toQQ L2 or phi0 toQQ F1 != toQQ F2 then error "map is not correct!";
+    --         return (A0, phi0)
+    --         );
+    --     );
+    -- now let's look through all of the components for a smooth point.
+    compsI := decompose I;
+    As := for c in compsI list A % c;
+    As = for a in As list try lift(a, ZZ) else continue; -- grab the ones that lift.
+    As = select(As, a -> (d := det a; d == 1 or d == -1));
+    if #As > 0 then (
+        A0 := As#0;
+        phi0 := map(RZ, RZ, transpose A0);
+        if phi0 L1 != L2 or phi0 F1 != F2 then error "map is not correct!";
+        (A0, phi0)
+        )
+    else (
+        if any(compsI, c -> codim c < n*n or degree c =!= 1) then (
+            << "warning: there might be a map in this case!" << endl;
+            << netList compsI << endl;
+            << "----------------------------------" << endl;
+            compsI 
+            )
+        else null
+        )
     )
 
-doit = (T) -> (
-    Xs := T#"CYHash";
-    combineSet((T#"Sets"#0), (lab1,lab2) -> (
-            X1 := Xs#(first lab1);
-            X2 := Xs#(first lab2);
-            c2Form X1 == c2Form X2 and cubicForm X1 == cubicForm X2
-            ))
+separateAndCombineViaAnsatz = method()
+separateAndCombineViaAnsatz(TopologySet, HashTable, Ring) := TopologySet => (tops, Ts, RQ) -> (
+    )
+separateAndCombineViaAnsatz(List, HashTable, Ring) := List => (Ls, Ts, RQ) -> (
+    -- Ls: is a list of labels.
+    -- Ts: is a hash table containing for each lab in labels, the (c2, cubic, h11, h12) of Xs#lab.
+    -- restL#lab is a list of either pairs: {lab, matrix}, or of simply: labels.
+    -- RQ is QQ[h11 variables].
+    -- Result: list of distinct topologies found, and in each list: each element is a list of equivalent topologies.
+    (A, phi) := genericLinearMap RQ;
+    if #Ls === 1 then return Ls;
+    distinctTops := new MutableHashTable; -- label => list of {label, matrix}, those with the same topology
+    for i in Ls do (
+        Ti := Ts#i;
+        prev := keys distinctTops;
+        isFound := false;
+        for j in prev do (
+            Tj := Ts#j;
+            ans := findMaps(Tj, Ti, A, phi, RQ); -- either a matrix of integers or null, or "unknown"
+            if ans === null then (
+                -- Ti is distinct from Tj
+                )
+            else if class first ans === Matrix then (
+                -- we have a match!
+                (A0, phi0) := ans;
+                -- The following seems to be a redundant check!
+                if all(flatten entries A0, a -> liftable(a, ZZ))
+                then (
+                    isFound = true;
+                    distinctTops#j = append(distinctTops#j, {i, lift(A0, ZZ)});
+                    break;
+                    )
+                )
+            else (
+                << (i,j) << " might be the same, might not *** " << endl;
+                )
+            );
+        if not isFound then (
+            distinctTops#i = {};
+            << "found new top: " << i << endl;
+            );
+        );
+    -- take distinctTops, so something with them....
     )
 
-info TopologySet := T -> (
-    << "Total number of objects considered:         " << T#"Sets"/(x -> (x/length//sum))//sum << endl;
-    << "Number of known different topologies:       " << #T#"Sets" << endl;
-    << "Maximum possible # of different topologies: " <<  T#"Sets"/(x -> length x)//sum << endl;
-    << "Largest number in one set:                  " << T#"Sets"/(x -> (x/length//max))//max << endl;
-    )
+-- partitionH113sByTopology(List, HashTable, Ring) := HashTable => (Ls, Ts, RQ) -> (
+--     -- Ls is a list of labels to separate.
+--     -- Ts is a hash table of label => {c2, cubicform, h11, h12}
+--     -- This function first separates these by the invariants: invariantsAll.
+--     -- The for each pair in each set, it attempts to find a map between them.
+--     -- output: a hashtable, keys are labels, values are lists of {label, matrix}
+--     (A, phi) := genericLinearMap RQ;
+--     if #Ls === 1 then return hashTable {Ls#0 => {}};
+--     H := partition(lab -> invariantsAll toSequence Ts#lab, Ls);
+--     distinctTops := new MutableHashTable; -- label => list of {label, matrix}, those with the same topology
+--     for i in Ls do (
+--         Ti := Ts#i;
+--         -- now we attempt to match this with each key of distinctTops
+--         << "trying " << i << endl;
+--         prev := keys distinctTops;
+--         isFound := false;
+--         for j in prev do (
+--             Tj := Ts#j;
+--             ans := findMaps(Tj, Ti, A, phi, RQ);
+--             --if j == (115,0) and i == (120,0) then error "debug me";
+--             if ans === null then (
+--                 -- Ti is distinct from Tj
+--                 )
+--             else if class first ans === Matrix then (
+--                 -- we have a match!
+--                 (A0, phi0) := ans;
+--                 if all(flatten entries A0, a -> liftable(a, ZZ))
+--                 then (
+--                     isFound = true;
+--                     distinctTops#j = append(distinctTops#j, {i, lift(A0, ZZ)});
+--                     break;
+--                     )
+--                 )
+--             else (
+--                 << (i,j) << " might be the same, might not" << endl;
+--                 )
+--             );
+--         if not isFound then (
+--             distinctTops#i = {};
+--             << "found new top: " << i << endl;
+--             );
+--         );
+--     new HashTable from distinctTops
+--     )
+
+
+-- REMOVE?  This is the start of a union-find algorithm.  But we are not using it, I think.
+-- combineSet = (Ls, binfun) -> (
+--     -- binfun(X1,X2) should return a matrix if these are the same topology, null if we don't know.
+--     -- note: the number of newsets is identical.  We might just be coalescing elements in one set.
+--     -- NOTE: currently the matrix is lost, we need to be able to keep it!
+--     upnode := new MutableList from 0..#Ls-1;
+--     nodesize := new MutableList from (#Ls : 1);
+--     find := x -> (
+--         root := x;
+--         while upnode#root != root do root = upnode#root;
+--         while upnode#x != root do (
+--             par := upnode#x;
+--             upnode#x = root; 
+--             x = par;
+--             );
+--         root
+--         );
+--     union := (x,y) -> (
+--         x = find x;
+--         y = find y;
+--         if x === y then return;
+--         if nodesize#x  < nodesize#y then (
+--             (x,y) = (y,x);
+--             );
+--         upnode#y = x;
+--         nodesize#x = nodesize#x + nodesize#y;
+--         nodesize#y = 0;
+--         );
+--     for i from 0 to #Ls - 2 do 
+--       for j from i+1 to #Ls - 1 do (
+--           aij := binfun(Ls#i,Ls#j);
+--           if aij =!= null then union(i,j);
+--           );
+--     P := partition(x -> find x, toList(0..#Ls-1));
+--     for p in values P list (for p1 in p list Ls#p1)
+--     )
+
+-- doit = (T) -> (
+--     Xs := T#"CYHash";
+--     combineSet((T#"Sets"#0), (lab1,lab2) -> (
+--             X1 := Xs#(first lab1);
+--             X2 := Xs#(first lab2);
+--             c2Form X1 == c2Form X2 and cubicForm X1 == cubicForm X2
+--             ))
+--     )
+
 
 ///
   -- Analyze h11=3 examples
@@ -349,19 +591,19 @@ debug needsPackage "StringTorics"
       LF2' := LF2/(f -> sub(f, T));
       I0 := sub(ideal last coefficients(phi LF1'_0 - LF2'_0), B);
       A0 := A % I0;
-      phi0 := map(T, T, A0);
+      phi0 := map(T, T, transpose A0);
       trim(I0 + sub(ideal last coefficients (phi0 LF1'_1 - LF2'_1), B))
       )
 
   getEquivalenceIdeal = method()
-  getEquivalenceIdeal(Thing, Thing, HashTable) := Ideal => (lab1, lab2, Xs) -> (
+  getEquivalenceIdeal(Thing, Thing, HashTable) := Sequence => (lab1, lab2, Xs) -> (
       X1 := Xs#lab1;
       X2 := Xs#lab2;
       LF1 := (c2Form X1, cubicForm X1);
       LF2 := (c2Form X2, cubicForm X2);
       RQ := QQ (monoid ring LF1_0);
       (A,phi) := genericLinearMap RQ;
-      getEquivalenceIdealHelper(LF1, LF2, A, phi)
+      (getEquivalenceIdealHelper(LF1, LF2, A, phi), A)
       )
 
 ------------------------------------
@@ -387,14 +629,7 @@ invariants List := (f) -> (
     {badp, (trim content f_0)_0, (trim content f_1)_0, #facs, d, nc, f_2, f_3}
     )
 
-allPoints = (p, n) -> (
-    -- all points in kk = ZZ//p in kk^n
-    pts := for a from 0 to p-1 list {a};
-    if n == 1 then return pts;
-    if n <= 0 then error "internal logic error";
-    b := allPoints(p, n-1);
-    flatten for a from 0 to p-1 list (b/(b1 -> prepend(a, b1)))
-    )
+
 
 pointCount = method()
 pointCount(RingElement, ZZ) := ZZ => (F, p) -> (
@@ -410,6 +645,41 @@ pointCount(RingElement, ZZ) := ZZ => (F, p) -> (
     --if ans1 != ans2 then << "My previous code was incorrect" << endl;
     ans1
     )
+
+allPointMaps = method()
+allPointMaps(ZZ, Ring) := (p, R) -> (
+    N := numgens R;
+    K := ZZ/p;
+    pts := allPoints(p,N);
+    for a in pts list map(K, R, a)
+    )
+
+
+
+-- allPointMaps(ZZ, ZZ, Ring) := (p, n, R) -> (
+--     N := numgens R;
+--     K := GF(p,n);
+--     pts := allPoints(p,N);
+--     for a in pts list map(K, R, a)
+--     )
+
+-- pointCount = method()
+-- pointCount(RingElement, RingElement, List) := ZZ => (L, F, pts) -> (
+--     -- pts is a list of list of ring maps
+--     --   each list is generally all of the points in k^N, for k = ZZ/p, p = 2,3,5,7,11,13, maybe k = GF 4, ...
+    
+--     -- F is a polynomial in 3 variables (FIXME: any number of variables)
+--     -- p is a prime number
+--     kk := ZZ/p;
+--     R := kk (monoid ring F);
+--     Fp := sub(F, R);
+--     allpts := allPoints(p, numgens ring F);
+--     allmaps := allpts/(pt -> map(kk, R, pt));
+--     ans1 := # for a in allpts list (phi := map(kk, R, a); if phi Fp == 0 then a else continue);
+--     --ans2 := # for x in (0,0,0)..(p-1,p-1,p-1) list if sub(Fp, matrix{{x}}) == 0 then x else continue;
+--     --if ans1 != ans2 then << "My previous code was incorrect" << endl;
+--     ans1
+--     )
 
 invariants CalabiYauInToric := List => X -> (
     L := c2Form X;
@@ -590,6 +860,54 @@ factorShape RingElement := F -> (
 --     )
 
 
+invariantsAllX = method()
+invariantsAllX(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
+    RZ := ring L;
+    if ring F =!= RZ then 
+        error "expected same rings for c2 and cubic form";
+    if coefficientRing RZ =!= ZZ then 
+        error "expected c2 and cubic form ring to be a polynomial ring over ZZ";
+    RQ := QQ[gens RZ];
+    toQQ := F -> sub(F, vars RQ);
+    sing := (cod, I) -> trim(I + minors(cod, jacobian I));
+    linearcontent := (I) -> (
+        if I == 0 then return 0;
+        lins := select(I_*, f -> f != 0 and first degree f <= 1);
+        if #lins == 0 then return 0;
+        gcd for ell in lins list (trim content ell)_0
+        );
+    FQ := toQQ F;
+    LQ := toQQ L;
+    inv0 := polynomialContent L;
+    inv1 := polynomialContent F;
+    -- dimension and degree of each component of the singular loci over QQ.
+--    inv2 := sort for c in decompose sing_1 ideal FQ list {codim c, degree c};
+--    inv3 := sort for c in decompose sing_2 ideal(LQ, FQ) list {codim c, degree c};
+--    inv4 := betti res saturate sing_1 ideal FQ;
+    -- inverse system of FQ
+--    inv5 := betti res inverseSystem FQ; -- not clear this one is worthwhile
+    -- integer parts of singular loci.
+    conductF := integerPart saturate sing_1 ideal F;
+    conductLF := integerPart saturate sing_2 ideal(L,F);
+    inv6 := conductF;
+    inv7 := conductLF;
+    inv8 := factorShape det hessian F;
+    inv9 := linearcontent saturate sing_1 F;
+    hashTable {"h11" => h11,
+     "h12" => h12,
+     "c(L)" => inv0, 
+     "c(F)" => inv1, 
+--     "comps sing FQ" => inv2, 
+--     "comps sing LFQ" => inv3, 
+--     "bettti sing LFQ" => inv4,
+--     "betti inv F" => inv5,
+     "conduct(F)" => inv6,
+     "conduct(L,F)}" => inv7,
+     "hessian shape" => inv8,
+     "lincontent sing F" => inv9
+     }
+    )
+
 invariantsAll = method()
 invariantsAll(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
     RZ := ring L;
@@ -641,7 +959,8 @@ invariantsAll(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
 invariantsAll CalabiYauInToric := X -> invariantsAll(c2Form X, cubicForm X, hh^(1,1) X, hh^(1,2) X)
 
 mapIsIsomorphism = method()
-mapIsIsomorphism(Matrix, CalabiYauInToric, CalabiYauInToric) := Boolean => (M, X1, X2) -> (
+mapIsIsomorphism(Matrix, CalabiYauInToric, CalabiYauInToric) :=
+mapIsIsomorphism(Matrix, CYToolsCY3, CYToolsCY3) := Boolean => (M, X1, X2) -> (
     -- M is a matrix over the base field, a possible map giving
     -- an isomorphism of topologies.
     -- T1, T2 are two topologies.
@@ -703,9 +1022,11 @@ partitionByTopology(List, HashTable, ZZ) := (Ls, Xs, degreelimit) -> (
         << "trying " << i << endl;
         prev := keys distinctTops;
         isFound := false;
+        if GVi === null then prev = {}; -- we cannot use GV with non-favorables currently.
         for j in prev do (
             Xj := hashXs#j;
             GVj := GVs#j;
+            if GVj === null then continue;  -- we cannot use GV with non-favorables currently.
             -- compare CY's i, j
             Ms := findLinearMaps(GVj, GVi);
             if Ms === {} then continue;
@@ -795,6 +1116,19 @@ linearEquationConstraints(Matrix, RingMap, List, List) := Sequence => (A, phi, L
     if J != 0 then A0 = A0 % (trim J1);
     (A0, map(TR, TR, transpose A0), trim ideal gens gb J1)
     )
+
+linearEquationConstraintsIdeal = method()
+linearEquationConstraintsIdeal(Matrix, RingMap, List, List) := Sequence => (A, phi, Ls, pts) -> (
+    -- each entry of Ls is a list/sequence of length 2: {F, G}
+    -- where F, G are polynomials in a ring R, (A, phi) are obtained from
+    -- genericLinearMap.  We return the ideal of constraints in T
+    -- for which phi(F) = G, for all pairs {F,G} in Ls.
+    -- We also return A0, phi0 corresponding to these constraints.
+    T := ring A;
+    A0 := A;
+    TR := target phi;
+    I := sum for L in Ls list ideal sub(last coefficients(phi L_0 - L_1), T);
+    I)
 
 TEST ///
   debug StringTorics
@@ -887,54 +1221,82 @@ findMaps = (top1, top2, A, phi, RQ) -> (
     )
 
 
--- findMaps = method()
--- findMaps(CalabiYauInToric, CalabiYauInToric, Ring) := (X1, X2, RQ) -> (
---     (A, phi) := genericLinearMap RQ;
---     TR := target phi;
---     n := numgens TR;
---     T := coefficientRing TR;
---     toTR := f -> sub(f, TR);
---     toQQ := f -> sub(f, RQ);
---     evalphi := (F,G) -> trim sub(ideal last coefficients((phi toTR F) - toTR G), T);
---     (L1, F1, h11, h12) := (c2Form X1, cubicForm X1, hh^(1,1) X1, hh^(1,2) X1);
---     (L2, F2, l11, l12) := (c2Form X2, cubicForm X2, hh^(1,1) X2, hh^(1,2) X2);
---     RZ := ring L1;
---     if RZ =!= ring F1 or RZ =!= ring L2 or RZ =!= ring F2 then error "expected polynomials over the same ring";
---     if h11 != l11 or h12 != l12 then return null;
---     I := (evalphi(L1, L2) + evalphi(F1, F2));
---     if I == 1 then return null;
---     -- first see if there is a unique solution.
---     -- if codim I === n*n and degree I === 1 then (
---     --     A0 := A % I;
---     --     if support A0 === {} then (
---     --         A0 = lift(A0, QQ);
---     --         phi0 := map(RQ, RQ, transpose A0);
---     --         if phi0 toQQ L1 != toQQ L2 or phi0 toQQ F1 != toQQ F2 then error "map is not correct!";
---     --         return (A0, phi0)
---     --         );
---     --     );
---     -- now let's look through all of the components for a smooth point.
---     compsI := decompose I;
---     As := for c in compsI list A % c;
---     As = for a in As list try lift(a, ZZ) else continue; -- grab the ones that lift.
---     As = select(As, a -> (d := det a; d == 1 or d == -1));
---     if #As > 0 then (
---         A0 := As#0;
---         phi0 := map(RZ, RZ, transpose A0);
---         if phi0 L1 != L2 or phi0 F1 != F2 then error "map is not correct!";
---         (A0, phi0)
---         )
---     else (
---         if any(compsI, c -> codim c < n*n or degree c =!= 1) then (
---             << "warning: there might be a map in this case!" << endl;
---             << netList compsI << endl;
---             << "----------------------------------" << endl;
---             compsI 
---             )
---         else null
---         )
---     )
+findIsomorphism = method()
+findIsomorphism(CalabiYauInToric, CalabiYauInToric) := (X1, X2) -> (
+    (L1, F1, h11, h12) := (c2Form X1, cubicForm X1, hh^(1,1) X1, hh^(1,2) X1);
+    (L2, F2, l11, l12) := (c2Form X2, cubicForm X2, hh^(1,1) X2, hh^(1,2) X2);
+    if h11 != l11 or h12 != l12 then return null;
+    findIsomorphism((L1,F1), (L2,F2))
+    )
 
+findIsomorphism(Sequence, Sequence) := (LF1, LF2) -> (
+    (L1, F1) := LF1;
+    (L2, F2) := LF2;
+    RZ := ring L1;
+    if RZ =!= ring F1 or RZ =!= ring L2 or RZ =!= ring F2 then error "expected polynomials over the same ring";
+    RQ := QQ (monoid RZ);
+    (A, phi) := genericLinearMap RQ;
+    TR := target phi;
+    n := numgens TR;
+    T := coefficientRing TR;
+    toTR := f -> sub(f, TR);
+    toQQ := f -> sub(f, RQ);
+    -- Two ways we can use mappinginfo:
+    -- the first is simple: we take phi(F) = G.
+    -- the second is when we want one ideal to map to another:
+    -- each generator of the first ideal must map to an element of the second ideal.
+    evalPhi := (F,G) -> sub(ideal last coefficients((phi toTR F) - toTR G), T);
+    evalPhiIdeal := (I1,I2) -> sub(ideal last coefficients((phi toTR I1) % toTR I2), T);
+    I := (evalPhi(L1, L2) + evalPhi(F1, F2));
+    if I == 1 then return null; -- this isn't so good: if we have trouble finding this,
+      -- we must deal with that.
+    -- first see if there is a unique solution.
+    -- if codim I === n*n and degree I === 1 then (
+    --     A0 := A % I;
+    --     if support A0 === {} then (
+    --         A0 = lift(A0, QQ);
+    --         phi0 := map(RQ, RQ, transpose A0);
+    --         if phi0 toQQ L1 != toQQ L2 or phi0 toQQ F1 != toQQ F2 then error "map is not correct!";
+    --         return (A0, phi0)
+    --         );
+    --     );
+    -- now let's look through all of the components for a smooth point.
+    compsI := decompose I;
+    As := for c in compsI list A % c;
+    As = for a in As list try lift(a, ZZ) else continue; -- grab the ones that lift.
+    As = select(As, a -> (d := det a; d == 1 or d == -1));
+    if #As > 0 then (
+        A0 := As#0;
+        phi0 := map(RZ, RZ, transpose A0);
+        if phi0 L1 != L2 or phi0 F1 != F2 then error "internal logic error: map is not correct!";
+        (A0, phi0)
+        )
+    else (
+        if any(compsI, c -> codim c < n*n or degree c =!= 1) then (
+            << "warning: there might be a map in this case!" << endl;
+            << netList compsI << endl;
+            << "----------------------------------" << endl;
+            compsI 
+            )
+        else null
+        )
+    )
+
+determineIsomorphism = method()
+determineIsomorphism(Sequence, Matrix, RingMap, Ring) := (Ts, A, phi, RQ) -> (
+    -- Ts is a Sequence (Ti, Tj), where each Ti, Tj is a List:
+    --  {h11, h12, c2 form, cubic form}
+    -- The latter two are in RZ = ZZ[n vars], and
+    -- RQ = QQ[same n vars]
+    -- A is n x n generic matrix over a coeff ring `coefficientRing T`, over QQ.
+    -- T = (this coeff ring)[same n vars].
+    -- phi : T --> T, given by x |--> Ax, or perhaps (transpose A)*x.  TODO: GET THIS RIGHT!
+    -- Returns either an n x n invertible matrix A0 over ZZ, or null.
+    -- s.t. if phi0 : x |-> A0*x, then phi0 maps the c2 form L1 to L2, cubic form F1 to F2.
+    -- If no such map exists, null is returned.  If there may be a map, but we can't 
+    -- conclusively find one, then an ideal in the variables of A is returned.
+    
+    )
 
 partitionH113sByTopology = method()
 partitionH113sByTopology(List, HashTable, Ring) := HashTable => (Ls, Ts, RQ) -> (

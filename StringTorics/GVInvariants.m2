@@ -18,7 +18,6 @@
 --     entries transpose((rays M) // GLSM)
 --     )
 
-toricMoriCone = method()
 
 toricMoriCone(NormalToricVariety, List) := Cone => (V, basisIndices) -> (
     IV := intersectionRing (abstractVariety V);
@@ -30,12 +29,19 @@ toricMoriCone(NormalToricVariety, List) := Cone => (V, basisIndices) -> (
     )
 
 toricMoriCone CalabiYauInToric := Cone => X -> (
-    toricMoriCone(ambient X, basisIndices X)
+    -- TODO: handle toric mori cones of non-favorables
+    if isFavorable X then toricMoriCone(ambient X, basisIndices X)
     )
 
 hilbertBasisGenerators = method()
 hilbertBasisGenerators Cone := List => C -> (
     for x in hilbertBasis C list flatten entries x
+    )
+
+-- This function returns a very large heft vector.  Not so good!
+heft CalabiYauInToric := List => X -> (
+    C := toricMoriCone X;
+    sum entries transpose rays dualCone C
     )
 
 gvInvariants = method(Options => {
@@ -115,6 +121,7 @@ gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices)
     )
 
 gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
+    if not isFavorable X then return null;
     intersectionnums := for t in intersectionNumbers X list append(t#0, t#1);
     mori := if opts.Mori =!= null then 
                 opts.Mori 
@@ -126,7 +133,7 @@ gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
     -- OK, now we have computed everything we need.  Write it to a file
     infile := opts.FilePrefix | "-input";
     outfile := opts.FilePrefix | "-output";
-    infile << gvInput(mori, heft, transpose degrees ring ambient X, intersectionnums,
+    infile << gvInput(mori, heft, transpose degrees X, intersectionnums,
         opts.DegreeLimit, opts.Precision) << close;
     inputLine := opts.Executable | " <" | infile | " >" | outfile;
     print inputLine;
@@ -135,23 +142,66 @@ gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
     (lines get outfile)/value//hashTable
     )
 
+gvRay = method(Options => options gvInvariants)
+gvRay(CalabiYauInToric, List) := HashTable => opts -> (X, curveClass) -> (
+    -- This doesn't seem to be correct
+    if not isFavorable X then return null;
+    return gvInvariants(X,Mori => {curveClass})
+    )
+
 gvCone = method(Options => options gvInvariants)
 gvCone CalabiYauInToric := Cone => opts -> X -> (
+    if not isFavorable X then return null;
     gv := gvInvariants(X, opts);
     posHull transpose matrix ((keys gv)/toList)
     )
 
+gvInvariantsAndCone = method(Options => options gvInvariants)
+gvInvariantsAndCone(CalabiYauInToric, ZZ) := Sequence => opts -> (X, D) -> (
+    -- D is the degree bound to start with.  We could start with 5, or DegreeLimit/2 or DegreeLimit/4, or ...
+    if not isFavorable X then return null;
+    degvec := heft X;
+    gv := gvInvariants(X, opts);
+    keysgv := keys gv;
+    H := hashTable for k in keysgv list k => dotProduct(k, degvec);
+    firstSet := select(keys H, k -> H#k <= D);
+    if debugLevel > 0 then << "The number of curves in the first set: " << #firstSet << endl;
+    C := posHull transpose matrix (firstSet);
+    Cdual := dualCone C;
+    HC := transpose rays Cdual;
+    curves := for k in keys H list if H#k > D then transpose matrix {k} else continue;
+    set2 := select(curves, c  -> any(flatten entries (HC * c), a -> a < 0));
+    if debugLevel > 0 then << "The number of curves not in the first cone: " << #set2 << endl;
+    C2 := if #set2 == 0 then C else posHull (rays C | matrix{set2});
+    if debugLevel > 0 and #set2 == 0 then (
+        << "CY " << label X << " C = " << rays C  << endl
+        )
+    else
+        << "*differs* CY " << label X << " C1 = " << rays C << " and C2 = " << rays C2 << endl;
+    (gv, C2)
+    )
+
 partitionGVConeByGV = method(Options => options gvInvariants)
 partitionGVConeByGV CalabiYauInToric := HashTable => opts -> X -> (
+    -- return null if we cannot computr GV invariants (i.e. if non-favorable).
+    if not isFavorable X then return null;
     gv := gvInvariants(X, opts); -- TODO: stash this?
     C := posHull transpose matrix ((keys gv)/toList);
     gvX := entries transpose rays C;
     partition(f -> if gv#?(toSequence f) then gv#(toSequence f) else 0, gvX)
     )
 
+partitionGVConeByGV(CYToolsCY3, ZZ) := HashTable => opts -> (X, D) -> (
+    -- return null if we cannot computr GV invariants (i.e. if non-favorable).
+    (gv, C) := gvInvariantsAndCone(X, D, opts);
+    gvX := entries transpose rays C;
+    partition(f -> if gv#?f then gv#f else 0, gvX)
+    )
+
 -- TODO: move to Topology.m2? file?
 findLinearMaps = method()
 findLinearMaps(HashTable, HashTable) := List => (gv1, gv2) -> (
+    -- gv1, gv2: result of partitionGVConeByGV
     if sort keys gv1 =!= sort keys gv2 then return {};
     for k in keys gv1 do if #gv1#k =!= #gv2#k then return {};
     n := # (first values gv1)_0; -- we should check if all the values are lists of integers of this size.
@@ -179,3 +229,40 @@ findLinearMaps(HashTable, HashTable) := List => (gv1, gv2) -> (
     --if any(newMs, m -> support m =!= {}) then << "some M is not reduced to a constant" << endl;
     Ms
     )
+
+----------------------------
+-- new code ----------------
+----------------------------
+-- GVInvariants class
+--  has X in cache, or way to rerun gv's at higher invarisnts, rays, etc.
+--  
+
+-- Design: What should a GVInvariants class look like?
+--  1. Has hash table as it does now.
+--  2. Knows its degree limit, and grading vector.
+--  3. Can compute "infinity cone": actually, should be done for 2 or 3 different degrees,
+--       then compare them?
+--  4. Compute ray of GV values out some distance.
+--    This should use special features of the code?  Does it work on non-extremal rays?
+-- The following is perhaps not part of this class...
+--  5. Determine what kind of extremal ray a ray is:
+--    1. nilpotent (type I)
+--    2. nilpotent (type II0, type IIg)
+--    3. potent ray.
+--    4. is a ray in the closure of the infinity cone?  Or can we not consider this possibility?
+-- For non-general CY3's it is possible for a curve to be effective, but have gv ray all 0's.
+
+-- GVInvariants = new Type of HashTable
+-- gvInvariantsObject = method(Options => {
+--         Mori => null, 
+--         Heft => null,
+--         DegreeLimit => 5,
+--         Precision => 150,
+--         FilePrefix => "foo",
+--         Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV",
+--         KeepFiles => true
+--     })
+--gvInvariantsObject()
+ -- need: intersection numbers
+ --       mori cone hilbert basis gens
+ --       degrees
