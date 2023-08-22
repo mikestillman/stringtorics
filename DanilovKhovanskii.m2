@@ -22,6 +22,10 @@ export {"Cheap",
     "getSparseeZ",
     "eZ2hZ",
     "toeZMatrix",
+    "matchCones",
+    "fanRayList",
+    "makeConeToFaceDict",
+    "makeConeTable",
     "computeHodgeDeligne",
     "computeHodgeDeligneInPToric",
     "computeHodgeDeligneAffineAndTorus",
@@ -225,128 +229,162 @@ torusFactor (HashTable, ZZ, ZZ) := (eZ, d, D) -> (--d = dimension of polytope; D
     new HashTable from eZproduct
     )
 
-faceToCone = method();
---Find the cone of Pfan corresponding to a face of P.
---F is a face of P, Pfan is the normal fan of P.
-faceToCone (Polyhedron, Fan) := (F, Pfan) -> (
-    rys := rays Pfan;
-    vs := vertices F;
-    dots := entries (transpose rys * vs);
-    Fcone := for r from 0 to #dots - 1 list (
-	if all(dots#r, x -> x == -1) then r else continue
+matchCones = method();
+matchCones (Cone, HashTable) := (c, Pcones) -> (
+    a := true;
+    i := dim c;
+    d := max keys Pcones;
+    cnew := c;
+    while (a and i <= d) do (
+	j := 0;
+	l := #Pcones#i;
+	while (a and j < l) do (--print(i, j, l);
+	    if contains(Pcones#i#j, c) then (
+		a = false;
+		cnew = Pcones#i#j;
+		);
+	    j = j + 1;
+	    );
+	i = i + 1;
 	);
-    coneFromVData(rys_Fcone)
+    if a then error "No match found.";
+    cnew
     )
 
-makeConeTable = method();
---Make a dictionary between faces of P and cones of Pfan.
---Pfan is the normal fan of P.
-makeConeTable (Polyhedron, Fan) := (P, Pfan) -> (
-    rys := rays Pfan;
-    d := dim P;
-    new HashTable from for n from 0 to d list (
-	Fs := facesAsPolyhedra(d - n, P);
-	d - n => for F in Fs list (
-	    faceToCone(F, Pfan)
+fanRayList = method();--does not return lineality generators
+--assume rays C is a subset of rays F
+fanRayList (Cone, Fan) := (C, F) -> (
+    rys := rays F;
+    linF := linealitySpace F;
+    nrys := numcols rys;
+    rs := rays C;
+    linC := linealitySpace C;
+    nrs := numcols rs;
+    --subs := subsets(0..numcols rys - 1, nrs);
+    --print(rys, linF, rs, linC);--, subs);
+    sort flatten if linF == 0 then (
+	for r from 0 to nrs - 1 list (
+	    for ry from 0 to nrys - 1 list (
+	    	if rs_r == rys_ry then ry else continue
+    	    	--if image (rys_s | linF) == image (rs | linC) then s else continue
+	    	)
+	    )
+	)
+    else (
+	for r from 0 to nrs - 1 list (
+	    for ry from 0 to nrys - 1 list (
+	    	if minors(numcols linF + 1, linF | rs_{r} -  rys_{ry}) == 0 then ry else continue
+    	    	--if image (rys_s | linF) == image (rs | linC) then s else continue
+	    	)
 	    )
 	)
     )
 
-matchCones = method();
---Find the minimal cone of Pfan containing a given cone of P'fan.
---c1 and c2 are lists of the rays in each cone. clist is a list of the cones in Pfan.
-matchCones (List, List, List) := (c1, c2, clist) -> (
-    c1 == c2 or (
-	Clist := for c in clist list (
-	    if isSubset(c1, c) then c else continue
+makeConeToFaceDict = method();
+makeConeToFaceDict (Polyhedron, Fan) := (P, Pfan) -> (
+    rys := rays Pfan;
+    vs := vertices P;
+    dots := entries (transpose rys * vs);-- print(rys, vs, dots);
+    rys2vs := for r in dots list (
+	mindot := r#0;
+	minvs := {0};
+	for v from 1 to #r - 1 do (
+	    if r#v < mindot then (
+		mindot = r#v;
+		minvs = {v};
+		)
+	    else if r#v == mindot then (
+		minvs = append(minvs, v);
+		);
 	    );
-	isSubset(c1, c2) and not any(clist, c -> c == c1) and all(Clist, c -> isSubset(c2, c))
+	minvs
+	);-- print(rys2vs);
+    new HashTable from flatten for i from 0 to dim Pfan list (
+	for c in cones(i, Pfan) list (
+	    --dual face of c = intersection over rays in c of vertices in
+	    --facets dual to each ray
+	    c => if #c == 0 then (
+		for v from 0 to numcols vs - 1 list v
+		)
+	    else (
+		minvs := rys2vs#(c#0);
+	        for r from 1 to #c - 1 do (
+		    minvs = for v in minvs list (
+		        if any(rys2vs#(c#r), x -> x == v) then v else continue
+		        );
+		    );
+	        minvs
+		)
+	    )
 	)
     )
 
-matchCones (Cone, Cone, List) := (c1, c2, clist) -> (
-    c1 == c2 or (
-	Clist := for c in clist list (
-	    if contains(c, c1) then c else continue
-	    );
-	contains(c2, c1) and not any(clist, c -> c == c1) and all(Clist, c -> contains(c, c2))
+makeConeTable = method();
+makeConeTable Fan := F -> (
+    Fdim := dim F;
+    new HashTable from for i from 0 to Fdim list (
+	Fdim - i => facesAsCones(i, F)
+	--i => cones(i, F)
 	)
     )
 
-coneToFace = method();
---c is a list of the rays in each cone, Pfanlist is a list of the cones in Pfan,
---Pcones is a HashTable serving as a dictionay between cones in Pfan and faces in P.
-coneToFace (List, List, HashTable, Polyhedron) := (c, Pfanlist, Pcones, P) -> (
-    c1 := for c2 in Pfanlist do (
-	if matchCones(c, c2, Pfanlist) then break c2;
-	); print("c1", c1);
-    (i, j) := for k in keys Pcones do (
-	a := false;
-	kl := for l from 0 to #Pcones#k - 1 do (
-	    if c1 == Pcones#k#l then (a = true; break (k, l));
-	    ); print("kl", kl);
-	if a then break kl;
-	);
-    Fs := facesAsPolyhedra(i, P);
-    Fs#j
+coneInPfanToFaceInP = method();
+--c is a list of rays in the cone
+coneInPfanToFaceInP (List, Polyhedron, HashTable) := (c, P, ConeToFaceDict) -> (
+    vlist := ConeToFaceDict#c;
+    (convexHull (vertices P)_(vlist), vlist)
     )
 
-coneToFace (Cone, List, HashTable, Polyhedron) := (c, Pfanlist, Pcones, P) -> (
-    c1 := for c2 in Pfanlist do (
-	if matchCones(c, c2, Pfanlist) then break c2;
-	); print("c1", rays c1);
-    (i, j) := for k in keys Pcones do (
-	a := false;
-	kl := for l from 0 to #Pcones#k - 1 do (
-	    if c1 == Pcones#k#l then (a = true; break (k, l));
-	    ); print("kl", kl);
-	if a then break kl;
-	);
-    Fs := facesAsPolyhedra(i, P);
-    Fs#j
+coneInPfanToFaceInP (Cone, Polyhedron, Fan, HashTable) := (c, P, Pfan, ConeToFaceDict) -> (
+    cl := fanRayList(c, Pfan);
+    vlist := ConeToFaceDict#cl;
+    (convexHull (vertices P)_(vlist), vlist)
     )
 
-computeHodgeDeligne = method(Options => {FaceInfo => {true, new HashTable from {}, -1}});
+coneInP'fanToConeInPfan = method();
+coneInP'fanToConeInPfan (Cone, HashTable) := (c, Pcones) -> (
+    c1 := matchCones(c, Pcones);
+    c1
+    )
+
+coneInP'fanToFaceInP = method();
+coneInP'fanToFaceInP (Cone, Sequence) := (c, PFanConesDict) -> (
+    (P, Pfan, Pcones, ConeToFaceDict) := PFanConesDict;
+    c1 := coneInP'fanToConeInPfan(c, Pcones);
+    coneInPfanToFaceInP(c1, P, Pfan, ConeToFaceDict)
+    )
+
+computeHodgeDeligne = method(Options => {FaceInfo => {true, new HashTable, -1, ()}});
 --FaceInfo: first entry = true, if this is the full polytope, and = Sequence containing information about the full poltyope if not; 
 --second = data from lower-dimensional faces;
 --third = dimension of ambient variety (will usually, but not always, be the number of rows of the vertex matrix)
-computeHodgeDeligne Polyhedron := opts -> P -> (
-    --determine relevant dimensions (of P and of the ambient space)
-    d := dim P;
-    D := opts.FaceInfo#2;
-    if D == -1 then (
-	D = numrows vertices P
-	);
-    
+--Note: Won't work if P is neither prime nor full-dimensional.
+computeHodgeDeligne Polyhedron := opts -> P -> (        
     --Store information about the normal fan, Pfan, or a simplicial subdivision thereof, P'fan.
-    topdim := class opts.FaceInfo#0 === Boolean; print("poly dim = "| d | ", ambient dim = " | D, topdim);
-    (Pfan, PfanDim, Pfanfaces, Pfanlist, P'fan, P'fanfaces) := if topdim then (
+    topdim := opts.FaceInfo#0;
+    (Pfan, P'fan) := if #opts.FaceInfo#3 == 0 then (
 	Pfan2 := normalFan P;
-	PfanDim2 := dim Pfan2;
-	Pfanfaces2 := new HashTable from for i from 0 to PfanDim2 list (--not necessarily same order
-	    i => facesAsCones(i, Pfan2)
-	    );
-        Pfanlist2 := flatten for i from 0 to #Pfanfaces2 - 1 list Pfanfaces2#i;
-        P'fan2 := if isSimplicial Pfan2 then (print("Pfan is simplicial");
+	P'fan2 := if isSimplicial Pfan2 then (print("Pfan is simplicial");
 	    Pfan2
     	    )
         else (print("Pfan is not simplicial");
-	    VP'2 := if isReflexive P then (
-		reflexiveToSimplicialToricVariety P
-		)
-	    else (
-		VP2 := normalToricVariety P;
-		makeSimplicial(VP2, Strategy => 1)
-		);
+	    rys := entries transpose rays Pfan2;
+	    cs := maxCones Pfan2;
+	    VP2 := normalToricVariety(rys, cs);--needs to be over ZZ?
+	    VP'2 := makeSimplicial(VP2, Strategy => 1);
 	    fan VP'2
 	    );
-	P'fanfaces2 := new HashTable from for i from 0 to dim P'fan2 list (--not necessarily same order
-	    i => facesAsCones(i, P'fan2)
-	    );
-	(Pfan2, PfanDim2, Pfanfaces2, Pfanlist2, P'fan2, P'fanfaces2)
+	(Pfan2, P'fan2)
         )
-    else opts.FaceInfo#0;-- print(#Pfan, #Pfanfaces, #Pfanlist, #P'fan, #P'fanfaces);
-   
+    else opts.FaceInfo#3;
+        
+    --determine dimension of P and of the ambient space
+    d := dim P;
+    FanDim := dim P'fan;
+    D := opts.FaceInfo#2;
+    if D == -1 then (
+	D = FanDim;
+	); print("poly dim = "| d | ", ambient dim = " | D, topdim);
    
     eZ := new MutableHashTable;
     eZbar := new MutableHashTable;
@@ -369,33 +407,39 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
     
     --Begin by computing eZ of the varieties corresponding to each cone of the [subdivided] normal fan, P'fan.
     --This is known by induction. Build up from lowest dimension, 1.
-    eZfaces := new MutableHashTable from opts.FaceInfo#1;
-    --print(opts.FaceInfo#1); print(eZfaces);
-    --print("eZfaces: " | #eZfaces | " , keys(eZfaces): " | #(keys eZfaces));
-    if #(keys eZfaces) == 0 then (--print("no face info");
-	Pfaces := faces(P);-- print(Pfaces);
-	Pcones := makeConeTable(P, Pfan);--same ordering as Pfaces
-	P'fanDim := dim P'fan;
-	P'cones := new HashTable from for i from 0 to P'fanDim list (--not necessarily same ordering
-	    P'fanDim - i => facesAsCones(i, P'fan)
-	    );
+    eZcones := new MutableHashTable from opts.FaceInfo#1;
+    eZfaces := new MutableHashTable;
+    --print(opts.FaceInfo#1); print(eZcones);
+    --print("eZcones: " | #eZcones | " , keys(eZcones): " | #(keys eZcones));
+    if #(keys eZcones) == 0 then (--print("no face info");
+	Pcones := makeConeTable Pfan;
+	P'cones := makeConeTable P'fan;
+	ConeToFaceDict := makeConeToFaceDict(P, Pfan);
 	for n from 1 to d - 1 do (
-    	    for i from 0 to #(P'cones#(d - n)) - 1 do (print(n, i, P'cones#(d - n)#i);
-		eZfaces2 := new HashTable from flatten for k from 1 to n - 1 list (
-		    for l from 0 to #(P'cones#(d - k)) - 1 list (-- print(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0, isSubset(Pfaces#(d - k)#l#0, Pfaces#(d - n)#i#0));
-		        if contains(P'cones#(d - k)#l, P'cones#(d - n)#i) and eZfaces#?(P'cones#(d - k)#l) then P'cones#(d - k)#l => eZfaces#(P'cones#(d - k)#l) else continue
+    	    for i from 0 to #(P'cones#(FanDim - n)) - 1 do (--print(n, i, rays P'cones#(FanDim - n)#i);
+		(F, Fverts) := coneInP'fanToFaceInP(P'cones#(FanDim - n)#i, (P, Pfan, Pcones, ConeToFaceDict));-- print(Fverts, vertices F);
+		eZcones2 := new HashTable from flatten for k from 1 to n - 1 list (
+		    for l from 0 to #(P'cones#(FanDim - k)) - 1 list (-- print(Pfaces#(FanDim - k)#l#0, Pfaces#(FanDim - n)#i#0, isSubset(Pfaces#(FanDim - k)#l#0, Pfaces#(FanDim - n)#i#0));
+		        if contains(P'cones#(FanDim - k)#l, P'cones#(FanDim - n)#i) and eZcones#?(P'cones#(FanDim - k)#l) then P'cones#(FanDim - k)#l => eZcones#(P'cones#(FanDim - k)#l) else continue
 		        )
-		    --for k in keys eZfaces list (print(k, Pfaces#(d - n)#i#0);
-		    --if isSubset(k, Pfaces#(d - n)#i#0) then (print("yes"); k => eZfaces#k) else continue
-		    );-- print("face ready"); print(eZfaces2);
-		F := coneToFace(P'cones#(d - n)#i, Pfanlist, Pcones, P);
-		e := computeHodgeDeligne(F, FaceInfo => {(Pfan, PfanDim, Pfanfaces, Pfanlist, P'fan, P'fanfaces), eZfaces2, n});
-	    	eZfaces#(P'cones#(d - n)#i) = e#0;
-		--eZfaces#(Pfaces#(d - n)#i#0) = e#0;--print(e);
+		    --for k in keys eZcones list (print(k, Pfaces#(FanDim - n)#i#0);
+		    --if isSubset(k, Pfaces#(FanDim - n)#i#0) then (print("yes"); k => eZcones#k) else continue
+		    );-- print("face ready"); print(eZcones2);
+		Fdim := dim F;
+		e := if eZfaces#?Fverts then (print("eZ_F already known");
+		    eZfaces#Fverts
+		    )
+		else (
+		    e2 := computeHodgeDeligne(F, FaceInfo => {false, eZcones2, Fdim, (Pfan, P'fan)});
+		    eZfaces#Fverts = e2#0;-- print(eZfaces#Fverts);
+		    eZfaces#Fverts
+		    );-- print(e);
+		eZcones#(P'cones#(FanDim - n)#i) = torusFactor(e, Fdim, n);
+		--eZcones#(Pfaces#(FanDim - n)#i#0) = e#0;--print(e);
 		
 		--Need to account for torus factors.
 		--The dimension of the ambient torus is n. The dimension of the Newton polytope is dim F.
-		--eZfaces#(P'cones#(d - n)#i) = torusFactor(e#0, dim F, n); print(dim F, n);
+		--eZcones#(P'cones#(FanDim - n)#i) = torusFactor(e#0, dim F, n); print(dim F, n);
 		); print("done " | n);
 	    );
 	);-- print("faces done");--Hodge-Deligne numbers of the face.
@@ -412,11 +456,11 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
     for p from 0 to d - 1 do (
 	for q from d - p to d - 1 do (--print(p,q);
 	    eZbar#(p, q) = getSparseeZ(eZ, (p, q)) + sum (
-		for k in keys eZfaces list getSparseeZ(eZfaces#k, (p, q))
+		for k in keys eZcones list getSparseeZ(eZcones#k, (p, q))
 		); --print"a";
 	    eZbar#(d - 1 - p, d - 1 - q) = eZbar#(p, q); --print"b";
 	    eZ#(d - 1 - p, d - 1 - q) = eZbar#(d - 1 - p, d - 1 - q) - sum (
-		for k in keys eZfaces list getSparseeZ(eZfaces#k, (d - 1 - p, d - 1 - q))
+		for k in keys eZcones list getSparseeZ(eZcones#k, (d - 1 - p, d - 1 - q))
 		); --print"c";
 	    );
 	); --print("p + q < d - 1");
@@ -431,25 +475,30 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
 	    	)
 	    );
 	eZbar#(p, d - 1 - p) = eZ#(p, d - 1 - p) + sum (
-	    for k in keys eZfaces list getSparseeZ(eZfaces#k, (p, d - 1 - p))
+	    for k in keys eZcones list getSparseeZ(eZcones#k, (p, d - 1 - p))
 	    );
 	); --print("p + q = d - 1");
     --hZ := eZ2hZ(P, eZ);
     eZ = torusFactor(eZ, d, D);
     eZbar = torusFactor(eZbar, d, D);
     if topdim then (print("topdim = true");
-        for k in keys(eZfaces) do (
-            eZfaces#k = torusFactor(eZfaces#k, d, D);
+        for k in keys(eZcones) do (
+            eZcones#k = torusFactor(eZcones#k, d, D);
 	    );
         );
-    (new HashTable from eZ, new HashTable from eZbar, new HashTable from eZfaces)
+    (new HashTable from eZ, new HashTable from eZbar, new HashTable from eZcones)
     )
 
-computeHodgeDeligne CYPolytope := P -> computeHodgeDeligne(polytope(P, "M"))
+computeHodgeDeligne CYPolytope := opts -> P -> (
+    PM := polytope(P, "M");
+    PMfan := normalFan PM;
+    PM'fan := fan reflexiveToSimplicialToricVariety PM;
+    computeHodgeDeligne(PM, FaceInfo => {true, new HashTable, dim PM, (PMfan, PM'fan)})
+    )
 
-computeHodgeDeligne CalabiYauInToric := X -> computeHodgeDeligne(polytope(X, "M"))
+computeHodgeDeligne CalabiYauInToric := opts -> X -> computeHodgeDeligne(cyPolytope(X))
 
---check non-degeneracy
+--check non-degeneracy; not the same as for CYPolytope!
 computeHodgeDeligne ToricDivisor := D -> computeHodgeDeligne(polytope(D))
 
 computeHodgeDeligne NormalToricVariety := V -> (
@@ -463,10 +512,10 @@ computeHodgeDeligne NormalToricVariety := V -> (
 --Not tested.
 computeHodgeDeligneInPToric = method();
 computeHodgeDeligneInPToric (Polyhedron, List) := (P, whichFaces) -> (
-    (eZ, eZbar, eZfaces) := computeHodgeDeligne(P);
+    (eZ, eZbar, eZcones) := computeHodgeDeligne(P);
     eZtoric := new MutableHashTable from {};
     for k in keys eZ do (print(k);--maybe not eZ; need to switch to indexing by cones
-	eZtoric#k = eZ#k + sum for f in whichFaces list getSparseeZ(eZfaces#f, k);
+	eZtoric#k = eZ#k + sum for f in whichFaces list getSparseeZ(eZcones#f, k);
 	);
     new HashTable from eZtoric
     )
@@ -492,7 +541,7 @@ computeHodgeDeligneAffineAndTorus (Polyhedron, ZZ, ZZ) := opts -> (P, n, r) -> (
 		    )
 		);
 	    D := n + r - #s;--work in T^n x C^(r - #s)
-	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D}); 
+	    (eZ, eZbar, eZcones) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D, ()}); 
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
 		); print("done subset:" | toString(s));
@@ -504,7 +553,7 @@ computeHodgeDeligneAffineAndTorus (Polyhedron, ZZ, ZZ) := opts -> (P, n, r) -> (
 	    H := {};
 	    newP := intersection(P, H);--finish...
 	    D := n + r - #s;--work in T^n x C^(r - #s)
-	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D}); 
+	    (eZ, eZbar, eZcones) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D, ()}); 
 	    eZ#s = eZ;
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
@@ -522,18 +571,17 @@ computeHodgeDeligneAffineAndTorus (Matrix, ZZ, ZZ) := opts -> (M, n, r) -> (
     subs := subsets(r);
     if opts.Cheap then (print("Cheap");
 	for s in subs do (--lambda_j == 0 <-> j in s
-	    newP := convexHull M_(for i from 0 to numcols M - 1 list (
-		    if (a := true;
-			for j in s do (--column i must have not have std vector e_j
-			    a = (a and M_(n + j, i) == 0)
-			    ); print(i, a);
-			a
-			)
-		    then i else continue
+	    newM := entries M_(for i from 0 to numcols M - 1 list (
+		    if all(s, j -> M_(n + j, i) == 0) then i else continue
 		    )
 		);
+	    --delete rows in s
+	    newM = matrix for r from 0 to #newM - 1 list (
+		if all(s, j -> n + j != r) then newM#r else continue
+		); print(newM);
+	    newP := convexHull newM;
 	    D := n + r - #s;--work in T^n x C^(r - #s)
-	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D}); print(eZ);
+	    (eZ, eZbar, eZcones) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D, ()}); print(eZ);
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
 		); print("done subset:" | toString(s));
@@ -543,7 +591,7 @@ computeHodgeDeligneAffineAndTorus (Matrix, ZZ, ZZ) := opts -> (M, n, r) -> (
 	for s in subs do (
 	    newP := convexHull M;--finish...
 	    D := n + r - #s;--work in T^n x C^(r - #s)
-	    (eZ, eZbar, eZfaces) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D}); 
+	    (eZ, eZbar, eZcones) := computeHodgeDeligne(newP, FaceInfo => {false, new HashTable, D, ()}); 
 	    eZ#s = eZ;
 	    for k in keys(eZ) do (print(k);
 		eZtoric#k = getSparseeZ(eZtoric, k) + eZ#k
@@ -621,7 +669,7 @@ Description
   Example
     P = convexHull matrix {{-1, 4, -1, -1, 0, -1}, {-1, -1, 4, 0, -1, -1}, {-1, -1, -1, 1, 1, 1}}
     latticePoints(P)
-    (eZ, eZbar, eZfaces) = computeHodgeDeligne(P)
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
     eZ
     eZbar
 Caveat
@@ -885,7 +933,7 @@ Description
   Example
     PN = convexHull transpose matrix {{1, 0, 0}, {0, 1, 0}, {-1, -1, -2}, {0, 0, 1}, {0, 0, -1}}
     PM = polar PN
-    (eZ, eZbar, eZfaces) = computeHodgeDeligne(PM)
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(PM)
     hZ = eZ2hZ(PM, eZ)
     hZbar = eZ2hZ(PM, eZbar)
 Caveat
@@ -918,7 +966,7 @@ Description
     Since it is neither possible nor desirable to store the values of $e^{p,q}(Z)$, and all but a finite number of them are 0, this function allows the user to fetch the value of $e^{p,q}(Z)$ for any pair $(p, q)$.
   Example
     P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
-    (eZ, eZbar, eZfaces) = computeHodgeDeligne(P)
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
     getSparseeZ(eZ, (0, 0))
     getSparseeZ(eZ, (1, 1))
     getSparseeZ(eZ, (2, 2))
@@ -951,7 +999,7 @@ Description
   Example
     PN = convexHull transpose matrix {{1, 0, 0}, {0, 1, 0}, {-1, -1, -2}, {0, 0, 1}, {0, 0, -1}}
     PM = polar PN
-    (eZ, eZbar, eZfaces) = computeHodgeDeligne(PM)
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(PM)
     hZ = eZ2hZ(PM, eZ)
     hZbar = eZ2hZ(PM, eZbar)
     toeZMatrix(eZ)
@@ -1021,9 +1069,9 @@ Description
     In the case of projective normal toric varieties constructed from lattice polytopes, a polytope that is not full-dimensional gives rise to a variety that is a product of a torus and a second variety whose dimension is equal to that of the polytope.
   Example
     P = stdSimplex(2)
-    (eZ, eZbar, eZfaces) = computeHodgeDeligne(P)
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
     Q = convexHull transpose matrix {{0, 0}, {1, 0}, {0, 1}}
-    (eZ1, eZbar1, eZfaces1) = computeHodgeDeligne(Q)
+    (eZ1, eZbar1, eZcones1) = computeHodgeDeligne(Q)
     torusFactor(Q, 2, 3)
 Caveat
 SeeAlso
@@ -1150,7 +1198,7 @@ TEST ///
   psi = ehrhartNumerator(P)
   assert (computeSumqeZ(P, psi, 0) == -8)
   assert (computeSumqeZ(P, psi, 1) == 0)
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(P)
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
   assert (eZ === new HashTable from {(0,0) => -7, (1,0) => -1, (0,1) => -1, (1,1) => 1})
   assert (eZbar === new HashTable from {(0,0) => 1, (1,0) => -1, (0,1) => -1, (1,1) => 1})
 ///
@@ -1166,7 +1214,7 @@ TEST ///
   assert (computeSumqeZ(PM, psi, 0) == 33)
   assert (computeSumqeZ(PM, psi, 1) == 27)
   assert (computeSumqeZ(PM, psi, 2) == 2)
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(PM)
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(PM)
   -- assert eZ === new HashTable from {(0,0) => 19, (1,0) => 7, (0,1) => 7, (2,0) => 1, (1,1) => 14, (0,2) => 1, (2,2) => 1})
   assert (eZ === new HashTable from {(0,0) => 20, (1,0) => 12, (0,1) => 12, (2,0) => 1, (1,1) => 15, (0,2) => 1, (2,2) => 1})
   assert (eZbar ===  new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (2,0) => 1, (1,1) => 20, (0,2) => 1, (2,1) => 0, (1,2) => 0, (2,2) => 1})
@@ -1180,7 +1228,7 @@ TEST ///
   PM = polytope(Q, "M")
   vertices PM
   isReflexive PM
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(PM);
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(PM);
   assert(eZbar === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (1,1) => 3, (2,0) => 0, (0,2) => 0, (3,0) => -1, (2,1) => -73, (0,3) => -1, (1,2) => -73, (1,3) => 0, (2,2) => 3,
       (3,1) => 0, (2,3) => 0, (3,2) => 0, (3,3) => 1})
 
@@ -1190,7 +1238,7 @@ TEST ///
   PM = polytope(Q, "M")
   vertices PM
   isReflexive PM
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(PM);
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(PM);
   assert(eZbar === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (1,1) => 3, (2,0) => 0, (0,2) => 0, (3,0) => -1, (2,1) => -75, (0,3) => -1, (1,2) => -75, (1,3) => 0, (2,2) => 3,
       (3,1) => 0, (2,3) => 0, (3,2) => 0, (3,3) => 1})
 
@@ -1203,7 +1251,7 @@ TEST ///
 
 TEST ///
   P = convexHull transpose matrix {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {-1, 0, 0}, {0, -1, 0}, {0, 0, -1}}
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(P)
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
   assert (eZ === new HashTable from {(0,0) => 5, (1,0) => 0, (0,1) => 0, (2,0) => 1, (1,1) => 0, (0,2) => 1, (2,2) => 1})
   assert (eZbar === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (2,0) => 1, (1,1) => 8, (0,2) => 1, (2,1) => 0, (1,2) => 0, (2,2) => 1})
 ///
@@ -1211,14 +1259,34 @@ TEST ///
 TEST ///
   d = 2
   Q2 = 2 * stdSimplex(d)--not full dimensional
-  Q3 = 3 * stdSimplex(d)
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(Q2)
+  Q2fan = normalFan Q2
+  Q2cones = makeConeTable Q2fan
+  rys = rays Q2fan
+  lS = linealitySpace Q2fan
+  for k in keys Q2cones do (
+    for C in Q2cones#k do (
+	assert(coneFromVData(rys_(fanRayList(C, Q2fan)), lS) == matchCones(C, Q2cones));
+	);
+    );
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(Q2)
   assert(eZ === new HashTable from {(0,0) => 5, (0,1) => 0, (1,0) => 0, (2,0) => 0, (0,2) => 0, (1,1) => -6, (2,1) => 0, (1,2) => 0, (2,2) => 1})
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(Q3)
+  
+  Q3 = 3 * stdSimplex(d)
+  Q3fan = normalFan Q3
+  Q3cones = makeConeTable Q3fan
+  rys = rays Q3fan
+  lS = linealitySpace Q3fan
+  for k in keys Q3cones do (
+    for C in Q3cones#k do (
+	assert(coneFromVData(rys_(fanRayList(C, Q3fan)), lS) == matchCones(C, Q3cones));
+	);
+    );
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(Q3)
   assert(eZ === new HashTable from {(0,0) => 8, (0,1) => 1, (1,0) => 1, (2,0) => 0, (0,2) => 0, (1,1) => -9, (2,1) => -1, (1,2) => -1, (2,2) => 1})
+  
   --computeHodgeDeligneTorusCI({Q2, Q3}, d)
-  Q2 = 2 * stdSimplex(5)
-  Q3 = 3 * stdSimplex(5)
+  --Q2 = 2 * stdSimplex(5)
+  --Q3 = 3 * stdSimplex(5)
   --eZCI = computeHodgeDeligneTorusCI({Q2, Q3})
   --assert(eZCI === new HashTable from {(0,0) => 58, (1,0) => 0, (0,1) => 0, (1,1) => 105, (0,2) => 0, (2,0) => 0, (3,0) => 0, (0,3) => 0, (2,1) => 40, (1,2) => 40, (3,1) => 5, (1,3) => 5,
   --    (2,2) => -16, (3,2) => 20, (2,3) => 20, (3,3) => 14})
@@ -1232,11 +1300,11 @@ TEST ///
   Q2 = convexHull (vertices Q)_{0,1,2,3}
   Q3 = convexHull (vertices Q)_{0,4,5,6}
   assert(PP == Q)
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(Q2, FaceInfo => {true, new HashTable, 3})
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(Q2, FaceInfo => {true, new HashTable, 3, ()})
   assert(eZ === new HashTable from {(0,0) => 6, (1,0) => 0, (0,1) => 0, (2,0) => 0, (1,1) => -3, (0,2) => 0, (2,2) => 1})
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(Q3, FaceInfo => {true, new HashTable, 3})
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(Q3, FaceInfo => {true, new HashTable, 3, ()})
   assert(eZ === new HashTable from {(0,0) => 9, (1,0) => 1, (0,1) => 1, (2,0) => 0, (1,1) => -3, (0,2) => 0, (2,2) => 1})
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(Q, FaceInfo => {true, new HashTable, 4})
+  (eZ, eZbar, eZcones) = computeHodgeDeligne(Q, FaceInfo => {true, new HashTable, 4, ()})
   assert(eZ === new HashTable from {(0,0) => -15, (0,1) => -1, (1,0) => -1, (2,0) => 0, (1,1) => 1, (0,2) => 0, (3,0) => 0, (2,1) => 0, (0,3) => 0, (1,2) => 0,
       (2,2) => -4, (3,3) => 1})
   P = PP
@@ -1260,7 +1328,7 @@ TEST ///
   P2 = convexHull transpose matrix {{0,0,0},{1,0,0},{0,1,0}}
   P1 = convexHull transpose matrix {{0,0,0}, {0,0,1}}
   Q1 = P2 + P1
-  Q2 = 2*P2 + 3*P1
+  Q2 = 2 * P2 + 3 * P1
   (eZCI, eZtoric) = computeHodgeDeligneTorusCI({Q1, Q2})
   assert(eZCI#(0, 1) == -3)
   assert(eZCI#(1, 0) == -3)
@@ -1296,96 +1364,37 @@ TEST///
   isSimplicial V
   isSimplicial Vfan
   isSimplicial Pfan
-  (eZ, eZbar, eZfaces) = computeHodgeDeligne(P)
-  --appears to give h^(1,1) = 2, h^(1,2) = 66
-  --compare with topes_50 in previous example with correct result
-  
-  Pfan = normalFan P;
-  PfanDim = dim Pfan;
-  Pfanfaces = new HashTable from for i from 0 to PfanDim list (--not necessarily same order
-      i => facesAsCones(i, Pfan)
-      );
-  Pfanlist = flatten for i from 0 to #Pfanfaces - 1 list Pfanfaces#i;
-  P'fan = if isSimplicial Pfan then Pfan else (
-      VP' = if isReflexive P then reflexiveToSimplicialToricVariety P else (
-	  VP = normalToricVariety P;
-	  makeSimplicial(VP, Strategy => 1)
-          );
-      fan VP'
-      );
-  P'fanfaces = new HashTable from for i from 0 to dim P'fan list (--not necessarily same order
-        i => facesAsCones(i, P'fan)
-        );
-  Pfaces = faces(P);-- print(Pfaces);
-  Pcones = makeConeTable(P, Pfan);--same order as Pfaces
-  P'fanDim = dim P'fan;
-  P'cones = new HashTable from for i from 0 to P'fanDim list (--not necessarily same order
-	    P'fanDim - i => facesAsCones(i, P'fan)
-	    );
+  (eZ, eZbar, eZconesCY) = computeHodgeDeligne(P)
+  assert(eZbar === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (1,1) => 2,
+      (2,0) => 0, (0,2) => 0, (3,0) => -1, (2,1) => -66, (0,3) => -1,
+      (1,2) => -66, (1,3) => 0, (2,2) => 2, (3,1) => 0, (2,3) => 0, (3,2)
+      => 0, (3,3) => 1})
+  --a non-fine subdivision fan will give h^(1,1) = 2, h^(1,2) = 66
+  (eZCY, eZbarCY, eZconesCY) = computeHodgeDeligne(Q)
+  assert(eZbarCY === new HashTable from {(0,0) => 1, (1,0) => 0, (0,1) => 0, (1,1) => 3,
+      (2,0) => 0, (0,2) => 0, (3,0) => -1, (2,1) => -69, (0,3) => -1,
+      (1,2) => -69, (1,3) => 0, (2,2) => 3, (3,1) => 0, (2,3) => 0, (3,2)
+      => 0, (3,3) => 1})
+  assert(eZ === eZCY)
+///
 
-  VP = normalToricVariety P
-  --VV = makeSimplicial VP
-  VV = reflexiveToSimplicialToricVariety P
-  P'fan = fan VV
-  Pfanfaces = faces Pfan
-  P'fanfaces = faces P'fan
-  Pfanlist = flatten for i from 0 to #Pfanfaces - 1 list Pfanfaces#i 
-  d = dim P
-  
+TEST ///
+  topes = kreuzerSkarke(3);
+  Q = cyPolytope topes_25
+  X = makeCY Q
+  V = ambient X
+  Vfan = fan V
+  #rays V
+  D = sum for i from 0 to 6 list V_i
+  P = polytope D
+  d= dim P
   for i from 0 to d - 1 do (
       print("codim = " | i);
       fs := faces(i, P);
       Fs := facesAsPolyhedra(i, P);
       for j from 0 to #fs - 1 do (
-          print(fs#j#0, ehrhartNumeratorQuicker(Fs#j), ehrhartNumerator(Fs#j));
-	  for k from 1 to d - i do (
-	      print(k | ": " | #latticePoints(k * Fs#j))
-	      );
-    	  );
+          assert(ehrhartNumeratorQuicker(Fs#j) == ehrhartNumerator(Fs#j));
       )
-  Pfaces := faces(P)
-  FacesToCones = new HashTable from flatten for i from 0 to dim P - 1 list (
-      for j from 0 to #(Pfaces#i) - 1 list (
-	  f := Pfaces#i#j#0;
-	  F := (facesAsPolyhedra(i, P))#j;
-	  c := faceToCone(F, Pfan); print(f, c);
-	  f => c
-	  )
-      )
-  for i from 0 to d - 1 do (
-      for j from 0 to #(Pfaces#i) - 1 do (
-	  for k from 0 to i - 1 do (
-	      for l from 0 to #(Pfaces#k) - 1 do (
-		  if isSubset(Pfaces#i#j#0, Pfaces#k#l#0) then (
-		      if isSubset(FacesToCones#(Pfaces#k#l#0), FacesToCones#(Pfaces#i#j#0)) then (
-			  print(i, j, k, l, Pfaces#i#j#0, Pfaces#k#l#0)
-			  )
-		      )
-		  )
-	      )
-	  )
-      )
-  for i from 0 to dim Pfan do (
-      for j from 0 to #Pfanfaces#i - 1 do (
-	  f := Pfanfaces#i#j;
-	  for k from 0 to dim P'fan do (
-	      for l from 0 to #P'fanfaces#k - 1 do (
-		  f' := P'fanfaces#k#l;
-		  if matchCones(f', f, Pfanlist) then print(f', f, d - #f');
-		  )
-	      )
-	  )
-      )
-  for k in keys Pfanfaces do (
-      for l from 0 to #Pfanfaces#k - 1 do (
-	  assert(Pfanfaces#k#l == faceToCone(coneToFace(P'fanfaces#k#l, Pfanlist, Pcones, P), Pfan));
-	  );
-      );
-  for k in keys P'fanfaces do (
-      for l from 0 to #P'fanfaces#k - 1 do (
-	  if not P'fanfaces#k#l == faceToCone(coneToFace(P'fanfaces#k#l, Pfanlist, Pcones, P), Pfan) then print(k, l, P'fanfaces#k#l);
-	  );
-      );
 ///
 
 
