@@ -1226,6 +1226,12 @@ findIsomorphism(CalabiYauInToric, CalabiYauInToric) := (X1, X2) -> (
     (L1, F1, h11, h12) := (c2Form X1, cubicForm X1, hh^(1,1) X1, hh^(1,2) X1);
     (L2, F2, l11, l12) := (c2Form X2, cubicForm X2, hh^(1,1) X2, hh^(1,2) X2);
     if h11 != l11 or h12 != l12 then return null;
+    findIsomorphism((L1,F1), (L2,F2))
+    )
+
+findIsomorphism(Sequence, Sequence) := (LF1, LF2) -> (
+    (L1, F1) := LF1;
+    (L2, F2) := LF2;
     RZ := ring L1;
     if RZ =!= ring F1 or RZ =!= ring L2 or RZ =!= ring F2 then error "expected polynomials over the same ring";
     RQ := QQ (monoid RZ);

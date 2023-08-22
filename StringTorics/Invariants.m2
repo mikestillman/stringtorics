@@ -231,18 +231,6 @@ invariantsContents CalabiYauInToric := List => X -> {
     polynomialContent cubicForm X
     }
 
-invariantsPointCounts = method()
-invariantsPointCounts(PointCounter, CalabiYauInToric) := List => (PC, X) -> (
-    )
-
-
-
-
-
-
-
-
-
 
 ----------------------------------------------------------------------------------
 

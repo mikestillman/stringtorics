@@ -56,8 +56,8 @@ setCYIntersectionRing = (X, R) -> (
         );
     )
 
-calabiYauInToric = method(Options => {ID => null, Ring => null})
-calabiYauInToric(CYPolytope, List) := CalabiYauInToric => opts -> (Q, triang) -> (
+calabiYau = method(Options => {ID => null, Ring => null})
+calabiYau(CYPolytope, List) := CalabiYauInToric => opts -> (Q, triang) -> (
     X := new CalabiYauInToric from {
         symbol cache => new CacheTable,
         "polytope data" => Q,
@@ -68,14 +68,16 @@ calabiYauInToric(CYPolytope, List) := CalabiYauInToric => opts -> (Q, triang) ->
     X
     )
 
-cyData = method(Options => options calabiYauInToric)
-cyData(CYPolytope, List) := opts -> (Q, triang) -> calabiYauInToric(Q, triang, opts)
+cyData = method(Options => options calabiYau)
+cyData(CYPolytope, List) := opts -> (Q, triang) -> calabiYau(Q, triang, opts)
 
 picardRing = method()
 picardRing CalabiYauInToric := X -> X.cache.PicardRing
 
-cyData(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
-    -- F is a function which takes an id of a CYPolytope and returns the object.
+cyData(String, Function) :=
+calabiYau(String, Function) := CalabiYauInToric => opts -> (str, F) -> (
+    -- F is a function which takes an id of a CYPolytope and returns the CYPolytope
+    -- The string is the value taken from a CY database .
     L := lines str;
     if L#0 != "CYData" then error "string is not in proper format";
     fields := hashTable for i from 1 to #L-1 list getKeyPair L#i;

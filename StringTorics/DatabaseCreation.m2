@@ -65,7 +65,35 @@ addToCYDatabase(String, KSEntry) := CYPolytope => opts -> (dbfilename, ks) -> (
     Q
     )
 
+processCYPolytopes = method()
+processCYPolytopes(String, ZZ, Sequence) := (dbfilenamePrefix, h11, lohi) -> (
+    elapsedTime topes := kreuzerSkarke(h11, Limit => 200000);
+    mytopes := take(topes, toList lohi);
+    dbname := dbfilenamePrefix | "-" | lohi#0 | "-" | lohi#1 | ".dbm";
+    elapsedTime createCYDatabase(dbname, mytopes);
+    )
+
+--addToCYDatabase = method(Options => {NTFE => false})
+
+-- Delete this older version (which doesn't compute toric mori cone caps)
 -- This only adds the CY's coming from Q.
+-- addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
+--     elapsedTime Xs := findAllCYs Q; -- TODO: check: is findALlCYs still correct.
+--     << "  " << #Xs << " triangulations total" << endl;
+--     if opts.NTFE then (
+--         elapsedTime H := partition(restrictTriangulation, Xs);
+--         << "  " << #(keys H) << " NTFE triangulations" << endl;
+--         Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
+--         -- let's relabel these Xs
+--         );
+--     F := openDatabaseOut dbfilename;
+--     for X in Xs do (
+--         computeIntersectionNumbers X; -- this should load all of the data we want
+--         F#(toString label X) = dump X;
+--         );
+--     close F;    
+--     )
+
 addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
     -- This version also finds "moriConeCap" which is a cone containing the actual mori cone: it is the
     -- intersection of all mori cones coming from triangulations equivalent to the given one.
@@ -92,6 +120,14 @@ addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
 
 addToCYDatabase(String, List) := opts ->(dbfilename, topes) -> (
     for tope in topes do addToCYDatabase(dbfilename, tope, opts);
+    )
+
+addToCYDatabase(String, String, List) := opts ->(dbfilename, dbQfilename, topeLabels) -> (
+    for lab in topeLabels do (
+        << "polytope " << lab << endl;
+        Q := cyPolytope(dbQfilename, lab);
+        elapsedTime addToCYDatabase(dbfilename, Q, opts);
+        );
     )
 
 createCYDatabase = method(Options => {
@@ -206,6 +242,57 @@ readCYs(String, HashTable) := HashTable => opts -> (dbname, Qs) -> (
     close F;
     Xs
     )
+
+-------------------------------------------------------
+-- Read one example from a database or database file --
+-------------------------------------------------------
+cyPolytope(String, ZZ) := CYPolytope => opts -> (dbfilename, topeid) -> (
+    db := openDatabase dbfilename;
+    Q := cyPolytope(db, topeid, opts);
+    close db;
+    Q
+    )
+
+cyPolytope(Database, ZZ) := CYPolytope => opts -> (db, topeid) -> (
+    k := toString topeid;
+    if not db#?k then error("polytope with label "|k|" does not exist");
+    cyPolytope(db#k, opts)
+    )
+
+-- Check: this is not quite correct.
+calabiYau(Database, CYPolytope, Sequence) := CalabiYauInToric => opts -> (db, Q, lab) -> (
+    -- lab should be (polytopelab, triangulationlabel).
+    -- polytopelab should match label of Q.
+    if first lab =!= label Q then error "incorrect label";
+    k := toString lab;
+    if not db#?k then error("polytope with label "|k|" does not exist");
+    calabiYau(db#k, lab -> Q, opts)
+    )
+
+calabiYau(Database, Sequence) := CalabiYauInToric => opts -> (db, lab) -> (
+    -- lab should be (polytopelab, triangulationlabel).
+    -- first retrieve CYPolytope, and then CalabiYauInToric.
+    if #lab < 2 then error "expected well-formed label";
+    Q := cyPolytope(db, first lab);
+    k := toString lab;
+    if not db#?k then error("CY with label "|k|" does not exist");
+    calabiYau(db#k, lab -> Q, opts)
+    )
+
+calabiYau(String, CYPolytope, Sequence) := CalabiYauInToric => opts -> (dbfilename, Q, lab) -> (
+    db := openDatabase dbfilename;
+    X := calabiYau(db, Q, lab, opts);
+    close db;
+    X
+    )
+
+calabiYau(String, Sequence) := CalabiYauInToric => opts -> (dbfilename, lab) -> (
+    db := openDatabase dbfilename;
+    X := calabiYau(db, lab, opts);
+    close db;
+    X
+    )
+
 
 ///
   -- h11=4 database use, 19 June 2023.

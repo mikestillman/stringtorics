@@ -121,6 +121,7 @@ gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices)
     )
 
 gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
+    if not isFavorable X then return null;
     intersectionnums := for t in intersectionNumbers X list append(t#0, t#1);
     mori := if opts.Mori =!= null then 
                 opts.Mori 
@@ -141,8 +142,16 @@ gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
     (lines get outfile)/value//hashTable
     )
 
+gvRay = method(Options => options gvInvariants)
+gvRay(CalabiYauInToric, List) := HashTable => opts -> (X, curveClass) -> (
+    -- This doesn't seem to be correct
+    if not isFavorable X then return null;
+    return gvInvariants(X,Mori => {curveClass})
+    )
+
 gvCone = method(Options => options gvInvariants)
 gvCone CalabiYauInToric := Cone => opts -> X -> (
+    if not isFavorable X then return null;
     gv := gvInvariants(X, opts);
     posHull transpose matrix ((keys gv)/toList)
     )
@@ -220,3 +229,40 @@ findLinearMaps(HashTable, HashTable) := List => (gv1, gv2) -> (
     --if any(newMs, m -> support m =!= {}) then << "some M is not reduced to a constant" << endl;
     Ms
     )
+
+----------------------------
+-- new code ----------------
+----------------------------
+-- GVInvariants class
+--  has X in cache, or way to rerun gv's at higher invarisnts, rays, etc.
+--  
+
+-- Design: What should a GVInvariants class look like?
+--  1. Has hash table as it does now.
+--  2. Knows its degree limit, and grading vector.
+--  3. Can compute "infinity cone": actually, should be done for 2 or 3 different degrees,
+--       then compare them?
+--  4. Compute ray of GV values out some distance.
+--    This should use special features of the code?  Does it work on non-extremal rays?
+-- The following is perhaps not part of this class...
+--  5. Determine what kind of extremal ray a ray is:
+--    1. nilpotent (type I)
+--    2. nilpotent (type II0, type IIg)
+--    3. potent ray.
+--    4. is a ray in the closure of the infinity cone?  Or can we not consider this possibility?
+-- For non-general CY3's it is possible for a curve to be effective, but have gv ray all 0's.
+
+-- GVInvariants = new Type of HashTable
+-- gvInvariantsObject = method(Options => {
+--         Mori => null, 
+--         Heft => null,
+--         DegreeLimit => 5,
+--         Precision => 150,
+--         FilePrefix => "foo",
+--         Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV",
+--         KeepFiles => true
+--     })
+--gvInvariantsObject()
+ -- need: intersection numbers
+ --       mori cone hilbert basis gens
+ --       degrees
