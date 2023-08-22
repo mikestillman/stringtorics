@@ -511,11 +511,11 @@ computeHodgeDeligne NormalToricVariety := V -> (
 --For (a hypersurface in) a toric variety that is a subset of the projective normal toric variety that has polytope P.
 --Not tested.
 computeHodgeDeligneInPToric = method();
-computeHodgeDeligneInPToric (Polyhedron, List) := (P, whichFaces) -> (
+computeHodgeDeligneInPToric (Polyhedron, List) := (P, whichCones) -> (
     (eZ, eZbar, eZcones) := computeHodgeDeligne(P);
     eZtoric := new MutableHashTable from {};
     for k in keys eZ do (print(k);--maybe not eZ; need to switch to indexing by cones
-	eZtoric#k = eZ#k + sum for f in whichFaces list getSparseeZ(eZcones#f, k);
+	eZtoric#k = eZ#k + sum for c in whichCones list getSparseeZ(eZcones#c, k);
 	);
     new HashTable from eZtoric
     )
@@ -1103,7 +1103,11 @@ Description
     The Hodge-Deligne numbers of this disjoint union is the sum of the Hodge-Deligne numbers of the component tori.
   Example
     P = convexHull transpose matrix {{0, 0}, {1, 0}, {0, 1}}
-    eZ = computeHodgeDeligneInPToric(P, {{0, 1}, {1, 2}})
+    Pfan = normalFan P
+    rys = rays Pfan
+    cs = {{0}, {2}}
+    Cs = for c in cs list coneFromVData(rys_c)
+    --eZ = computeHodgeDeligneInPToric(P, Cs)
 Caveat
 SeeAlso
   computeHodgeDeligne
@@ -1394,6 +1398,7 @@ TEST ///
       Fs := facesAsPolyhedra(i, P);
       for j from 0 to #fs - 1 do (
           assert(ehrhartNumeratorQuicker(Fs#j) == ehrhartNumerator(Fs#j));
+	  );
       )
 ///
 
