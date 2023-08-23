@@ -23,7 +23,8 @@ CYPolytopeCache = {
     "basis indices" => {value, toString, List},
     "glsm" => {value, toString, List},
     "annotated faces" => {value, toString, List},
-    "automorphisms" => {value, toString, List}
+    "automorphisms" => {value, toString, List},
+    "autPermutations" => {value, toString, List}
     }
 
 cyPolytope = method(Options => {ID => null})
@@ -287,6 +288,49 @@ polar CYPolytope := cyData -> cyPolytope polytope(cyData, "M")
 
 findAllFRSTs CYPolytope := List => cyData -> (findAllFRSTs(transpose matrix rays cyData))/last
 
+normalizeByAutomorphisms = method()
+normalizeByAutomorphisms(List, List) := (gPerms, T) -> (
+    -- gPerms should be a list of permutations of 0..#rays-1, for a CYPolytoe Q.
+    -- T should be a list of list of integer indices into the rays of Q.
+    first sort for g in gPerms list (
+        sort for t in T list sort g_t
+        )
+    )
+
+findAllCYs = method(Options => {Ring => null, NTFE => true, Automorphisms => true}) -- opts.Ring: ZZ[h11 variables].
+findAllCYs CYPolytope := List => opts -> Q -> (
+    Ts := findAllFRSTs Q;
+    RZ := if opts#Ring === null then (
+        a := getSymbol "a";
+        h11 := hh^(1,1) Q;
+        ZZ[a_1 .. a_h11]
+        )
+    else (
+        opts#Ring
+        );
+    Xs := for i from 0 to #Ts - 1 list cyData(Q, Ts#i, Ring => RZ); -- we set the ID below.
+    -- If NTFE and UseAutomorphisms:
+    gPerms := if opts.Automorphisms then 
+                 automorphismsAsPermutations Q
+              else 
+                 {splice{0..#rays Q - 1}}; -- only the identity permutation
+    -- f is the function we use to partition the Xs.
+    f := if opts.NTFE then 
+             (X -> normalizeByAutomorphisms(gPerms, restrictTriangulation(2, X)))
+         else 
+             (X -> normalizeByAutomorphisms(gPerms, max X));
+    H := partition(f, Xs);
+    Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
+    count := 0;
+    Xs = for k in keys H list (
+        X := H#k#0; -- take the first one
+        setToricMoriConeCap(X, H#k);
+        X.cache#"id" = count;
+        count = count+1;
+        X);
+    Xs
+    )
+
 hh(Sequence, CYPolytope) := (pq, Q) -> (
     cySetH11H21 Q;
     (p,q) := pq;
@@ -308,12 +352,81 @@ hh(Sequence, CYPolytope) := (pq, Q) -> (
         )
     )
 
+
+isomorphisms(CYPolytope, CYPolytope) := (P, Q) -> (
+    isomorphisms(polytope P, polytope Q, annotatedFaces P, annotatedFaces Q)
+    )
+
 automorphisms CYPolytope := Q -> (
     if not Q.cache#?"automorphisms" then Q.cache#"automorphisms" = (
         P := polytope(Q, "N");
-        auts := isomorphisms(P, P);
-        sort for x in auts list x#1
+        auts := isomorphisms(Q, Q);
+        sort for x in auts list entries x
         );
     Q.cache#"automorphisms"
     )
 
+automorphismsAsPermutations = method()
+automorphismsAsPermutations CYPolytope := Q -> (
+    if not Q.cache#?"autPermutations" then Q.cache#"autPermutations" = (
+        G := automorphisms Q;
+        raysQ := rays Q;
+        raysMatrices := for v in rays Q list transpose matrix {v};
+        raysHash := hashTable for i from 0 to #raysMatrices - 1 list raysMatrices#i => i;
+        for g in G list (
+            m := matrix g;
+            for v in raysMatrices list raysHash#(m * v)
+            )
+        );
+    Q.cache#"autPermutations"
+    )
+
+    -- nrows := numrows vertexMatrix P;
+    -- if nrows != dim P or nrows != dim Q or nrows != numrows vertexMatrix Q
+    -- then error "expected polytoeps to be full dimensional and same dimension";
+    
+    -- -- Step 1. Find a facet of P with the smallest size.
+    -- annCYP := annotatedFaces CYP;
+    -- facetsP := for f in annCYP list if f#0 != nrows-1 then continue else f#1;
+    -- minsizeP := facetsP/length//min;
+    -- facetsMinsizeP := select(facetsP, f -> #f === minsizeP);
+    -- facetA := first facetsMinsizeP;
+
+    -- -- Step 2. Find all facets of Q with this smallest size minsizeP, or return {}.
+    -- annCYQ := annotatedFaces CYQ;
+    -- facetsQ := for f in annCYQ list if f#0 != nrows-1 then continue else f#1;
+    -- minsizeQ := facetsQ/length//min;
+    -- if minsizeQ =!= minsizeP then (
+    --     error "debug me";
+    --     return {};
+    --     );
+    -- facetsMinsizeQ := select(facetsQ, f -> #f === minsizeP);
+
+    -- -- Now find a subset of nrows elements if facetA which are full dimensional
+    -- -- TODO: don't assume facetA is norws!
+    -- if #facetA > nrows then (
+    --     -- we need to take a subset of these of size nrows that have full rank.
+    --     -- we then call these facetA again.  We don't actually need facetA again,
+    --     -- the only thing we use is Ainv.
+    --     C := ((vertexMatrix P)_facetA) ** QQ;
+    --     facetA = facetA _ (columnRankProfile mutableMatrix C);
+    --     if #facetA != nrows then error "my logic is missing a case";
+    --     );
+    -- A := (vertexMatrix P)_facetA;
+    -- Ainv := (A ** QQ)^-1;
+
+    -- -- now we loop through all possible maps from facetA to other facets,
+    -- -- and if it gives an integer matrix, we add it to the list.
+    -- vertsP := (vertexList P)/(v -> transpose matrix {v});
+    -- vertsQ := (vertexList Q)/(v -> transpose matrix {v});
+    -- hashQ := hashTable for i from 0 to #vertsQ-1 list vertsQ#i => i;
+    -- elapsedTime isos := flatten for f in facetsMinsizeQ list (
+    --     for perm in partialPermutations(f, nrows) list (
+    --         B := (vertexMatrix Q)_perm;
+    --         M := B * Ainv;
+    --         try (M = lift(M, ZZ)) else continue;
+    --         if all(vertsP, v -> hashQ#?(M * v)) then M else continue
+    --         )
+    --     );
+    -- return isos;
+    -- )                                                       

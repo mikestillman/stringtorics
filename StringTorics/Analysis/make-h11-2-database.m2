@@ -9,7 +9,7 @@
   topes = kreuzerSkarke(2, Limit => 1000);
   assert(#topes == 36)
   DBNAME = "../Databases/cys-ntfe-h11-2.dbm"
-  elapsedTime addToCYDatabase(DBNAME, topes) -- 38 seconds
+  elapsedTime addToCYDatabase(DBNAME, topes) -- 14 seconds
 
 ----------------------------------------------------
 -- Checking some basic data of examples in the DB --
@@ -22,7 +22,7 @@
   RQ = QQ (monoid RZ);
   (Qs, Xs) = readCYDatabase(DBNAME, Ring => RZ);
   assert(sort keys Qs == splice{0..35})
-  assert(# keys Xs == 39)
+  assert(# keys Xs == 36) -- 39 without automorphisms...
 
   -- automorphisms?
   autsizes = tally for lab in sort keys Qs list #automorphisms Qs#lab
@@ -51,47 +51,47 @@
 ---------------------------------  
 TEST ///
 -- some tests, alternate ways to construct
-  DBNAME = "../Databases/test3-cys-ntfe-h11-2.dbm" -- true below is the default, as is NTFE => true.
-  elapsedTime addToCYDatabase(DBNAME, topes, "CYs" => true) -- 47 seconds
-  F= openDatabase DBNAME  
-  sort keys F
-///
-
-TEST ///
-  -- Here we add in only polytope information, not CY info.
   restart
   needsPackage "StringTorics"
-  DBNAME = "../Databases/test4-cys-ntfe-h11-2.dbm"
   topes = kreuzerSkarke(2, Limit => 1000);
   assert(#topes == 36)
-  elapsedTime addToCYDatabase(DBNAME, topes, "CYs" => false) -- 42 seconds
-
-  F = openDatabase DBNAME
-  sort keys F  
+  DBNAME = "../Databases/test3-cys-ntfe-h11-2.dbm" -- true below is the default, as is NTFE => true.
+  elapsedTime addToCYDatabase(DBNAME, topes, "CYs" => true) -- 14 seconds
+  F = openDatabase DBNAME  
+  sort keys F
   close F
 
+  DBNAME = "../Databases/test4-cys-ntfe-h11-2.dbm" -- true below is the default, as is NTFE => true.
+  elapsedTime addToCYDatabase(DBNAME, topes, "CYs" => false) -- 13 seconds
+  F = openDatabase DBNAME  
+  sort keys F
+  close F
+  
   Qs = readCYPolytopes DBNAME;
   assert instance(Qs, HashTable)
   assert (sort keys Qs === splice {0..35})
 
-  -- Now create the CY's
-  for lab in sort keys Qs do addToCYDatabase(DBNAME, Qs#lab)
-
-  F = openDatabase DBNAME
-  sort keys F  
-  close F
-
   RZ = ZZ[a,b]
   (Qs, Xs) = readCYDatabase(DBNAME, Ring => RZ);
-///  
-  
-  
+  assert(keys Xs === {})
+///
+
 TEST ///
+  restart
+  needsPackage "StringTorics"
+  topes = kreuzerSkarke(2, Limit => 1000);
   DBNAME = "../Databases/test5-cys-ntfe-h11-2.dbm"
-  elapsedTime createCYDatabase(DBNAME, topes) -- 46 seconds
+  elapsedTime addToCYDatabase(DBNAME, topes) -- 14 seconds
 
   DBNAME = "../Databases/test6-cys-ntfe-h11-2.dbm"
   elapsedTime addToCYDatabase(DBNAME, topes_{10..20}) -- xx seconds
-  F= openDatabase DBNAME  
-  sort keys F  
+  F = openDatabase DBNAME  
+  assert(
+      sort (keys F)/value
+      ===
+      {(10,0), (11,0), (12,0), (13,0), (14,0), (15,0), (16,0), (17,0), 
+          (18,0), (19,0), (20,0), 
+          10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+      )
+  close F
 ///

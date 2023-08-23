@@ -10,9 +10,47 @@ debug needsPackage "StringTorics" -- the debug is because some functions are not
 DB4 = "../Databases/cys-ntfe-h11-4.dbm"
 DB4 = "../StringTorics/Databases/cys-ntfe-h11-4.dbm"
 
-R = ZZ[a,b,c,d]
-RQ = QQ (monoid R);
-(Qs, Xs) = readCYDatabase(DB4, Ring => R);
+RZ = ZZ[a,b,c,d]
+RQ = QQ (monoid RZ);
+(Qs, Xs) = readCYDatabase(DB4, Ring => RZ);
+
+
+-- Considering invariants (not coming from GV invariants):
+  allXs = sort keys Xs
+  allT = topologySet(allXs, Xs);
+  info allT -- 2014 possibly different topologies
+
+  allT = separateIfDifferent(allT, invariantsH11H12)
+  info allT
+
+  allT = separateIfDifferent(allT, hubschInvariants)
+  info oo
+
+  PC = pointCounter(RZ, Projective => true);
+  elapsedTime allT = separateIfDifferent(allT, pointCounts_PC)
+  info allT 
+  -- By itself: gets it to 1111.
+  -- After invariantsH11H12, hubschInvariants, this gives: 1114 different.
+
+  allT = separateIfDifferent(allT, hessianInvariants)
+  info oo -- goes from 1114 to 1123, but is much faster too than point counts.
+  -- by itself: 100 different classes.
+  -- after h11h12, hubsch: 660 different classes
+  --partition(lab -> hessianInvariants Xs#lab, sort keys Xs);
+
+  -- This gives the same benefit as hessianInvariants, if we first do: pointcounts, hubsch, h11h12.
+  allT = separateIfDifferent(allT, X -> polynomialContent det hessian cubicForm X)
+  info oo
+
+  allT = separateIfDifferent(allT, cubicConductorInvariants)
+  info oo -- to 1128.
+  -- by itself: 645.
+
+  allT = separateIfDifferent(allT, cubicLinearConductorInvariants) -- this is a good one!
+  info oo -- to 1135.  
+  -- by itself: 1049 classes
+
+
 
 -- We collect the nontorsion, torsion, favorable, nonfavorable's.
    torsions = for k in keys Qs list (

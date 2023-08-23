@@ -109,7 +109,7 @@ hubsch2 = X -> (
             hfcn {a,a,c,d} - hfcn {a,c,c,d} + hfcn {a,c,d,d},
             hfcn {a,a,c,d} - hfcn {a,c,c,d} - hfcn {a,c,d,d})
         );
-    << (d7part1, d7part2, d7part3, 24*d4) << endl;
+    --<< (d7part1, d7part2, d7part3, 24*d4) << endl;
     d7 := gcd(d7part1, d7part2, d7part3, 24*d4);
     (d4, d5, d6, d7)
     )
@@ -123,22 +123,32 @@ hubschInvariants CalabiYauInToric := X -> join(hubsch1 X, hubsch2 X, {gcd c2 X})
 allPoints = (p, n) -> (
     -- all points in kk = ZZ//p in kk^n
     pts := for a from 0 to p-1 list {a};
-    if n == 1 then return pts;
-    if n <= 0 then error "internal logic error";
+    if n === 1 then return pts;
+    if n === 0 then return {{}};
+    if n < 0 then error "internal logic error";
     b := allPoints(p, n-1);
     flatten for a from 0 to p-1 list (b/(b1 -> prepend(a, b1)))
     )
 
-createPointMaps = method()
-createPointMaps(ZZ, Ring) := (p, R) -> (
-    pts := allPoints(p, numgens R);
+allProjectivePoints = (p, n) -> (
+    -- all points in n-space (with p elements in the field) with first non-zero value = 1, except 0.
+    flatten for i from 1 to n list (
+        -- collect all the points with first non-zero value at location i+1.
+        firstPart := splice{(i-1): 0, 1};
+        --print firstPart;
+        for pt in allPoints(p, n-i) list join(firstPart, pt)
+        ))
+
+createPointMaps = method(Options => {Projective => true})
+createPointMaps(ZZ, Ring) := opts -> (p, R) -> (
+    pts := if opts.Projective then allProjectivePoints(p, numgens R) else allPoints(p, numgens R);
     kk := ZZ/p;
     for pt in pts list map(kk, R, pt)
     )
-createPointMaps(Sequence, Ring) := (pr, R) -> (
+createPointMaps(Sequence, Ring) := opts -> (pr, R) -> (
     (p,r) := pr;
     q := p^r;
-    pts0 := allPoints(q, numgens R);
+    pts0 := if opts.Projective then allProjectivePoints(q, numgens R) else allPoints(q, numgens R);
     -- now for each one we translate to GF(p,nr);
     t := local t;
     kk := GF(p^r, Variable => t);
@@ -155,7 +165,12 @@ createPointMaps(Sequence, Ring) := (pr, R) -> (
 
 PointCounter = new Type of HashTable
 pointCounter = method(Options=> {
-        "Primes" => {2,3,5,7,11,13,(2,2),(3,2),(2,3)}
+--        "Primes" => {2,3,5,7,11,13,(2,2),(3,2),(2,3),(2,4)}, -- h11=3 gives 166 diff.
+--        "Primes" => {2,3,5,7,11,13,(2,2),(3,2),(2,3),17}, -- h11=3 gives 167 diff
+          "Primes" => {2,3,5,7,11,13,(2,2),(3,2),(2,3),17,19}, -- h11=3 gives 168 diff
+--          "Primes" => {2,3,5,7,11,13,(2,2),(3,2),(2,3),17,19,23,29,31,37}, -- h11=3 still gives 168 diff
+--        "Primes" => {2,3,5,7,11,13,(2,2),(3,2),(2,3),(2,4),17,19,23,(5,2),(3,3),29},
+        Projective => true
         })
 pointCounter Ring := PointCounter => opts -> RZ -> (
     -- we expect that RZ is a polynomial ring over ZZ, in n variables.
@@ -163,7 +178,7 @@ pointCounter Ring := PointCounter => opts -> RZ -> (
     -- In the latter case we find points over GF(p^r), in the former, over ZZ/p.
     n := numgens RZ;
     LprimePowers := opts#"Primes";
-    Lmaps := for pr in LprimePowers list createPointMaps(pr, RZ);
+    Lmaps := for pr in LprimePowers list createPointMaps(pr, RZ, Projective => opts.Projective);
     PC := new PointCounter from {
         symbol Ring => RZ,
         "Primes" => LprimePowers,
@@ -175,6 +190,16 @@ pointCounter Ring := PointCounter => opts -> RZ -> (
 pointCounts = method()
 pointCounts(PointCounter, RingElement, RingElement) := List => (PC, L, F) -> (
     -- We return a list with 3 lists in it:
+    cL := polynomialContent L;
+    cF := polynomialContent F;
+    if cL != 1 then (
+        L = L // cL;
+        --<< "content L = " << cL << " and L/cL = " << L << endl;
+        );
+    if cF != 1 then (
+        F = F // cF;
+        --<< "content F = " << cF << " and F/cF = " << F << endl;
+        );
     R := PC.Ring;
     if R =!= ring L or R =!= ring F then error "expected elements to be over the same ring";
     elems := PC#"Elements";
@@ -193,7 +218,7 @@ pointCounts(PointCounter, RingElement, RingElement) := List => (PC, L, F) -> (
         )
     )
 pointCounts(PointCounter, CalabiYauInToric) := List => (PC, X) -> (
-    pointCounts(PC, c2Form X, cubicForm X)
+    elapsedTime pointCounts(PC, c2Form X, cubicForm X)
     )
 TEST ///
 -*
@@ -212,7 +237,9 @@ TEST ///
 
   R = ZZ[a,b]
   createPointMaps(3, R)
+  createPointMaps(3, R, Projective => false)
   createPointMaps((2,2), R)
+  createPointMaps((2,2), R, Projective => false)
   createPointMaps((2,3), ZZ[a,b,c])
   
   R = ZZ[a,b,c];
@@ -231,7 +258,69 @@ invariantsContents CalabiYauInToric := List => X -> {
     polynomialContent cubicForm X
     }
 
+-----------------------------
+-- Hessian invariants -------
+-----------------------------
+hessianInvariants = method()
+hessianInvariants CalabiYauInToric := X -> (
+    factorShape det hessian cubicForm X
+    )
 
+-----------------------------
+-- Singular set invariants --
+-----------------------------
+
+linearcontent := (I) -> (
+    if I == 0 then return 0;
+    lins := select(I_*, f -> f != 0 and first degree f <= 1);
+    if #lins == 0 then return 0;
+    gcd for ell in lins list (trim content ell)_0
+    );
+
+contentToDegree := (d, I) -> (
+    if I == 0 then return 0;
+    lins := select(I_*, f -> f != 0 and first degree f <= d);
+    if #lins == 0 then return 0;
+    gcd for ell in lins list (trim content ell)_0
+    );
+
+cubicConductorInvariants = method()
+cubicConductorInvariants CalabiYauInToric := X -> (
+    F := cubicForm X;
+    jac := ideal F + ideal jacobian F;
+    jacsat := saturate jac;
+    {integerPart jacsat, linearcontent jacsat}
+    )
+
+cubicLinearConductorInvariants = method()
+cubicLinearConductorInvariants CalabiYauInToric := X -> (
+    L := c2Form X;
+    F := cubicForm X;
+    I := ideal(L,F);
+    jac := I + minors(2, jacobian I);
+    jacsat := saturate jac;
+    integerPart jacsat
+    )
+
+singularContents = method()
+singularContents CalabiYauInToric := (X) -> (
+    F := cubicForm X;
+    F = 1/(polynomialContent F) * F;
+    jac := ideal F + ideal jacobian F;
+    jacsat := saturate jac;
+    H := partition(f -> first degree f, jacsat_*);
+    degs := sort keys H;
+    prevgcd := 0;
+    done := false;
+    for i from 0 to max degs list (
+        if prevgcd == 1 then break;
+        if not H#?i then prevgcd
+        else (
+            gcd1 := gcd((H#i)/polynomialContent);
+            prevgcd = gcd(gcd1, prevgcd);
+            prevgcd
+            ))
+    )
 ----------------------------------------------------------------------------------
 
 --Ternary cubic form for

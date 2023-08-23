@@ -266,6 +266,7 @@ export {
     
     -- Flop chains, Mori cones
 
+    "Automorphisms",
     "FilePrefix",
     "Executable",
     "Mori",
@@ -826,19 +827,20 @@ exampleP111122'44 = () -> (value /// () -> (
      )
 
 
-findAllCYs = method(Options => {Ring => null}) -- opts.Ring: ZZ[h11 variables].
-findAllCYs CYPolytope := List => opts -> Q -> (
-    Ts := findAllFRSTs Q;
-    RZ := if opts#Ring === null then (
-        a := getSymbol "a";
-        h11 := hh^(1,1) Q;
-        ZZ[a_1 .. a_h11]
-        )
-    else (
-        opts#Ring
-        );
-    for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i, Ring => RZ)
-    )
+-- Being rewritten 22 Aug 2023.
+-- findAllCYs = method(Options => {Ring => null}) -- opts.Ring: ZZ[h11 variables].
+-- findAllCYs CYPolytope := List => opts -> Q -> (
+--     Ts := findAllFRSTs Q;
+--     RZ := if opts#Ring === null then (
+--         a := getSymbol "a";
+--         h11 := hh^(1,1) Q;
+--         ZZ[a_1 .. a_h11]
+--         )
+--     else (
+--         opts#Ring
+--         );
+--     for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i, Ring => RZ)
+--     )
 
 
 -- keys: id, cypolytopedata, triangulation, cache.  The id is what? (id of polytope, which triangulation)

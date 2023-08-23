@@ -1643,3 +1643,41 @@ TEST ///
   automorphisms Q
   netList restrictTriangulation X,  netList restrictTriangulation X2
 ///
+
+TEST ///
+-*
+  restart
+  needsPackage "StringTorics"
+*-  
+  -- Testing interface for calabiYau, cyPolytope, in presence of databases.
+  debug needsPackage "StringTorics"
+  DB = "../Databases/cys-ntfe-h11-3.dbm"  
+  DB = "./Databases/cys-ntfe-h11-3.dbm"  
+  RZ = ZZ[a,b,c]
+  elapsedTime (Qs, Xs) = readCYDatabase(DB, Ring => RZ);
+  Q = Qs#6
+  Xs = findAllCYs(Q, NTFE => false)
+  G = automorphisms Q
+  tri1 = restrictTriangulation_2 Xs#0
+  gtri1 = normalizeByAutomorphisms(Q, tri1)
+
+  tri2 = restrictTriangulation_2 Xs#0
+  gtri2 = normalizeByAutomorphisms(Q, tri2)
+  gtri1 === tri1
+  gtri2 === tri2
+  gtri1 === gtri2
+  #Xs
+  # unique{gtri1, gtri2}
+  # findAllCYs(Qs#31, NTFE => false, Automorphisms => false) == 6
+  # findAllCYs(Qs#31, NTFE => false, Automorphisms => true) == 1
+  # findAllCYs(Qs#31, NTFE => true, Automorphisms => false) == 6
+  # findAllCYs(Qs#31, NTFE => true, Automorphisms => true) == 1
+  for lab in sort keys Qs list (
+      Q = Qs#lab;
+      elapsedTime {# findAllCYs(Q, NTFE => false, Automorphisms => false),
+      # findAllCYs(Q, NTFE => false, Automorphisms => true),
+      # findAllCYs(Q, NTFE => true, Automorphisms => false),
+      # findAllCYs(Q, NTFE => true, Automorphisms => true)
+      })
+  Q = Qs#31
+///

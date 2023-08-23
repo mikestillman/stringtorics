@@ -51,7 +51,7 @@ gvInvariants = method(Options => {
     Precision => 150,
     FilePrefix => "foo",
 --    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV-good/computeGV",
-    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV",
+    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV-good/computeGV",
     KeepFiles => true
     })
 
@@ -266,3 +266,106 @@ findLinearMaps(HashTable, HashTable) := List => (gv1, gv2) -> (
  -- need: intersection numbers
  --       mori cone hilbert basis gens
  --       degrees
+
+moriConeGVs = method()
+moriConeGVs(CalabiYauInToric, ZZ) := (X, deglimit) ->(
+    -- deglimit that the GV invariants were computed to.
+    -- loop thru the toric mori cone cap generators, and for each,
+    -- look at the gv ray. -- then return a hash table whose keys are among
+    --   {POTENT, {gv vals on ray}
+    --   {FLOP, {gv vals on ray}, 
+    --   {TYPEII0, {gv vals on ray},
+    --   {TYPEIIg, {gv vals on ray}}
+    --   {ZERO} -- this means that 
+    --   {...}, C^perp has D^3 = 0.  Not sure what the gv invariants are in this case...
+    -- and whose values are the list of curve classes with that type.
+    )
+
+gvRay(HashTable, List, ZZ, List) := opts -> (GVHash, C, deglimit, degvector) -> (
+    contentC := gcd C;
+    if contentC =!= 1 then C = C // contentC;
+    d := dotProduct(degvector, C);
+    rayC := for i from 1 to floor(deglimit/d) list (
+        Cseq := toSequence(i*C);
+        if GVHash#?Cseq then GVHash#Cseq else 0
+        );
+    rayC
+    )
+
+count = 0;
+
+classifyExtremalCurve = method()
+classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvector) -> (
+    rayC := gvRay(GVHash, C, deglimit, degvector);
+    if #rayC <= 2 then return {"OTHER", rayC};
+    if all(2..#rayC-1, i -> rayC#i == 0) then (
+        -- only first two, possibly, are non-zero.
+        if rayC#0 == 0 and rayC#1 == 0 then (count=count+1; return {"ZERO", count});
+        if rayC#0 == -2 or rayC#1 == -2 then return {"TYPEII0", {rayC#0, rayC#1}};
+        if rayC#0 >= 0 and rayC#1 >= 0 then return {"FLOP", {rayC#0, rayC#1}};
+        if rayC#0 < 0 or rayC#1 < 0 then return {"TYPEIIg", {rayC#0, rayC#1}};
+        )
+    else return {"POTENT", {rayC#0, rayC#1, rayC#2, "..."}}
+    )
+///
+  restart
+  debug needsPackage "StringTorics" -- the debug is because some functions are not yet exported.
+  DB3 = "../Databases/cys-ntfe-h11-3.dbm"
+  RZ = ZZ[a,b,c]
+  RQ = QQ (monoid RZ);
+  (Qs, Xs) = readCYDatabase(DB3, Ring => RZ);
+
+  for k in sort keys Xs list (
+      X = Xs#k;
+      if not isFavorable X then continue; -- only handles favorable polytopes and CY3's.
+      degvec = heft X;
+      deglimit = max for c in toricMoriConeCap X list 3 * dotProduct(degvec, c);
+      << "degree limit for " << k << " is " << deglimit << endl;
+      gvX = gvInvariants(X, DegreeLimit => deglimit);
+      moriClass = sort for c in toricMoriConeCap X list
+          classifyExtremalCurve(gvX, c, deglimit, degvec);
+      print netList (ans := prepend(k, moriClass));
+      moriClass
+      )     
+
+  restart
+  debug needsPackage "StringTorics" -- the debug is because some functions are not yet exported.
+  DB4 = "../Databases/cys-ntfe-h11-4.dbm"
+  RZ = ZZ[a,b,c,d]
+  RQ = QQ (monoid RZ);
+  (Qs, Xs) = readCYDatabase(DB4, Ring => RZ);
+  
+  X = Xs#(137,0)
+  for k in sort keys Xs list (
+  deglimit = 14
+  degvec = heft X
+  gvX = gvInvariants(X, DegreeLimit => deglimit);
+
+  netList for c in toricMoriConeCap X list
+    sort classifyExtremalCurve(gvX, c, deglimit, degvec)
+
+  for k in sort keys Xs list (
+      X = Xs#k;
+      if not isFavorable X then continue; -- only handles favorable polytopes and CY3's.
+      deglimit = 14;
+      degvec = heft X;
+      gvX = gvInvariants(X, DegreeLimit => deglimit);
+      moriClass = sort for c in toricMoriConeCap X list
+          classifyExtremalCurve(gvX, c, deglimit, degvec);
+      print moriClass;
+      moriClass
+      )     
+     
+          
+
+  
+
+
+
+  moricap = toricMoriConeCap X
+  for c in toricMoriConeCap X list
+    c => gvRay(gvX, c, 22, heft X)
+  netList oo
+  
+
+///

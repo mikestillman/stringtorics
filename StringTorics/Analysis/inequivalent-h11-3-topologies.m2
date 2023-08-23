@@ -38,19 +38,50 @@ select(sort keys Qs, lab -> (ans := not isFavorable polar Qs#lab; print ans; ans
   allT = topologySet(allXs, Xs);
   info allT -- 306 possibly different topologies
 
-  -- allT = separateIfDifferent(allT, invariantsH11H12)
-  -- info allT
+  allT = separateIfDifferent(allT, invariantsH11H12)
+  info allT
 
-  -- allT = separateIfDifferent(allT, hubschInvariants)
-  -- info oo
+  allT = separateIfDifferent(allT, hubschInvariants)
+  info oo
 
-  -- PC = pointCounter RZ;
-  -- allT = separateIfDifferent(allT, pointCounts_PC)
-  -- info allT
+  PC = pointCounter(RZ, Projective => true);
+  allT = separateIfDifferent(allT, pointCounts_PC)
+  info allT
+  --partProj = partition(lab -> pointCounts_PC Xs#lab, sort keys Xs);
 
+  allT = separateIfDifferent(allT, hessianInvariants)
+  info oo
+  --partition(lab -> hessianInvariants Xs#lab, sort keys Xs);
+
+  -- This gives the same benefit as hessianInvariants, if we first do: pointcounts, hubsch, h11h12.
+  allT = separateIfDifferent(allT, X -> polynomialContent det hessian cubicForm X)
+  info oo
+
+  allT = separateIfDifferent(allT, cubicConductorInvariants)
+  info oo -- on its own, this breaks into 67 different cases. (but 145 are in one class!)
+    -- still at 174 if we do the ones above this too.
+
+  allT = separateIfDifferent(allT, cubicLinearConductorInvariants) -- this is a good one!
+  info oo -- on its own, breaks into 168 classes, BUT no new ones after using above
+
+
+  -- -- Don't use affine points.  They are likely equivalent to projective points, and *much* slower.
+  -- PC = pointCounter(RZ, Projective => false); -- very pricy...
+  -- allTA = separateIfDifferent(allT, pointCounts_PC)
+  -- info allTA
+  -- partAffine = partition(lab -> pointCounts_PC Xs#lab, sort keys Xs);
+  -- (values partProj)/sort//sort
+  -- (values partAffine)/sort//sort
+  -- oo === ooo
+  
   allT1 = combineIfSame(allT, X -> (c2Form X, cubicForm X))
   equivalences allT1
   info allT1 
+
+  elapsedTime allT2 = separateIfDifferent(allT, invariantsAll) -- 18 seconds
+  info allT2 
+  netList representatives allT2
+  equivalences allT2
 
   elapsedTime allT2 = separateIfDifferent(allT1, invariantsAll) -- 18 seconds
   info allT2 
@@ -294,3 +325,23 @@ T = target phi
 (L1,F1) = (sub(L1,T), sub(F1,T))
 (L2,F2) = (sub(L2,T), sub(F2,T))
 phi L1 - L2
+
+-------------------------------------------
+-- Automorphisms --------------------------
+-------------------------------------------
+automorphisms Qs#0
+automorphisms Qs#1
+netList annotatedFaces Qs#0
+topenum = 0
+select(sort keys Xs, lab -> first lab == topenum)
+
+Xs = findAllCYs Qs#2
+tri1 = restrictTriangulation(2, Xs#0)
+tri2 = restrictTriangulation(2, Xs#1)
+tri3 = restrictTriangulation(2, Xs#2)
+tri1 === tri2
+tri1 === tri3
+tri2 === tri3
+netList restrictTriangulation(Xs#0)
+findAllFRSTs(Qs#2)
+>>>>>>> Stashed changes

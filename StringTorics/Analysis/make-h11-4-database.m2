@@ -4,15 +4,20 @@
   -- h11=4 database construction, 19 June 2023.
   restart
   needsPackage "StringTorics"
-  DB4 = "../Databases/cys-ntfe-h11-4.dbm"
+  DBNAME = "../Databases/cys-ntfe-h11-4.dbm"
   topes = kreuzerSkarke(4, Limit => 5000); -- 1197 of these
   assert(#topes == 1197)
-  elapsedTime createCYDatabase(DB4, topes) -- 906 seconds
-  -- Let's find which are not favorable, not torsion free.
-  
-  Qs = readCYPolytopes DB4;
-  assert(sort keys Qs == splice{0..1196})
+  elapsedTime addToCYDatabase(DBNAME, topes) -- 
+  elapsedTime createCYDatabase(DBNAME, topes) -- 1468 seconds, includes all Xs.
 
+  -- Let's find which are not favorable, not torsion free.
+
+  (Qs, Xs) = readCYDatabase DBNAME;
+
+  assert(sort keys Qs == splice{0..1196})
+  #sort keys Xs == 1774
+  
+  
   elapsedTime for k in keys Qs do (    
       << "---- doing k = " << k << endl;
       Q := Qs#k;
@@ -21,6 +26,9 @@
 
 
   nonfavorables = for k in sort keys Qs list if not isFavorable Qs#k then k else continue
+  nonfavorableXs = for k in sort keys Xs list if not isFavorable Qs#(first k) then k else continue
+
+  -- TODO XXX: fix this stuff
   torsions = for k in keys Qs list (
       istor := prune coker matrix rays Qs#k != ZZ^4;
       if istor then k else continue
@@ -33,6 +41,7 @@
       nonfavorables 
       == {796, 800, 803, 1059, 1060, 
           1064, 1065, 1134, 1135, 1151, 1153, 1155}
+      )
   assert(
       torsions
       == 
