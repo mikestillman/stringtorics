@@ -18,6 +18,65 @@
   assert(#topes == 4990)
   elapsedTime addToCYDatabase(DBNAME, topes_{2709..#topes-1})
 
+
+  restart
+  debug needsPackage "StringTorics"
+  DBNAME = "../Databases/cys-ntfe-h11-5.dbm"
+  DBNAME1 = "../Databases/cys-ntfe-h11-5-part1.dbm"
+  DBNAME2 = "../Databases/cys-ntfe-h11-5-part2.dbm"
+  DBNAME3 = "../Databases/cys-ntfe-h11-5-part3.dbm"
+  DBNAME4 = "../Databases/cys-ntfe-h11-5-part4.dbm"
+  DBNAME5 = "../Databases/cys-ntfe-h11-5-part5.dbm"
+    
+  topes = kreuzerSkarke(5, Limit => 20000); -- 4990 of these
+  assert(#topes == 4990)
+  elapsedTime addToCYDatabase(DBNAME1, topes_{0..1000}) -- running in m2-2
+  elapsedTime addToCYDatabase(DBNAME2, topes_{1001..2000}) -- running in m2-3
+  elapsedTime addToCYDatabase(DBNAME3, topes_{2001..3000}) -- running in m2-4
+  elapsedTime addToCYDatabase(DBNAME4, topes_{3001..4000}) -- running in m2-5
+  elapsedTime addToCYDatabase(DBNAME5, topes_{4001..4989}) -- running in m2-6
+
+  combineCYDatabases{DBNAME, DBNAME1, DBNAME2, DBNAME3, DBNAME4, DBNAME5}
+
+---------------------------------
+-- Check the database somewhat --
+---------------------------------
+  restart
+  debug needsPackage "StringTorics"
+  DBNAME = "../Databases/cys-ntfe-h11-5.dbm"
+  R = ZZ[a,b,c,d,e]
+  RZ = R
+  RQ = QQ (monoid R);
+  elapsedTime (Qs, Xs) = readCYDatabase(DBNAME, Ring => R); -- 15 seconds on Apple M1 laptop
+
+-- NOTYET  -- This is with the (fixed) toric mori cone cap's.
+  moricones = for lab in sort keys Xs list if not isFavorable Xs#lab then continue else lab => toricMoriConeCap Xs#lab;
+  tally (moricones/(x -> #x#1))
+  netList (moricones/(x -> prepend(x#0, x#1)))
+  assert(
+        (tally for m in moricones list if m === null then continue else #m)
+        ===
+        new Tally from {4 => 1104, 5 => 496, 6 => 151, 7 => 9} -- check this with Andreas.
+        )
+
+  netList moricones
+  
+  -- this is the one with the likely faulty setToricMoriConeCap
+  new Tally from {5 => 4574, 6 => 3459, 7 => 2178, 8 => 764, 9 => 333, 10 => 128, 11 => 57, 12 => 105, 13 => 40, 14 => 34, 15 => 7, 16 => 18, 17 => 6, 18 => 4, 20 => 3, 21 => 1, 23 => 1, 54 => 1}
+
+-- code to fix the toric mori cones in the database.
+debug StringTorics
+F = openDatabaseOut DBNAME
+for lab in sort keys Xs do (
+    X := Xs#lab;
+    if not isFavorable X then continue;
+    elapsedTime setToricMoriConeCap X;
+    print netList prepend(lab, toricMoriConeCap X);
+    F#(toString lab) = dump X;
+    )
+close F
+
+
 ------------------------------------
 -- Checking the created database ---
 ------------------------------------

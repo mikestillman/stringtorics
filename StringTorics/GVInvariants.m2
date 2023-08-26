@@ -137,9 +137,11 @@ gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
         opts.DegreeLimit, opts.Precision) << close;
     inputLine := opts.Executable | " <" | infile | " >" | outfile;
     print inputLine;
-    run inputLine;
+    run inputLine; -- TODO: run this as a program and if it crashes, return something reasonable.
     -- Get the output, package as a hash table
-    (lines get outfile)/value//hashTable
+    contents := get outfile;
+    if #contents == 0 then return null;
+    (lines contents)/value//hashTable
     )
 
 gvRay = method(Options => options gvInvariants)
@@ -153,6 +155,7 @@ gvCone = method(Options => options gvInvariants)
 gvCone CalabiYauInToric := Cone => opts -> X -> (
     if not isFavorable X then return null;
     gv := gvInvariants(X, opts);
+    if gv === null then return null;
     posHull transpose matrix ((keys gv)/toList)
     )
 
@@ -162,6 +165,7 @@ gvInvariantsAndCone(CalabiYauInToric, ZZ) := Sequence => opts -> (X, D) -> (
     if not isFavorable X then return null;
     degvec := heft X;
     gv := gvInvariants(X, opts);
+    if gv === null then return null;
     keysgv := keys gv;
     H := hashTable for k in keysgv list k => dotProduct(k, degvec);
     firstSet := select(keys H, k -> H#k <= D);
@@ -186,6 +190,7 @@ partitionGVConeByGV CalabiYauInToric := HashTable => opts -> X -> (
     -- return null if we cannot computr GV invariants (i.e. if non-favorable).
     if not isFavorable X then return null;
     gv := gvInvariants(X, opts); -- TODO: stash this?
+    if gv === null then return null;
     C := posHull transpose matrix ((keys gv)/toList);
     gvX := entries transpose rays C;
     partition(f -> if gv#?(toSequence f) then gv#(toSequence f) else 0, gvX)
@@ -307,6 +312,9 @@ classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvec
         )
     else return {"POTENT", {rayC#0, rayC#1, rayC#2, "..."}}
     )
+
+
+
 ///
   restart
   debug needsPackage "StringTorics" -- the debug is because some functions are not yet exported.
@@ -315,9 +323,13 @@ classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvec
   RQ = QQ (monoid RZ);
   (Qs, Xs) = readCYDatabase(DB3, Ring => RZ);
 
-  for k in sort keys Xs list (
+  moris = for k in sort keys Xs list (
       X = Xs#k;
       if not isFavorable X then continue; -- only handles favorable polytopes and CY3's.
+      classifyExtremalCurves(X, Verbose => 2)
+      );
+
+  moris/keys/sort//unique
       degvec = heft X;
       deglimit = max for c in toricMoriConeCap X list 3 * dotProduct(degvec, c);
       << "degree limit for " << k << " is " << deglimit << endl;
@@ -355,13 +367,6 @@ classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvec
       print moriClass;
       moriClass
       )     
-     
-          
-
-  
-
-
-
   moricap = toricMoriConeCap X
   for c in toricMoriConeCap X list
     c => gvRay(gvX, c, 22, heft X)
@@ -369,3 +374,82 @@ classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvec
   
 
 ///
+
+gvTopMoriConeCapDegree = method()
+gvTopMoriConeCapDegree CalabiYauInToric := X -> (
+    if not isFavorable X then error "expected a favorable polytope";
+    degvec := heft X;
+    max for c in toricMoriConeCap X list dotProduct(degvec, c)
+    )
+
+classifyExtremalCurves = method(Options => {
+        Verbose => 0,
+        DegreeLimit => null,
+        MoriHilbertGens => null
+        })
+classifyExtremalCurves(HashTable, List, ZZ, List) := (GVHash, Cs, deglimit, degvector) -> (
+    partition(c -> classifyExtremalCurve(GVHash, c, deglimit, degvector), Cs)
+    )
+
+classifyExtremalCurves CalabiYauInToric := opts -> X -> (
+    if not isFavorable X then error "expected favorable CY3-fold";
+    mori := if opts.MoriHilbertGens === null then toricMoriConeCap X else opts.MoriHilbertGens;
+    deglimit := 3 * gvTopMoriConeCapDegree X;
+    if opts.Verbose > 1 then << "*** mori cone cap degree limit is " << deglimit << " ***" << endl;
+    degvec := if opts.DegreeLimit === null then heft X else opts.DegreeLimit;
+    gvX := gvInvariants(X, DegreeLimit => deglimit);
+    partition(c -> classifyExtremalCurve(gvX, c, deglimit, degvec), mori)
+    )
+
+///
+  restart
+  debug needsPackage "StringTorics"
+  DB4 = "../Databases/cys-ntfe-h11-4.dbm"
+  RZ = ZZ[a,b,c,d]
+  RQ = QQ (monoid RZ);
+  (Qs, Xs) = readCYDatabase(DB4, Ring => RZ);
+
+  moris = for k in sort keys Xs list elapsedTime (
+      X = Xs#k;
+      if not isFavorable X then continue; -- only handles favorable polytopes and CY3's.
+      mori1 = classifyExtremalCurves(X, Verbose => 2);
+      print netList {mori1};
+      mori1
+      );
+
+
+  X = Xs#(34,0)
+  assert isFavorable X
+  classifyExtremalCurves(Xs#(34,0), Verbose => 2)
+  classifyExtremalCurves(Xs#(35,0), Verbose => 2)
+  mori = toricMoriConeCap X;
+  deglimit = 3 * gvTopMoriConeCapDegree X;
+  deglimit
+  degvec = heft X;
+  gvX = gvInvariants(X, DegreeLimit => deglimit)
+  partition(c -> classifyExtremalCurve(gvX, c, deglimit, degvec), mori)
+///
+-- GVInvariantsTable = new Type of HashTable
+
+-- makeGVInvariantsTable = (intersectionNums, moriGens, GLSM, heftvec, deglimit) -> (
+--     new GVInvariantsTable from {
+--         IntersectionNumbers => intersectionNums,
+--         MoriHilbertGens => moriGens, -- a list of curve classes (each a list of n integers).
+--         Degrees => GLSM, -- format: a list if all the toric degrees.
+--         Heft => heftvec, -- format: a list of integers, of same length as each GLSM degree
+--         cache => new CacheTable from {
+--             "GV" =>  new MutableHashTable -- keys: (degreelimit, precision), value: a hash table c => gv.
+--             }
+--         }
+--     )
+
+-- gvInvariantsTable = method()
+
+-- gvInvariantsTable CalabiYauInToric := GVInvariantsTable => X -> (
+--     makeGVInvariantsTable (
+--     )
+
+moriConeCapGVInvariants = method()
+moriConeCapGVInvariants CalabiYauInToric := X -> (
+    )
+    )

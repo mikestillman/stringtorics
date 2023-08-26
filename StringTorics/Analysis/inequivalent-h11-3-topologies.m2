@@ -64,6 +64,9 @@ select(sort keys Qs, lab -> (ans := not isFavorable polar Qs#lab; print ans; ans
   allT = separateIfDifferent(allT, cubicLinearConductorInvariants) -- this is a good one!
   info oo -- on its own, breaks into 168 classes, BUT no new ones after using above
 
+  allT = separateIfDifferent(allT, singularContents) -- this is a good one!
+  info oo -- on its own, breaks into 168 classes, BUT no new ones after using above
+  
 
   -- -- Don't use affine points.  They are likely equivalent to projective points, and *much* slower.
   -- PC = pointCounter(RZ, Projective => false); -- very pricy...
@@ -344,4 +347,34 @@ tri1 === tri3
 tri2 === tri3
 netList restrictTriangulation(Xs#0)
 findAllFRSTs(Qs#2)
->>>>>>> Stashed changes
+
+--------------------------------------
+-- (166,0), (171,0)
+A = matrix{{0,-3,1},{0,1,0},{1,-1,2}}
+X1= Xs#(166, 0)
+X2 = Xs#(171, 0)
+phi = map(RZ, RZ, A)
+phi cubicForm X1 == cubicForm X2
+phi c2Form X1 == c2Form X2
+classifyExtremalCurves X1
+classifyExtremalCurves X2
+A * transpose matrix{{1,0,0}} 
+
+-- curves are transformed via A^T
+matrix{{1,0,0}} * (transpose A)
+matrix{{1,1,0}} * (transpose A)
+matrix{{-2,0,1}} * (transpose A)
+
+-- divisors are transformed via A^-1
+matrix{{0,1,0}} * A^-1
+matrix{{0,0,1}} * A^-1
+matrix{{1,-1,2}} * A^-1
+
+-- The ring map is: a,b,c -> matrix{{a,b,c}} * A.
+-- or, a\\b\\c --> (transpose A) * a\\b\\c
+A * transpose matrix{{a,b,c}}
+-- matrix{{a,b,c}} --> matrix{{a,b,c}} * A
+phi.matrix
+
+-- if L = a*x + b*y +c*z, what is phi(L) in terms of the
+-- row or column vector {x,y,z}.

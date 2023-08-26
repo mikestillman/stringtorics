@@ -53,9 +53,9 @@ RQ = QQ (monoid RZ);
   -- by itself: 1049 classes
 
 
-------------------------------
--- Try separating given h12 --
-------------------------------
+----------------------------------
+-- Try separating given h12 = 35--
+----------------------------------
 X35s = select(sort keys Xs, lab -> hh^(1,2) Xs#lab == 35)  
   allT = topologySet(X35s, Xs);
   info allT -- 1 bucket. 31 different possible.
@@ -81,11 +81,106 @@ X35s = select(sort keys Xs, lab -> hh^(1,2) Xs#lab == 35)
       )
 netList oo
 
+  
+  
   netList representatives allT  
   toricMoriConeCap Xs#(9,0)
   toricMoriConeCap Xs#(19,2)
   heft  Xs#(9,0)
   heft  Xs#(19,2)
+
+  flatten flatten select(allT#"Sets", s -> #s == 8)
+  set8 = {(8, 0), (11, 0), (12, 0), (12, 1), (12, 2), (21, 0), (21, 1), (21, 2)}
+  set8/(lab -> isFavorable Xs#lab)
+  set8/(lab -> isFavorable polar Qs#(first lab))
+  gvs = hashTable(set8/(lab -> lab => elapsedTime gvInvariants(Xs#lab, DegreeLimit => 16)));
+  for lab in set8 list (
+      X := Xs#lab;
+      degvec := heft X;
+      print degvec;
+      for c in toricMoriConeCap X list classifyExtremalCurve(gvs#lab, c, 16, degvec)
+      )
+
+  transpose matrix toricMoriConeCap Xs#(8,0)
+  transpose matrix toricMoriConeCap Xs#(11,0)
+  f = (lab) -> (X := Xs#lab; degvec := heft X; for c in toricMoriConeCap X list classifyExtremalCurve(
+
+  C120 = transpose matrix toricMoriConeCap Xs#(12,0)
+  C121 = transpose matrix toricMoriConeCap Xs#(12,1)
+  A = C120^-1 * C121_{1,0,2,3,4}
+  A = C120^-1 * C121_{1,0,3,2,4}
+  A = C120^-1 * C121_{0,1,3,2,4}
+  phi = map(RZ, RZ, A)
+  phi c2Form Xs#(12,0)
+  c2Form Xs#(12,1)
+  partitionByTopology(set8, Xs, 16)
+  
+  set8/(lab -> partitionGVConeByGV(Xs#lab, DegreeLimit => 5))
+  
+-- Here is the group of 66 that might still be equivalent after point counts ---
+-- And the second largest group: of 30.
+L = value get "allT-h11-5-after-pointCounts";
+netList select(L, x -> #x > 9)
+for x in L list {
+    M := flatten x;
+    M = select(M, lab -> isFavorable Xs#lab);
+    allLi = topologySet(M, Xs);
+    combineByGV(allLi, DegreeLimit => 10);
+    print info allLi
+    }
+
+set66 = {(1817, 0), (1818, 0), (1821, 0), (1821, 1), (1821, 2), (1821, 3), (1821, 4), (1821, 5), (1821, 6), (1821, 7), (1821, 8), (1821, 9), (1829, 0), (1829, 1), (1829, 2), (1829, 3), (1829, 4), (1838, 0), (1838, 1), (1838, 2), (1838, 3), (1838, 4), (1838, 5), (1838, 6), (1838, 7), (1838, 8), (1838, 9), (1838, 10), (1838, 11), (1838, 12), (1838, 13), (1838, 14), (1839, 0), (1839, 1), (1839, 2), (1839, 3), (1839, 4), (1839, 5), (1839, 6), (1839, 7), (1839, 8), (1839, 9), (1843, 0), (1843, 1), (1843, 2), (1843, 3), (1843, 4), (1843, 5), (1843, 6), (1843, 7), (1843, 8), (1843, 9), (1849, 0), (1849, 1), (1849, 2), (1858, 0), (1858, 1), (1858, 2), (1858, 3), (1923, 0), (1923, 1), (1923, 2), (1923, 3), (1923, 4), (1923, 5), (2009, 0)}  
+set30 = {(4425, 0), (4426, 0), (4428, 0), (4429, 0), (4438, 0), (4439, 0), (4440, 0), (4442, 0), (4444, 0), (4445, 0), (4446, 0), (4450, 0), (4454, 0), (4460, 0), (4461, 0), (4464, 0), (4465, 0), (4471, 0), (4476, 0), (4477, 0), (4478, 0), (4479, 0), (4481, 0), (4485, 0), (4488, 0), (4498, 0), (4499, 0), (4503, 0), (4504, 0), (4506, 0)}
+partitionByTopology(set66, Xs, 5) -- these 66 are all the same.
+partitionByTopology(set30, Xs, 5) -- 19 different classes left
+
+-- 8 of the 30 are not favorable, 22 are.  The 22 are 
+all30 = topologySet(set30, Xs);
+  elapsedTime all30a = combineByGV(all30, DegreeLimit => 10); -- sec
+  elapsedTime all30b = combineByGV(all30a, DegreeLimit => 15); -- sec
+  --elapsedTime all30c = combineByGV(all30b, DegreeLimit => 18); -- didn't seem to work?!
+
+  -- 9 different ones left.
+  -- can we separate them by various invariants?
+  separateIfDifferent(all30c, invariantsAll) -- didn't separate!
+  -- let's do more point counts.
+  
+  elapsedTime PC = pointCounter(RZ, "Primes" => {(2,2),(3,2),(2,3), 17, 19, 23}, Projective => true);
+  elapsedTime all30d = separateIfDifferent(all30b, pointCounts_PC);
+  info all30d -- still 9 different classes!
+  
+  the9 = flatten representatives all30d
+  toricMoriConeCap(Xs#(the9_0))
+
+  set22 = select(set30, lab -> isFavorable Xs#lab)
+  all22 = topologySet(set22, Xs)
+  info all22
+  elapsedTime all22a = combineByGV(all22, DegreeLimit => 5); -- sec
+  info all22a -- <= 11 different.
+  elapsedTime all22b = combineByGV(all22a, DegreeLimit => 10); -- sec
+  info all22b  -- <= 2 different.
+  elapsedTime all22c = combineByGV(all22b, DegreeLimit => 15); -- sec
+  info all22c -- 1 DIFFERENT TOP HERE.
+
+-- read in the different sets after point counts, from heaviside.
+allS = value get "allT-h11-5-after-pointCounts";
+allS = select(allS, x -> #x > 1)
+tally (allS/(x -> #x)) -- 1662 pairs of 2 each.
+-- Let's attack those.
+allS2 = select(allS, x -> #x == 2)
+gv90 = gvInvariants(Xs#(9,0), DegreeLimit => 16)
+gv192 = gvInvariants(Xs#(19,2), DegreeLimit => 16)
+
+degvec = heft Xs#(9,0)
+for c in toricMoriConeCap Xs#(9,0) list dotProduct(c, degvec)
+mori = posHull transpose matrix toricMoriConeCap Xs#(9,0)
+matrix{hilbertBasis dualCone mori}
+(transpose rays mori) * matrix{hilbertBasis dualCone mori}
+classifyExtremalCurves(gv90, toricMoriConeCap Xs#(9,0), 16, heft Xs#(9,0))
+classifyExtremalCurves(gv192, toricMoriConeCap Xs#(19,2), 16, heft Xs#(19,2))
+toricMoriConeCap Xs#(19,2)
+
+--------------- BELOW THIS IS PROBABLY FROM h11=4... ------------------------------
 -- We collect the nontorsion, torsion, favorable, nonfavorable's.
    torsions = for k in keys Qs list (
       istor := prune coker matrix rays Qs#k;

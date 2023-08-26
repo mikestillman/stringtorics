@@ -9,7 +9,7 @@
   topes = kreuzerSkarke(2, Limit => 1000);
   assert(#topes == 36)
   DBNAME = "../Databases/cys-ntfe-h11-2.dbm"
-  elapsedTime addToCYDatabase(DBNAME, topes) -- 14 seconds
+  elapsedTime addToCYDatabase(DBNAME, topes) -- 15 seconds
 
 ----------------------------------------------------
 -- Checking some basic data of examples in the DB --
@@ -46,6 +46,19 @@
       )
   assert(nonfavorableQs === {})
 
+  assert(
+      (tally for lab in sort keys Qs list # automorphisms Qs#lab)
+      ===
+      new Tally from {2 => 5, 4 => 5, 6 => 12, 8 => 1, 12 => 6, 16 => 1, 
+          24 => 3, 36 => 1, 48 => 1, 72 => 1} -- TODO: CHECK with Andreas
+  )
+
+  assert(
+      (tally for lab in sort keys Xs list if not isFavorable Xs#lab then continue else # toricMoriConeCap Xs#lab)
+      ===
+      new Tally from {2 => 36}
+      )
+
 ---------------------------------
 -- Alternate uses and examples --
 ---------------------------------  
@@ -55,13 +68,13 @@ TEST ///
   needsPackage "StringTorics"
   topes = kreuzerSkarke(2, Limit => 1000);
   assert(#topes == 36)
-  DBNAME = "../Databases/test3-cys-ntfe-h11-2.dbm" -- true below is the default, as is NTFE => true.
+  DBNAME = "../Databases/test3-cys-ntfe-h11-2.dbm"
   elapsedTime addToCYDatabase(DBNAME, topes, "CYs" => true) -- 14 seconds
   F = openDatabase DBNAME  
   sort keys F
   close F
 
-  DBNAME = "../Databases/test4-cys-ntfe-h11-2.dbm" -- true below is the default, as is NTFE => true.
+  DBNAME = "../Databases/test4-cys-ntfe-h11-2.dbm"
   elapsedTime addToCYDatabase(DBNAME, topes, "CYs" => false) -- 13 seconds
   F = openDatabase DBNAME  
   sort keys F

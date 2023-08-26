@@ -24,7 +24,8 @@ CYPolytopeCache = {
     "glsm" => {value, toString, List},
     "annotated faces" => {value, toString, List},
     "automorphisms" => {value, toString, List},
-    "autPermutations" => {value, toString, List}
+    "autPermutations" => {value, toString, List},
+    "triangulations" => {value, toString, List}
     }
 
 cyPolytope = method(Options => {ID => null})
@@ -286,7 +287,11 @@ polytope CYPolytope := Polyhedron => cyData -> polytope(cyData, "N")
 
 polar CYPolytope := cyData -> cyPolytope polytope(cyData, "M")
 
-findAllFRSTs CYPolytope := List => cyData -> (findAllFRSTs(transpose matrix rays cyData))/last
+findAllFRSTs CYPolytope := List => cyData -> (
+    if not cyData.cache#?"triangulations" then
+        cyData.cache#"triangulations" = (findAllFRSTs(transpose matrix rays cyData))/last;
+    cyData.cache#"triangulations"
+    )
 
 normalizeByAutomorphisms = method()
 normalizeByAutomorphisms(List, List) := (gPerms, T) -> (
@@ -320,11 +325,9 @@ findAllCYs CYPolytope := List => opts -> Q -> (
          else 
              (X -> normalizeByAutomorphisms(gPerms, max X));
     H := partition(f, Xs);
-    Xs = (keys H)/(k -> H#k#0); -- only take one triangulation that matches
     count := 0;
     Xs = for k in keys H list (
         X := H#k#0; -- take the first one
-        setToricMoriConeCap(X, H#k);
         X.cache#"id" = count;
         count = count+1;
         X);

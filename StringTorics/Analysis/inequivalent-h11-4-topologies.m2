@@ -14,9 +14,9 @@ RZ = ZZ[a,b,c,d]
 RQ = QQ (monoid RZ);
 (Qs, Xs) = readCYDatabase(DB4, Ring => RZ);
 
-
 -- Considering invariants (not coming from GV invariants):
   allXs = sort keys Xs
+  allXs = sort select(keys Xs, lab -> isFavorable Xs#lab);
   allT = topologySet(allXs, Xs);
   info allT -- 2014 possibly different topologies
 

@@ -56,11 +56,13 @@ addToCYDatabase(String, KSEntry) := CYPolytope => opts -> (dbfilename, ks) -> (
         annotatedFaces Q; -- compute annotated faces
         automorphisms Q;
         automorphismsAsPermutations Q;
+        findAllFRSTs Q;
         -- now write it
         F#(toString lab) = dump Q;
         )
-    else
+    else (
         Q = cyPolytope F#(toString lab);
+        );
     close F;
     if opts#"CYs" then addToCYDatabase(dbfilename, Q, NTFE => opts.NTFE);
     Q
@@ -113,6 +115,7 @@ addToCYDatabase(String, CYPolytope) := opts -> (dbfilename, Q) -> (
     --     );
     F := openDatabaseOut dbfilename;
     for X in Xs do (
+        setToricMoriConeCap X;
         computeIntersectionNumbers X; -- this should load all of the data we want
         F#(toString label X) = dump X;
         );
@@ -225,7 +228,7 @@ readCYDatabase String := Sequence => opts -> (dbname) -> (
     )
 
 readCYPolytopes = method()
-readCYPolytopes String := HashTable => (dbname) -> (
+readCYPolytopes String := HashTable => dbname -> (
     F := openDatabase dbname;
       labs := (keys F)/value;
       Qlabels := sort select(labs, lab -> instance(lab, ZZ));

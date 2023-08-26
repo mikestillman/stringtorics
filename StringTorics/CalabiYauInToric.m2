@@ -298,7 +298,7 @@ setToricMoriConeCap CalabiYauInToric := List => Y -> (
     -- Xs are all of the CY3's equivalent to Y (including Y), possibly includes others too?
     if not isFavorable Y then return null;
     Q := cyPolytope Y;
-    Xs := findAllCYs Q;
+    Xs := findAllCYs(Q, NTFE => false, Automorphisms => false);
     myNTFE := restrictTriangulation Y;
     myXs := select(Xs, X0 -> restrictTriangulation X0 === myNTFE);
     Y.cache#"toric mori cone cap" = sort entries transpose rays dualCone posHull matrix{for X in myXs list rays dualCone toricMoriCone X};

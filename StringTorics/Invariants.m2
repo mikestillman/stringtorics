@@ -305,10 +305,28 @@ cubicLinearConductorInvariants CalabiYauInToric := X -> (
 singularContents = method()
 singularContents CalabiYauInToric := (X) -> (
     F := cubicForm X;
-    F = 1/(polynomialContent F) * F;
+    F = F // polynomialContent F;
     jac := ideal F + ideal jacobian F;
     jacsat := saturate jac;
     H := partition(f -> first degree f, jacsat_*);
+    degs := sort keys H;
+    prevgcd := 0;
+    done := false;
+    for i from 0 to max degs list (
+        if prevgcd == 1 then break;
+        if not H#?i then prevgcd
+        else (
+            gcd1 := gcd((H#i)/polynomialContent);
+            prevgcd = gcd(gcd1, prevgcd);
+            prevgcd
+            ))
+    )
+
+singularContents Ideal := (J) -> (
+    if not isHomogeneous J then error "expected homogeneous ideal";
+    -- Also expect: coefficients are ZZ.
+    -- Grading is singly graded.
+    H := partition(f -> first degree f, J_*);
     degs := sort keys H;
     prevgcd := 0;
     done := false;

@@ -266,6 +266,8 @@ export {
     
     -- Flop chains, Mori cones
 
+    "IntersectionNumbers",
+    "MoriHilbertGens",
     "Automorphisms",
     "FilePrefix",
     "Executable",
