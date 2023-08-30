@@ -1403,12 +1403,14 @@ hh(Sequence, TopologicalDataOfCY3) := (pq, T) -> (
         if q == 3 or q == 0 then 1 else 0
         )
     else if p == 1 then (
-        if q == 1 then T#"h11"
-        else if q == 2 then T#"h21"
+        if q == 1 then T#2
+        else if q == 2 then T#3
         else 0
         )
     else if p == 2 then (
-        if q == 2 then T#"h11" else 0
+        if q == 1 then T#3
+        else if q == 2 then T#2 
+        else 0
         )
     else if p == 3 then (
         if q == 3 then 1
@@ -1416,6 +1418,6 @@ hh(Sequence, TopologicalDataOfCY3) := (pq, T) -> (
         )
     )
 
-c2Form TopologicalDataOfCY3 := T -> T#"c2"
-cubicForm TopologicalDataOfCY3 := T -> T#"cubic intersection form"
+c2Form TopologicalDataOfCY3 := T -> T#0
+cubicForm TopologicalDataOfCY3 := T -> T#1
 ----- end of removing code TODO -----------------------------

@@ -57,6 +57,7 @@ setCYIntersectionRing = (X, R) -> (
     )
 
 calabiYau = method(Options => {ID => null, Ring => null})
+-- TODO, BUG!! The triang needs to indices in the Q rays.
 calabiYau(CYPolytope, List) := CalabiYauInToric => opts -> (Q, triang) -> (
     X := new CalabiYauInToric from {
         symbol cache => new CacheTable,

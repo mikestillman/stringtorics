@@ -354,6 +354,7 @@ A = matrix{{0,-3,1},{0,1,0},{1,-1,2}}
 X1= Xs#(166, 0)
 X2 = Xs#(171, 0)
 phi = map(RZ, RZ, A)
+phi vars RZ
 phi cubicForm X1 == cubicForm X2
 phi c2Form X1 == c2Form X2
 classifyExtremalCurves X1

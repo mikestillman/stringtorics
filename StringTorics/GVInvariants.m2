@@ -41,7 +41,10 @@ hilbertBasisGenerators Cone := List => C -> (
 -- This function returns a very large heft vector.  Not so good!
 heft CalabiYauInToric := List => X -> (
     C := toricMoriCone X;
-    sum entries transpose rays dualCone C
+    heft1 := sum entries transpose rays dualCone C;
+    Ccap := posHull transpose matrix toricMoriConeCap X;
+    heft2 := sum entries transpose rays dualCone Ccap;
+    heft2
     )
 
 gvInvariants = method(Options => {
@@ -81,6 +84,8 @@ gvInput = (moriGenerators, heftval, GLSM, intersectionnums, degreelimit, prec) -
 --  and use only info obtained from data we have in CalabiYauInToric.
 --  requires: intersectionNumbersOfCY
 --            toricMoriCone
+
+filenameCounter := 0;
 
 gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices) -> (
     -- Compute intersection numbers for X in V (using this basis)
@@ -123,16 +128,20 @@ gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices)
 gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
     if not isFavorable X then return null;
     intersectionnums := for t in intersectionNumbers X list append(t#0, t#1);
+    -- mori := if opts.Mori =!= null then 
+    --             opts.Mori 
+    --         else 
+    --             hilbertBasisGenerators toricMoriCone(ambient X, basisIndices X);
     mori := if opts.Mori =!= null then 
                 opts.Mori 
             else 
-                hilbertBasisGenerators toricMoriCone(ambient X, basisIndices X);
+                hilbertBasisGenerators posHull transpose matrix toricMoriConeCap X;
     heft := if opts.Heft =!= null then opts.Heft else (
       sum entries transpose rays dualCone posHull transpose matrix mori
       );
     -- OK, now we have computed everything we need.  Write it to a file
-    infile := opts.FilePrefix | "-input";
-    outfile := opts.FilePrefix | "-output";
+    infile := temporaryFileName(); -- opts.FilePrefix | "-input" 
+    outfile := temporaryFileName(); -- opts.FilePrefix | "-output" | filenameCounter;
     infile << gvInput(mori, heft, transpose degrees X, intersectionnums,
         opts.DegreeLimit, opts.Precision) << close;
     inputLine := opts.Executable | " <" | infile | " >" | outfile;
@@ -148,7 +157,10 @@ gvRay = method(Options => options gvInvariants)
 gvRay(CalabiYauInToric, List) := HashTable => opts -> (X, curveClass) -> (
     -- This doesn't seem to be correct
     if not isFavorable X then return null;
-    return gvInvariants(X,Mori => {curveClass})
+    degvec := heft X;
+    grad := dotProduct(degvec, curveClass);
+    << "using DegreeLimit: " << 4*grad << endl;
+    return gvInvariants(X,Mori => {curveClass}, DegreeLimit => 4 * grad, Heft => {0,1,0,0})
     )
 
 gvCone = method(Options => options gvInvariants)
@@ -300,6 +312,21 @@ gvRay(HashTable, List, ZZ, List) := opts -> (GVHash, C, deglimit, degvector) -> 
 count = 0;
 
 classifyExtremalCurve = method()
+
+classifyExtremalCurve List := rayC -> (
+    -- rayC: a list of the gv invariants along the ray of a toric mori cone extremal curve.
+    -- these are either extremal on the CY, or not effective on the CY.
+    if #rayC <= 2 then return {"OTHER", rayC};
+    if all(2..#rayC-1, i -> rayC#i == 0) then (
+        -- only first two, possibly, are non-zero.
+        if rayC#0 == 0 and rayC#1 == 0 then (count=count+1; return {"ZERO", count});
+        if rayC#0 == -2 or rayC#1 == -2 then return {"TYPEII0", rayC};
+        if rayC#0 >= 0 and rayC#1 >= 0 then return {"FLOP", rayC};
+        if rayC#0 < 0 or rayC#1 < 0 then return {"TYPEIIg", rayC};
+        )
+    else return {"POTENT", rayC}
+    )
+
 classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvector) -> (
     rayC := gvRay(GVHash, C, deglimit, degvector);
     if #rayC <= 2 then return {"OTHER", rayC};
@@ -452,4 +479,55 @@ classifyExtremalCurves CalabiYauInToric := opts -> X -> (
 moriConeCapGVInvariants = method()
 moriConeCapGVInvariants CalabiYauInToric := X -> (
     )
+
+-- How to write down this invariant.
+-- Note: if ZERO is present, then comaring it is indeterminate.
+
+-- If all toric mori cone cap rays have a non-zero gv invariant, then
+-- Two routines: (1) gives the matching.
+--               (2) is just the invariant.
+
+-- How to do this function best?
+-- return type: {true/unknown, invariant, matching}
+-- Input: X
+--    or: gvInvariants of X.
+--        
+-*
+step 1: compute the degrees of the toric mori cone cap curves
+step 2: compute gv's up to the max of these degrees (or retrieve those)
+step 3: if all gv#?c then true mori cone.
+  -- question: can we have n1=0, n2 != 0.
+
+
+*-
+
+computeGVInvariants = method()
+computeGVInvariants(CalabiYauInToric, List, ZZ) := (X, degvec, deglimit) -> (
     )
+
+-- Good one here, I think.
+extremalRayGVs = method(Options => {Limit => 4, Heft => null})
+extremalRayGVs(CalabiYauInToric, List) := opts -> (X, curveClass) -> (
+    if not isFavorable X then return null; -- later, maybe we can modify this...
+    degvec := if opts.Heft =!= null then opts.Heft else heft X;
+    deglimit := opts.Limit * dotProduct(degvec, curveClass);
+    gvHash := gvInvariants(X,Mori => {curveClass}, DegreeLimit => deglimit, Heft => degvec);
+    for i from 1 to opts.Limit list (
+        c := toSequence(i * curveClass);
+        if gvHash#?c then gvHash#c else 0
+        )
+    )
+
+classifyExtremalCurves CalabiYauInToric := opts -> X -> (
+    if not isFavorable X then error "expected favorable CY3-fold";
+    if not X.cache#?"toric mori cone gvs" then (
+        mori := toricMoriConeCap X;
+        val := hashTable for c in mori list (
+            gvs := extremalRayGVs(X, c, Limit => 4);
+            c => classifyExtremalCurve gvs
+            );
+        X.cache#"toric mori cone gvs" = partition(c -> val#c, mori)
+        );
+    X.cache#"toric mori cone gvs"
+    )
+

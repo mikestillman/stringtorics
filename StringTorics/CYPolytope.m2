@@ -6,16 +6,13 @@
 -- 
 
 CYPolytopeFields = {
-    -- first entry: true means it must exist and be in the main hash table
-    --   false: it might exist, and is in the cache table.
-    "rays" => {value, toString, List},
-    "face dimensions" => {value, toString, List}
+    "rays" => {value, toString, List}
     }
 
 -- These are the cache fields that we write to a string via 'dump'
 CYPolytopeCache = {
-    -- first entry: true means it must exist and be in the main hash table
-    --   false: it might exist, and is in the cache table.
+    -- these fields do not need to exist.
+    "face dimensions" => {value, toString, List},
     "id" => {value, toString, ZZ},
     "favorable" => {value, toString, Boolean},
     "h11" => {value, toString, ZZ},
@@ -30,6 +27,15 @@ CYPolytopeCache = {
 
 cyPolytope = method(Options => {ID => null})
 
+-- This is the main creation function.  Other functions call this.
+-- Goal: this function does NOT change vertices list
+-- TODO: currently it is NOT this!  
+
+-- vertices: A list of the integer coordinates (also a list)
+cyPolytope List := CYPolytope => opts -> vertices -> (
+    cyPolytope(transpose matrix vertices, opts)
+    )
+
 cyPolytope Polyhedron := opts -> P2 -> (    
     LP := latticePointList P2;
     LPdim := for lp in LP list dim(P2, minimalFace(P2, lp));
@@ -39,8 +45,8 @@ cyPolytope Polyhedron := opts -> P2 -> (
     cyData := new CYPolytope from {
         symbol cache => new CacheTable,
         "rays" => LP,
-        "face dimensions" => LPdim
         };
+    cyData.cache#"face dimensions" = LPdim;
     if opts.ID =!= null then cyData.cache#"id" = opts.ID;
     cyData
     )
@@ -48,10 +54,6 @@ cyPolytope Polyhedron := opts -> P2 -> (
 cyPolytope Matrix := CYPolytope => opts -> vertices -> (
     P2 := convexHull vertices;
     cyPolytope(P2, opts)
-    )
--- vertices: A list of the integer coordinates (also a list) of the vertices of the polytope
-cyPolytope List := CYPolytope => opts -> vertices -> (
-    cyPolytope(transpose matrix vertices, opts)
     )
 cyPolytope KSEntry := CYPolytope => opts -> tope -> (
     -- KSEntry is a Kreuzer-Skarke polytope entry, returned from
@@ -268,7 +270,7 @@ polytope(CYPolytope, String) := Polyhedron => (cyData, which) -> (
     if which === "N" then (
         if not cyData.cache#?"N polytope" then (
             LP := cyData#"rays";
-            LPdim := cyData#"face dimensions";
+            LPdim := cyData.cache#"face dimensions";
             verts := for i from 0 to #LP - 1 list if LPdim#0 == 0 then LP#i else continue;
             cyData.cache#"N polytope" = convexHull transpose matrix verts
             );

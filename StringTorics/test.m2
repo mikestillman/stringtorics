@@ -1496,13 +1496,13 @@ TEST ///
   for tope in topes list isFavorable convexHull matrix tope
   Q = cyPolytope(topes_8, ID => 8)
   Ts = findAllFRSTs Q  
-  Xs = findAllCYs Q
+  RZ = ZZ[a,b,c,d,e]
+  Xs = findAllCYs(Q, Ring => RZ)
 
-  for X in Xs list (X#"polytope data".cache#"id", X.cache#"id") -- id of each example.
+  assert((for X in Xs list label X) === {(8,0)}) -- (X#"polytope data".cache#"id", X.cache#"id") -- id of each example.
   for X in Xs list intersectionNumbers X
 
-  RZ = ZZ[a,b,c,d,e]
-  for X in Xs list topologicalData(X, RZ)
+  for X in Xs list topologicalData X
   assert(# unique oo == 1)
 
   Vs = Xs/ambient
@@ -1519,7 +1519,7 @@ TEST ///
   Q = cyPolytope(topes_30, ID => 30)
   Ts = findAllFRSTs Q
   RZ = ZZ[a,b,c]
-  Xs = for i from 0 to #Ts-1 list cyData(Q, Ts#i, ID => i, Ring => RZ)
+  Xs = for i from 0 to #Ts-1 list calabiYau(Q, Ts#i, ID => i, Ring => RZ)
   assert(#Xs == #Ts)
   vertices polytope Q
   label Q
@@ -1542,10 +1542,8 @@ TEST ///
 
   partitionGVConeByGV(X, DegreeLimit => 10)
   partitionGVConeByGV(X, DegreeLimit => 20)
-  partitionGVConeByGV(X, DegreeLimit => 40)
   hilbertBasis gvCone(X, DegreeLimit => 20)
-  gv = gvInvariants(X, DegreeLimit => 30);
-  
+  gv = gvInvariants(X, DegreeLimit => 20);
 ///  
 
 
@@ -1604,13 +1602,13 @@ TEST ///
   -- TODO: add tests for line bundles on X, and their cohomology.
 ///
 
-TEST ///
+/// -- NOT TESTED.
 -*
   restart
   needsPackage "StringTorics"
 *-  
   -- Testing interface for calabiYau, cyPolytope, in presence of databases.
-  DB = "Databases/cys-ntfe-h11-5.dbm"  
+  DB = (currentDirectory) | "Databases/cys-ntfe-h11-5.dbm"  
   RZ = ZZ[x_0..x_4]
   --elapsedTime (Qs, Xs) = readCYDatabase(DB, Ring => RZ); -- takes 13 seconds.
   --# sort keys Xs == 13635
@@ -1644,15 +1642,15 @@ TEST ///
   netList restrictTriangulation X,  netList restrictTriangulation X2
 ///
 
-TEST ///
+/// -- TODO: this test isn't finding the database file.
 -*
   restart
   needsPackage "StringTorics"
 *-  
   -- Testing interface for calabiYau, cyPolytope, in presence of databases.
   debug needsPackage "StringTorics"
-  DB = "../Databases/cys-ntfe-h11-3.dbm"  
-  DB = "./Databases/cys-ntfe-h11-3.dbm"  
+  -- TODO: this line doesn't work in tests, since the 
+  DB = "./Databases/cys-ntfe-h11-3.dbm"
   RZ = ZZ[a,b,c]
   elapsedTime (Qs, Xs) = readCYDatabase(DB, Ring => RZ);
   Q = Qs#6

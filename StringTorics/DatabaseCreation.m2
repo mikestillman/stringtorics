@@ -2625,3 +2625,89 @@ calabiYau(String, Sequence) := CalabiYauInToric => opts -> (dbfilename, lab) -> 
           ))//flatten//hashTable
 
 ///
+
+
+----------------------------------------------------------------
+-- Reading and writing polytopes, simplices, cy_classes files --
+----------------------------------------------------------------
+readPolytopes = method()
+readPolytopes String := filename -> (
+    contents := lines get filename;
+    hashTable for L in contents list (
+        v := toList value L;
+        lab := v#0;
+        i := 1;
+        pts := while i+3 <= #v list (
+            ans := for j from 0 to 3 list v#(i+j);
+            i = i + 4;
+            ans);
+        lab => pts
+        )
+    )
+
+readSimplices = method()
+readSimplices String := filename -> (
+    contents := lines get filename;
+    hashTable for L in contents list (
+        v := toList value L;
+        labX := v#0;
+        labQ := v#1;
+        i := 2;
+        simplices := while i+3 <= #v list (
+            ans := for j from 0 to 3 list v#(i+j)-1;
+            i = i + 4;
+            ans);
+        labX => {labQ, simplices}
+        )
+    )
+
+readEquivalences = method()
+readEquivalences String := List => filename -> (
+    contents := lines get filename;
+    for L in contents list (
+        v := value ("{"|L|"}");
+        i := 0;
+        equivsets := while i < #v list (
+            ans := while i < #v and v#i != -1 list (a := v#i; i=i+1; a);
+            if i < #v then i = i+1;
+            ans
+            );
+        equivsets
+        )
+    )
+
+cyPolytope(HashTable, ZZ):= CYPolytope => opts -> (vertexData, ind) -> (
+    cyPolytope(transpose matrix vertexData#ind, ID => ind)
+    )
+-- This function should not change the order of points?  But it does.
+
+///
+
+  restart
+  debug needsPackage "StringTorics"
+  DIRNAME = "~/Dropbox/Collaboration/Physics-Liam/Inequivalent CYs/cy_classes/"
+
+  Ps = readPolytopes(DIRNAME|"polytopes_h11=2.dat")
+  Ss = readSimplices(DIRNAME|"simplices_h11=2.dat")
+  Es = readEquivalences(DIRNAME|"cy_classes_h11=2.dat")
+  cyPolytope(Ps, 3)
+
+  readPolytopes(DIRNAME|"polytopes_h11=3.dat")
+  readSimplices(DIRNAME|"simplices_h11=3.dat")
+  readEquivalences(DIRNAME|"cy_classes_h11=3.dat")
+
+  Ps = readPolytopes(DIRNAME|"polytopes_h11=4.dat");
+  Ss = readSimplices(DIRNAME|"simplices_h11=4.dat");
+  Equivs = readEquivalences(DIRNAME|"cy_classes_h11=4.dat");
+
+  elapsedTime Qs = for lab in sort keys Ps list cyPolytope(Ps#lab, ID => lab);
+  
+
+  get (DIRNAME|"simplices_h11=2.dat")
+  get (DIRNAME|"cy_classes_h11=4.dat")
+  Q = cyPolytope oo
+  hh^(1,2) Q
+  isReflexive polytope Q
+  vertices polytope Q
+  netList annotatedFaces Q
+///

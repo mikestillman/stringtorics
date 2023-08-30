@@ -166,6 +166,20 @@ export {
     "partitionGVConeByGV",
     "findLinearMaps",
 
+    -- Invariants
+    "hubschInvariants",
+    "PointCounter",
+    "pointCounter",
+    "pointCounts",
+    "invariantsH11H12",
+    "invariantContents",
+    "hessianInvariants",
+    "singularContents",
+    "cubicConductorInvariants", -- rename?
+    "cubicLinearConductorInvariants", -- rename?
+    "singularContentsQuartic", -- rename?
+    "aronhold",
+    
     -- Topology
     "topologicalData",
     "isEquivalent",

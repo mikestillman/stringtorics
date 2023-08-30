@@ -225,6 +225,7 @@ TEST ///
  restart
  debug needsPackage "StringTorics"
 *-
+  debug StringTorics -- for allPoints, createPointMaps
   assert(
       allPoints(3, 2) 
       === 
@@ -241,12 +242,11 @@ TEST ///
   createPointMaps((2,2), R)
   createPointMaps((2,2), R, Projective => false)
   createPointMaps((2,3), ZZ[a,b,c])
-  
+
   R = ZZ[a,b,c];
-  elapsedTime PC = pointCounter(R, {2,3,5,7,11,13,(2,2),(3,2),(2,3)});
+  elapsedTime PC = pointCounter(R, "Primes" => {2,3,5,7,11,13,(2,2),(3,2),(2,3)});
   transpose matrix pointCounts(PC, a+b, a^3+b^3+c^3-3*a*b*c)
   transpose matrix pointCounts(PC, a+b, a^3+b^3+c^3-4*a*b*c)
-*-
 ///
 
 invariantsH11H12 = method()
@@ -339,6 +339,20 @@ singularContents Ideal := (J) -> (
             prevgcd
             ))
     )
+
+singularContentsQuartic = method()
+singularContentsQuartic CalabiYauInToric := (X) -> (
+   << "singularContentsQuartic: doing " << label X << endl;
+   F := cubicForm X;
+   F = F // polynomialContent F;
+   L := c2Form X;
+   L = L // polynomialContent L;
+   F = F*L;
+   jac := ideal F + ideal jacobian F;
+   jacsat := saturate jac;
+   singularContents jacsat
+   )
+ 
 ----------------------------------------------------------------------------------
 
 --Ternary cubic form for
@@ -437,7 +451,8 @@ aronhold RingElement := List => F -> (
     {S, T}
     )
     
-TEST ///
+/// -- TEST: takes too long
+  debug StringTorics -- for aronholdS, aronholdT.
   KK = QQ[a,b,c,d,e,f,g,h,i,j]
 
   S = a*g*e*c - a*g*h^2 - a*j*b*c + a*j*e*h + a*f*b*h - a*f*e^2 - 

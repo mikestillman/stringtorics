@@ -14,29 +14,57 @@ RZ = ZZ[a,b,c,d]
 RQ = QQ (monoid RZ);
 (Qs, Xs) = readCYDatabase(DB4, Ring => RZ);
 
+favorableXs = for lab in sort keys Xs list if isFavorable Xs#lab then lab else continue;
+#favorableXs == 1760
+
 -- Considering invariants (not coming from GV invariants):
   allXs = sort keys Xs
-  allXs = sort select(keys Xs, lab -> isFavorable Xs#lab);
+
+  -- Here we only consider favorables for now.
+  allXs = favorableXs; -- sort select(keys Xs, lab -> isFavorable Xs#lab);
   allT = topologySet(allXs, Xs);
-  info allT -- 2014 possibly different topologies
+  info allT -- 1760 possibly different topologies, over all favorables.
 
   allT = separateIfDifferent(allT, invariantsH11H12)
   info allT
 
-  allT = separateIfDifferent(allT, hubschInvariants)
+  elapsedTime allT = separateIfDifferent(allT, hubschInvariants)
   info oo
 
   PC = pointCounter(RZ, Projective => true);
-  elapsedTime allT = separateIfDifferent(allT, pointCounts_PC)
+  elapsedTime allT = separateIfDifferent(allT, pointCounts_PC) -- 181 seconds
   info allT 
+  -- TODO: need to cache these point counts.  They take too long, even at h11=4.
   -- By itself: gets it to 1111.
-  -- After invariantsH11H12, hubschInvariants, this gives: 1114 different.
+  -- After invariantsH11H12, hubschInvariants, this gives: 1113 different favorables
 
   allT = separateIfDifferent(allT, hessianInvariants)
-  info oo -- goes from 1114 to 1123, but is much faster too than point counts.
+  info oo -- goes from 1113 to 1122 favorables, but is much faster too than point counts.
   -- by itself: 100 different classes.
   -- after h11h12, hubsch: 660 different classes
   --partition(lab -> hessianInvariants Xs#lab, sort keys Xs);
+
+  elapsedTime allT = combineByGV(allT, DegreeLimit => 10); -- 220 sec
+  info allT
+  for xset in representatives allT list for lab in xset list 
+    sort for c in toricMoriConeCap Xs#lab list extremalRayGVs(Xs#lab, c, Limit => 4);  
+
+  elapsedTime allT = combineByGV(allT, DegreeLimit => 15); --  sec
+  info allT
+
+  for xset in representatives allT list for lab in xset list 
+    sort for c in toricMoriConeCap Xs#lab list extremalRayGVs(Xs#lab, c, Limit => 4);  
+
+
+-- This is a good place to do first round: combine using GV's.
+  allT = separateIfDifferent(allT, singularContents)
+  info oo -- lower bound on different favorable tops is 1127 at this point.
+
+  elapsedTime allT = separateIfDifferent(allT, singularContentsQuartic)
+  info oo -- lower bound on different (favorable) tops is 1138.
+  
+
+  
 
   -- This gives the same benefit as hessianInvariants, if we first do: pointcounts, hubsch, h11h12.
   allT = separateIfDifferent(allT, X -> polynomialContent det hessian cubicForm X)

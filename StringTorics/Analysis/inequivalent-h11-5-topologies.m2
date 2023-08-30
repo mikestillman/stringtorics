@@ -11,11 +11,24 @@ DBNAME = "../Databases/cys-ntfe-h11-5.dbm"
 
 RZ = ZZ[a,b,c,d,e]
 RQ = QQ (monoid RZ);
-(Qs, Xs) = readCYDatabase(DBNAME, Ring => RZ);
+elapsedTime (Qs, Xs) = readCYDatabase(DBNAME, Ring => RZ);
 
 -- Considering invariants (not coming from GV invariants):
   allXs = sort keys Xs;
+  
+  nonfavorables = for k in keys Qs list (
+      if not isFavorable Qs#k then k else continue
+      )
+  
+  nonfavorableXs = sort select(keys Xs, lab -> member(first lab, nonfavorables))
+  #nonfavorables == 93
+  #nonfavorableXs == 134
+
+  favorableXs = sort for k in keys Xs list if isFavorable Qs#(first k) then k else continue;
+  #favorableXs == 11713
+
   allT = topologySet(allXs, Xs);
+  allT = topologySet(favorableXs, Xs);
   info allT -- 1 bucket. (11847 possibly different topologies)
 
   elapsedTime allT = separateIfDifferent(allT, invariantsH11H12) -- 3 sec
