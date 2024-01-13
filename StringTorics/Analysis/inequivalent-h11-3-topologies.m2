@@ -24,19 +24,22 @@ elapsedTime (Qs, Xs) = readCYDatabase(DB3, Ring => R);
 
 torsionCYs = sort select(keys Xs, lab -> member(first lab, torsions))
 nonfavorableCYs = sort select(keys Xs, lab -> member(first lab, nonfavorables))
+favorableXs = sort select(keys Xs, lab -> not member(first lab, nonfavorables))
 assert(torsionCYs == {(0, 0), (9, 0), (10, 0), (55, 0), (62, 0)})
 assert(nonfavorableCYs == {(232,0)})
 
 -- how many of these have nonfavorable dual polytopes
 -- these are the ones that are not nec general in moduli
-select(sort keys Qs, lab -> (ans := not isFavorable polar Qs#lab; print ans; ans))
+-- select(sort keys Qs, lab -> (ans := not isFavorable polar Qs#lab; print ans; ans))
 
 ---------------------------------------------------------------
 -- Next step: How many of these 306 are distinct topologies? --
 ---------------------------------------------------------------
   allXs = sort keys Xs
+
+  allXs = favorableXs -- Numbers refer to this situation.
   allT = topologySet(allXs, Xs);
-  info allT -- 306 possibly different topologies
+  info allT -- 274 possibly different topologies
 
   allT = separateIfDifferent(allT, invariantsH11H12)
   info allT
@@ -66,8 +69,18 @@ select(sort keys Qs, lab -> (ans := not isFavorable polar Qs#lab; print ans; ans
 
   allT = separateIfDifferent(allT, singularContents) -- this is a good one!
   info oo -- on its own, breaks into 168 classes, BUT no new ones after using above
-  
 
+  newsets = for reps in representatives allT list (
+      partition(lab -> classifyExtremalCurves Xs#lab, reps)
+      )
+
+  netList extremalCurveInvariant(Xs#(2,0))
+  netList extremalCurveInvariant(Xs#(2,1))
+  
+  newsets = for reps in representatives allT list (
+      partition(lab -> netList extremalCurveInvariant Xs#lab, reps)
+      )
+  
   -- -- Don't use affine points.  They are likely equivalent to projective points, and *much* slower.
   -- PC = pointCounter(RZ, Projective => false); -- very pricy...
   -- allTA = separateIfDifferent(allT, pointCounts_PC)
@@ -94,6 +107,7 @@ select(sort keys Qs, lab -> (ans := not isFavorable polar Qs#lab; print ans; ans
   -- We have two ways to proceed here.
 
   -- VERSION #1: use GV invariants to find equivalences
+
   elapsedTime allT3a = combineByGV(allT2, DegreeLimit => 5); -- 14 sec
     info allT3a
     netList representatives allT3a

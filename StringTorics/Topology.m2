@@ -135,8 +135,12 @@ separateIfDifferent(TopologySet, Function) := (T, fun) -> (
     -- the 'flatten' on the next line makes one list of all definitely distinct topologies
     newsets := flatten for L in T#"Sets" list (
         -- L is a list of labels, all are equivalent (so maybe only one, but always >= 1).
-        P := partition(lab -> fun Xs#(first lab), L);
-        values P
+        if #L === 1 then {L}
+        else (
+            -- TODO: is this correct? XXX Just changed, not fixed....
+            P := partition(lab -> fun Xs#(first lab), L);
+            values P
+            )
         );
     new TopologySet from {
         "Sets" => newsets,
@@ -404,10 +408,10 @@ separateAndCombineViaAnsatz(List, HashTable, Ring) := List => (Ls, Ts, RQ) -> (
   -- Analyze h11=3 examples
 restart
 debug needsPackage "StringTorics"
-  R = ZZ[a,b,c]
-  RQ = QQ (monoid R);
-  (Qs, Xs) = readCYDatabase("../m2-examples/foo-cys-ntfe-h11-3.dbm", Ring => R);
-  
+  RZ = ZZ[a,b,c]
+  RQ = QQ (monoid RZ);
+  --(Qs, Xs) = readCYDatabase("../m2-examples/foo-cys-ntfe-h11-3.dbm", Ring => RZ);
+  (Qs, Xs) = readCYDatabase("./Databases/cys-ntfe-h11-3.dbm", Ring => RZ);
   -- First, let's only consider those with torsion free class group.
    torsions = for k in keys Qs list (
       istor := prune coker matrix rays Qs#k != ZZ^3;
@@ -415,13 +419,14 @@ debug needsPackage "StringTorics"
       )
 
   allXs = sort select(keys Xs, x -> not member(x#0, torsions))
+  allXs = sort keys Xs
   allT = topologySet(allXs, Xs);
 
   allT1 = combineIfSame(allT, X -> (c2Form X, cubicForm X))
   info allT1 
 
-  elapsedTime allT2 = separateIfDifferent(allT1, invariantsAll) -- 17 sec
-  info allT2
+  elapsedTime allT = separateIfDifferent(allT, invariantsAll) -- 17 sec
+  info allT
 
   elapsedTime allT3 = separateByGV allT2 -- 44 sec
   info allT3

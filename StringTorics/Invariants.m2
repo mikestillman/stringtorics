@@ -120,6 +120,33 @@ hubschInvariants CalabiYauInToric := X -> join(hubsch1 X, hubsch2 X, {gcd c2 X})
 ---------------------------------------
 -- Point counts -----------------------
 ---------------------------------------
+allPrimitivePoints = (ht, n) -> (
+    -- all nonzero primitive integer points in n-space, whose first
+    -- nonzero value is > 0
+    -- and whose gcd is 1, with entries a satisfying |a| <= ht
+    )
+
+allPointsToHeight = (ht, n) -> (
+    -- all points in ZZ^n, with each entry a s.t. |a| <= ht.
+    pts := for a from -ht to ht list {a};
+    if n === 1 then return pts;
+    if n === 0 then return {{}};
+    if n < 0 then error "internal logic error";
+    b := allPointsToHeight(ht, n-1);
+    flatten for a from -ht to ht list (b/(b1 -> prepend(a, b1)))
+    )
+
+allPrimitivePointsToHeight = (ht, n) -> (
+    pts := allPointsToHeight(ht, n);
+    for p in pts list (
+        nonzero := select(1, p, a ->  a != 0);
+        if #nonzero == 0 then continue;
+        --if nonzero#0 < 0 then continue;
+        if gcd p != 1 then continue;
+        p
+        )
+    )
+
 allPoints = (p, n) -> (
     -- all points in kk = ZZ//p in kk^n
     pts := for a from 0 to p-1 list {a};
@@ -498,6 +525,27 @@ aronhold RingElement := List => F -> (
   assert(aronholdT F == T) -- aronholdT is really too intensive for impatient people.
 ///
 
+hesseForm = method()
+hesseForm RingElement := F -> (
+    R := ring F;
+    if numgens R != 3 or first degree F =!= 3 or not isHomogeneous F
+    then error "expected homogeneous cubic in a ring with 3 variables";
+    -- TODO: this doesn't check that the degrees are all 1 yet...
+    
+    )
+
+TEST ///
+-- from cubicForm Xs#(12,0)
+  RQ = QQ[a,b,c]
+  F = -a^3+9*a^2*b-9*a*b^2+3*b^3+3*a^2*c-3*a*c^2+c^3
+  factor det hessian F
+  -- 3 factors:
+  a --> a, a-c -> b, a-b -> c
+  phi = map(RQ, RQ, {a, a-c, a-b})
+  phi^-1 F -- same!
+  phi F
+///
+
 end--
 
 -- notes on Elsenhans-Jahnel: Computing invariants of cubic surfaces (2020).
@@ -552,4 +600,5 @@ elapsedTime diff((det DM_{2,0,5}), oo);
 elapsedTime diff((det DM_{1,2,4}), oo);
 elapsedTime diff((det DM_{0,1,3}), oo);
 elapsedTime diff((det DM_{0,1,2}), oo);
-oo
+
+

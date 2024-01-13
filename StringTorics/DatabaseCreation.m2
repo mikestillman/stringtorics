@@ -2698,11 +2698,33 @@ cyPolytope(HashTable, ZZ):= CYPolytope => opts -> (vertexData, ind) -> (
 
   Ps = readPolytopes(DIRNAME|"polytopes_h11=4.dat");
   Ss = readSimplices(DIRNAME|"simplices_h11=4.dat");
-  Equivs = readEquivalences(DIRNAME|"cy_classes_h11=4.dat");
+  Es = readEquivalences(DIRNAME|"cy_classes_h11=4.dat");
 
-  elapsedTime Qs = for lab in sort keys Ps list cyPolytope(Ps#lab, ID => lab);
+  Ps = readPolytopes(DIRNAME|"polytopes_h11=5.dat");
+  Ss = readSimplices(DIRNAME|"simplices_h11=5.dat");
+  Es = readEquivalences(DIRNAME|"cy_classes_h11=5.dat");
+
+  Qs = new MutableHashTable
+  Xs = new MutableHashTable
+  RZ = ZZ[a,b,c,d]
+  elapsedTime X = makeCY(13, (Ps, Ss), Qs, Xs, Ring => RZ) -- this sets Qs#899, Xs#13.
+  elapsedTime X = makeCY(12, (Ps, Ss), Qs, Xs, Ring => RZ) -- this sets Qs#899, Xs#13.
+  peek Qs#899  .cache
   
+  elapsedTime Qs = for lab in sort keys Ps list cyPolytope(Ps#lab, ID => lab);
 
+  Ps#3,  rays Q -- these are in different orders!
+  Q = cyPolytope(Ps#3, ID => 3)
+  latticePointList polytope(Q, "N")
+  rays Q
+  calabiYau(13, Ps, Ss) -- 
+  Ss#13
+  Q = cyPolytope(Ps#(Ss#13#0), ID => Ss#13#0)
+  label Q === 899
+  rays Q
+  Q.cache#"face dimensions"
+  Ps#899  
+  netList annotatedFaces Q
   get (DIRNAME|"simplices_h11=2.dat")
   get (DIRNAME|"cy_classes_h11=4.dat")
   Q = cyPolytope oo
@@ -2711,3 +2733,24 @@ cyPolytope(HashTable, ZZ):= CYPolytope => opts -> (vertexData, ind) -> (
   vertices polytope Q
   netList annotatedFaces Q
 ///
+
+makeCY(ZZ, Sequence, MutableHashTable, MutableHashTable) := opts -> (labX, PSs, Qs, Xs) -> (
+    if Xs#?labX then return Xs#labX;
+    (Ps, Ss) := PSs;
+    polytopeid := Ss#labX#0;
+    P := Ps#polytopeid;
+    S := Ss#labX;
+    if not Qs#?polytopeid then (
+        Qs#polytopeid = cyPolytope(P, ID => polytopeid);
+        );
+    Q := Qs#polytopeid;
+    -- now place into the cache the translation for rays?
+    ---translate1 := hashTable for i from 0 to #Ps - 1 list Ps#i => i;
+    translate2 := hashTable for i from 0 to #(rays Q) - 1 list (rays Q)#i => i;
+    fromOldToNew := for i from 0 to #P-1 list translate2#(P#i);
+    tri := sort for T in S#1 list sort for t1 in T list fromOldToNew#t1;
+    X := calabiYau(Q, tri, ID => labX, Ring => opts#Ring);
+    Xs#labX = X;
+    X
+    )
+    

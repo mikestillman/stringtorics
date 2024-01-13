@@ -221,6 +221,7 @@ findLinearMaps(HashTable, HashTable) := List => (gv1, gv2) -> (
     -- gv1, gv2: result of partitionGVConeByGV
     if sort keys gv1 =!= sort keys gv2 then return {};
     for k in keys gv1 do if #gv1#k =!= #gv2#k then return {};
+    for k in keys gv1 do if #gv1#k >= 7 then return {}; -- do not waste time (1) trying to separate these?
     n := # (first values gv1)_0; -- we should check if all the values are lists of integers of this size.
     t := symbol t;
     T := QQ[t_(1,1)..t_(n,n)];
@@ -289,10 +290,10 @@ moriConeGVs(CalabiYauInToric, ZZ) := (X, deglimit) ->(
     -- deglimit that the GV invariants were computed to.
     -- loop thru the toric mori cone cap generators, and for each,
     -- look at the gv ray. -- then return a hash table whose keys are among
-    --   {POTENT, {gv vals on ray}
+    --   {TYPEII, {gv vals on ray} (potent ray: all non-zero, or infinitely many at least, nonzero)
     --   {FLOP, {gv vals on ray}, 
-    --   {TYPEII0, {gv vals on ray},
-    --   {TYPEIIg, {gv vals on ray}}
+    --   {TYPEIII0, {gv vals on ray},
+    --   {TYPEIIIg, {gv vals on ray}} might be indistinguishable from FLOP, in part because in general moduli these likely become FLOP's,
     --   {ZERO} -- this means that 
     --   {...}, C^perp has D^3 = 0.  Not sure what the gv invariants are in this case...
     -- and whose values are the list of curve classes with that type.
@@ -320,11 +321,11 @@ classifyExtremalCurve List := rayC -> (
     if all(2..#rayC-1, i -> rayC#i == 0) then (
         -- only first two, possibly, are non-zero.
         if rayC#0 == 0 and rayC#1 == 0 then (count=count+1; return {"ZERO", count});
-        if rayC#0 == -2 or rayC#1 == -2 then return {"TYPEII0", rayC};
-        if rayC#0 >= 0 and rayC#1 >= 0 then return {"FLOP", rayC};
-        if rayC#0 < 0 or rayC#1 < 0 then return {"TYPEIIg", rayC};
+        if rayC#0 == -2 or rayC#1 == -2 then return {"TYPEIII0", rayC};
+        if rayC#0 >= 0 and rayC#1 >= 0 then return {"FLOP", rayC}; -- these could be type IIIg as well?
+        if rayC#0 < 0 or rayC#1 < 0 then return {"TYPEIIIg", rayC}; -- 
         )
-    else return {"POTENT", rayC}
+    else return {"TYPEII", rayC}
     )
 
 classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvector) -> (
@@ -333,11 +334,11 @@ classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvec
     if all(2..#rayC-1, i -> rayC#i == 0) then (
         -- only first two, possibly, are non-zero.
         if rayC#0 == 0 and rayC#1 == 0 then (count=count+1; return {"ZERO", count});
-        if rayC#0 == -2 or rayC#1 == -2 then return {"TYPEII0", {rayC#0, rayC#1}};
+        if rayC#0 == -2 or rayC#1 == -2 then return {"TYPEIII0", {rayC#0, rayC#1}};
         if rayC#0 >= 0 and rayC#1 >= 0 then return {"FLOP", {rayC#0, rayC#1}};
-        if rayC#0 < 0 or rayC#1 < 0 then return {"TYPEIIg", {rayC#0, rayC#1}};
+        if rayC#0 < 0 or rayC#1 < 0 then return {"TYPEIIIg", {rayC#0, rayC#1}};
         )
-    else return {"POTENT", {rayC#0, rayC#1, rayC#2, "..."}}
+    else return {"TYPEII", {rayC#0, rayC#1, rayC#2, "..."}}
     )
 
 
@@ -531,3 +532,8 @@ classifyExtremalCurves CalabiYauInToric := opts -> X -> (
     X.cache#"toric mori cone gvs"
     )
 
+extremalCurveInvariant = method()
+extremalCurveInvariant CalabiYauInToric := X -> (
+    gv := classifyExtremalCurves X;
+    sort for a in pairs gv list {a#0, #a#1}
+    )

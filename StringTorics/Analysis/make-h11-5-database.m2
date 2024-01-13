@@ -38,6 +38,25 @@
 
   combineCYDatabases{DBNAME, DBNAME1, DBNAME2, DBNAME3, DBNAME4, DBNAME5}
 
+  restart
+  debug needsPackage "StringTorics"
+  DBNAME = "../Databases/cys-ntfe-new-h11-5.dbm"
+  DBNAME1 = "../Databases/cys-ntfe-new-h11-5-part1.dbm"
+  DBNAME2 = "../Databases/cys-ntfe-new-h11-5-part2.dbm"
+  DBNAME3 = "../Databases/cys-ntfe-new-h11-5-part3.dbm"
+  DBNAME4 = "../Databases/cys-ntfe-new-h11-5-part4.dbm"
+  DBNAME5 = "../Databases/cys-ntfe-new-h11-5-part5.dbm"
+    
+  topes = kreuzerSkarke(5, Limit => 20000); -- 4990 of these
+  assert(#topes == 4990)
+  elapsedTime addToCYDatabase(DBNAME1, topes_{0..1000}) -- running in m2-2
+  elapsedTime addToCYDatabase(DBNAME2, topes_{1001..2000}) -- running in m2-3
+  elapsedTime addToCYDatabase(DBNAME3, topes_{2001..3000}) -- running in m2-4
+  elapsedTime addToCYDatabase(DBNAME4, topes_{3001..4000}) -- running in m2-5
+  elapsedTime addToCYDatabase(DBNAME5, topes_{4001..4989}) -- running in m2-6
+
+  combineCYDatabases{DBNAME, DBNAME1, DBNAME2, DBNAME3, DBNAME4, DBNAME5}
+
 ---------------------------------
 -- Check the database somewhat --
 ---------------------------------
