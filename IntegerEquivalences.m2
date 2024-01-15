@@ -17,6 +17,7 @@ export {
     "genericLinearMap", -- genericLinearMap(R).  Constructs two new rings, T, U, a matrix A over T nxn, n = numgens R, and phi = map(U, U, transpose A).
     "invertibleMatrixOverZZ",
     "matches",
+    "selectLinear",
     "matchingData",
     "allSigns",
     "signedPermutations",
@@ -194,12 +195,34 @@ matches MatchingData := List => (MD) -> (
     targs = targs/flatten;
     (src, targs)
     )
-    
-    -- targets := cartesian (MD/(x -> if instance(x#1, List) then x#1 else {x#1}));
-    -- src := MD/first//flatten//toList;
-    -- (src, targets/flatten//toList)
 
-    -- )
+selectLinear = method()
+selectLinear MatchingData := MatchingData => (MD) -> (
+    -- ASSUMPTION: the base ring for Ideals and RingElement's is standard graded polynomial ring.
+    -- we keep only the ring elements that are linear.
+    -- for each ideal, we take only the linear elements.
+    -- We keep all row and column matrices.
+    matchingData for elem in MD list (
+        if instance(elem, Option) then (
+            if instance(elem#0, RingElement) then (
+                if degree elem#0 === {1} then elem else continue
+            ) else if instance(elem#0, Matrix) then elem
+        ) else (
+            if instance(elem#1#0, RingElement) then (
+                if degree elem#1#0 === {1} then elem else continue
+                )
+            else if instance(elem#1#0, Ideal) then (
+                elem1 := for x in elem#1 list
+                    select(x_*, f -> degree f === {1});
+                if #elem1#0 === 0 then continue;
+                elem2 := for x in elem#2 list
+                    select(x_*, f -> degree f === {1});
+                {elem#0, elem1/ideal, elem2/ideal}
+                )
+            else elem
+        ))
+    )
+
 
 invertibleMatrixOverZZ = method()
 invertibleMatrixOverZZ(Matrix, Ideal) := Sequence => (A, J) -> (
@@ -584,6 +607,20 @@ TEST ///
   netList first matches md
   netList last matches md
 
+  md = matchingData {
+    F1 => F2, 
+    L1 => L2,
+    {Permutations, {ideal(M1, M2^2), ideal(M2,M3^2)}, {ideal(N1,N2^2), ideal(N2,N3^2)}},
+    {SignedPermutations, {M1,M2,M3}, {N1,N2,N3}},
+    matrix{{1,2,3}} => matrix{{1,-2,1}}
+    }
+  assert isWellDefined md
+  matches md
+  netList first matches md
+  netList last matches md
+
+  md1 = selectLinear md
+  
   assert try (matchingData {
     {F1, F2},
     {Permutations, {L1}, {L2}},
