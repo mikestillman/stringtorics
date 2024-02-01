@@ -1,3 +1,7 @@
+-------------------------------------------------------
+-- OLD: replaced with IntegerEquivalences package -----
+-- TO BE REMOVED, do not use --------------------------
+-------------------------------------------------------
 debug needsPackage "StringTorics"
 -- routine to take saturation of singF, and its components, to their images
 
@@ -564,6 +568,7 @@ TEST ///
   needsPackage "StringTorics"
 *-
   DBNAME = "../Databases/cys-ntfe-h11-5.dbm"
+  DBNAME = "./Databases/cys-ntfe-h11-5.dbm"
   RZ = ZZ[a,b,c,d,e]
   RQ = QQ (monoid RZ);
   needs "../FindEquivalence.m2"

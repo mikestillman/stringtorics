@@ -96,7 +96,7 @@ DBNAME = "../Databases/cys-ntfe-h11-5.dbm"
 
 RZ = ZZ[a,b,c,d,e]
 RQ = QQ (monoid RZ);
-needs "../FindEquivalence.m2"
+--needs "../FindEquivalencesV2.m2"
 (A,phi) = genericLinearMap RQ
 
 elapsedTime (Qs, Xs) = readCYDatabase(DBNAME, Ring => RZ);
@@ -115,11 +115,11 @@ elapsedTime (Qs, Xs) = readCYDatabase(DBNAME, Ring => RZ);
   favorableXs = sort for k in keys Xs list if isFavorable Qs#(first k) then k else continue;
   #favorableXs == 11713
 
-  REPS = value get "inequiv-reps-h11-5"
+  REPS = value get "inequiv-reps-h11-5" -- 228 sets consisting of 489 topologies...
 
   elapsedTime for x in REPS list (
       elapsedTime for x1 in x list invariantsAll Xs#x1
-      );
+      ); -- this takes: 253 seconds...
   INVS = oo/unique/first;
 
   SETS = partition(x -> {

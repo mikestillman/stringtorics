@@ -1054,55 +1054,6 @@ partitionByTopology(List, HashTable, ZZ) := (Ls, Xs, degreelimit) -> (
     new HashTable from distinctTops
     )
 
--- Code to help determine equivalences between cubic forms.
--- 1. DONE Create ring T, TR, and (general) matrix A, and perhaps a phi: TR --> TR
---   corresponding to A.
--- 2. Given a list of linear forms that must map to other linear forms, find the constraint ideal
---   in T.
--- 3. Given points that map to points (in the contravariant map between affine spaces), 
---   find the constraint ideal.
--- 4. Given a list of linear forms that must match, up to sign, another set of linear forms.
---   
-genericLinearMap = method(Options => {Variable => null})
-genericLinearMap Ring := opts -> R -> (
-    -- R should be a polynomial ring in n variables.
-    n := numgens R;
-    K := coefficientRing R;
-    t := if opts.Variable === null then getSymbol "t" else opts.Variable;
-    T := K[t_(1,1)..t_(n,n)];
-    TR := T [gens R, Join => false];
-    A := map(T^n,,transpose genericMatrix(T, T_0, n, n));
-    phi := map(TR, TR, transpose A);
-    (A, phi)
-    )
-
-TEST ///
-  debug StringTorics
-  R = ZZ/101[a..d]
-  (A, phi) = genericLinearMap R
-  TR = target phi
-  assert(source phi === TR)
-  assert(ring A === coefficientRing TR)
-  for i from 0 to 3 do 
-    assert(phi TR_i == (A^{i} * (transpose vars TR))_(0,0))
-
-  R = ZZ[a..d]
-  (A, phi) = genericLinearMap R
-  TR = target phi
-  assert(source phi === TR)
-  assert(ring A === coefficientRing TR)
-  for i from 0 to 3 do 
-    assert(phi TR_i == (A^{i} * (transpose vars TR))_(0,0))
-
-  R = QQ[a..e]
-  (A, phi) = genericLinearMap R
-  TR = target phi
-  assert(source phi === TR)
-  assert(ring A === coefficientRing TR)
-  for i from 0 to numgens R - 1 do 
-    assert(phi TR_i == (A^{i} * (transpose vars TR))_(0,0))
-///
-
 linearEquationConstraints = method()
 linearEquationConstraints(Matrix, RingMap, List, List) := Sequence => (A, phi, Ls, pts) -> (
     -- each entry of Ls is a list/sequence of length 2: {F, G}

@@ -65,7 +65,8 @@ newPackage(
             "CohomCalg",
             "Topcom",
             "Triangulations",
-            "InverseSystems"
+            "InverseSystems",
+            "IntegerEquivalences"
             },
         PackageImports => {
             --"Graphs", 
@@ -165,6 +166,7 @@ export {
     "gvCone",
     "partitionGVConeByGV",
     "findLinearMaps",
+    "classifyExtremalCurves",
 
     -- Invariants
     "hubschInvariants",

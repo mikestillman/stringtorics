@@ -1,3 +1,8 @@
+-------------------------------------------------------
+-- OLD: replaced with IntegerEquivalences package -----
+-- TO BE REMOVED, do not use --------------------------
+-------------------------------------------------------
+
 debug needsPackage "StringTorics" -- let's arrange this so it doesn't need "debug"...
  -- debug needed for (at least): genericLinearMap.
 
