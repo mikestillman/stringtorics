@@ -1,5 +1,11 @@
 # stringtorics
 
+I want to have a cleaner interface.
+-- use normal toric varieties
+-- make sure we can write info we want to disk
+-- CompleteIntersectionInToric class is what our Calabi-Yau's should be?
+
+
 This is a bit out of date.  TODO: clean it up.    
     
 Currently, we have the poorly named types:

@@ -552,7 +552,7 @@ TEST ///
 --  needs "../FindEquivalence.m2"
   (A,phi) = genericLinearMap RQ
   elapsedTime (Qs, Xs) = readCYDatabase(DBNAME, Ring => RZ);
-  REPS = value get "./StringTorics/Analysis/inequiv-reps-h11-5"
+  REPS = value get "./Analysis/inequiv-reps-h11-5"
   SETS = new HashTable from {
       {{{4,1},{4,1}},{{5,1}}} => {50,55,65,66,70,72,73,80,85,91,92,95,96,100,103,116,117,186,193}, 
       {{{5,1}},{{5,1}}} => {7,9,10,14,22,23,24,27,31,36,37,49,51,56,71,93,99,101,102,108,115,130}, 
@@ -590,13 +590,13 @@ TEST ///
   -- column 3: # of REP sets
   -- column 4: list of indices into REPS.
   
-  -- We can use this collection to test FindEquivalence.m2 code:
+  -- We can use this collection to test IntegerEquivalences package:
   -- Goal: for each set of labels REPS#i, determine if these are the same topology or different.
   -- Note: some are very easy, some I can't yet do.
 
   -- example: REPS#87 {(1835, 0), (1864, 0), (1876, 0)}
   -- example: REPS#222
-  (X1, X2, X3) = REPS#222/(lab -> Xs#lab)//toSequence
+  (X1, X2, X3) = REPS#87/(lab -> Xs#lab)//toSequence
   (L1, F1) = (c2Form X1, cubicForm X1)
   (L2, F2) = (c2Form X2, cubicForm X2)
   (L3, F3) = (c2Form X3, cubicForm X3)
@@ -612,7 +612,6 @@ TEST ///
   GV1 = classifyExtremalCurves X1
   GV2 = classifyExtremalCurves X2
   netList {GV1, GV2}
-
 
   (X1, X2) = REPS#44/(lab -> Xs#lab)//toSequence
   (L1, F1) = (c2Form X1, cubicForm X1)
@@ -653,6 +652,44 @@ TEST ///
 
   matchingData{transpose matrix GV1#{"FLOP", {1,0,0,0}} => transpose matrix GV2#{"FLOP", {1,0,0,0}}}
   matchingData{{Permutations, transpose matrix GV1#{"FLOP", {3,0,0,0}}, transpose matrix GV2#{"FLOP", {1,0,0,0}}}
+
+  -- hessians which should be straightforward
+  set1 = SETS#{{{5,1}}, {{1, 1}, {1, 1}, {1, 1}, {1, 1}, {1, 1}}}  
+  elapsedTime for a in take(set1,6) list (
+      if #REPS#a != 2 then continue;
+      << "DOING " << a << endl;
+      (X1, X2) = REPS#a/(lab -> Xs#lab)//toSequence;
+      (L1, F1) = (c2Form X1, cubicForm X1);
+      (L2, F2) = (c2Form X2, cubicForm X2);
+      md := hessianMatches(F1, F2) | {L1 => L2} | {F1 => F2};
+      md1 := selectLinear md;
+      ans := tryEquivalences(md1 | {F1 => F2}, RQ, (A, phi));
+      --if ans#0 === INCONSISTENT then {{first a}, {last a}} else if ans#0 === CONSISTENT then {first a, last a, ans#1} else {a, ans}
+      print (a => ans);
+      ans
+      )
+  -- if a pair are the same, make a list {first, second, matrix}
+  -- if a pair is not the same, make {{first}, {second}}      
+  
+  set1 = SETS#{{{5,1}}, {{1, 1}, {1, 1}, {1, 1}, {2, 1}}} -- {33, 58} both distinct.
+  set1 = SETS#{{{4,1},{4,1}}, {{1, 1}, {1, 1}, {1, 1}, {2, 1}}} -- {133, 170, 209} distinct pairs
+  set1 = SETS#{{{5,1}}, {{1, 1}, {1, 1}, {3, 1}}} -- 
+  elapsedTime for a in take(set1,6) list (
+      if #REPS#a != 2 then (
+          << "DEFERRING " << a << " " << REPS#a << endl;
+          continue;
+          );
+      << "DOING " << a << " " << REPS#a << endl;
+      (X1, X2) = REPS#a/(lab -> Xs#lab)//toSequence;
+      (L1, F1) = (c2Form X1, cubicForm X1);
+      (L2, F2) = (c2Form X2, cubicForm X2);
+      md := hessianMatches(F1, F2) | {L1 => L2} | {F1 => F2};
+      md1 := selectLinear md;
+      ans := tryEquivalences(md1 | {F1 => F2}, RQ, (A, phi));
+      --if ans#0 === INCONSISTENT then {{first a}, {last a}} else if ans#0 === CONSISTENT then {first a, last a, ans#1} else {a, ans}
+      print (a => ans);
+      ans
+      )
   
 ///
 
