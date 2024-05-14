@@ -45,8 +45,8 @@
 
 newPackage(
         "StringTorics",
-        Version => "0.6", 
-        Date => "12 June 2023",
+        Version => "0.7", -- bumped on 12 April.
+        Date => "12 April 2024",
         Authors => {
             {Name => "Mike Stillman", 
             Email => "mike@math.cornell.edu", 
@@ -81,6 +81,7 @@ export {
     "TopologicalDataOfCY3",
 
     -- CYPolytope, CalabiYauInToric
+    "InteriorFacets",
     "ID",
     "cyPolytope",
     "dump",
@@ -626,6 +627,29 @@ applyPermutation(List, List) := (P, L) -> sort for f in L list applyPermutation(
           )
       )
 
+  QQCartierCoefficients = method ()
+  QQCartierCoefficients ToricDivisor := List => D -> (
+    X := variety D;
+    rayMatrix := QQ ** matrix rays X;
+    coeffs := QQ ** transpose (matrix {entries D});
+    apply (max X, sigma -> coeffs^sigma // rayMatrix^sigma)
+    );
+
+  monomialsToLatticePoints = method()
+  monomialsToLatticePoints(ToricDivisor, List) := List => (D, monoms) -> (
+      -- given a list of monomials in the Cox ring, returns their corresponding lattice point in the M lattice.
+      -- Maybe we do not need D?  Just the toric variety itself?
+    X := variety D;    
+    if not isProjective X then 
+        error "--expected the underlying toric variety to be projective";
+    degs := QQ ** transpose matrix rays X;
+    deginverse := transpose(id_(QQ^(numrows degs)) // degs);
+    coeff := matrix vector D;
+    for mon in monoms list (
+        flatten entries sub(deginverse * (transpose matrix{first exponents mon} - coeff), ZZ)
+	)
+    )
+
   normalToricVarietyFromGLSM = method(Options=>options normalToricVariety)
   normalToricVarietyFromGLSM(Matrix, List) := opts -> (GLSM, maxCones) -> (
       -- create rays from GLSM degrees (which will then be the output of 
@@ -918,6 +942,19 @@ load (currentFileDirectory | "StringTorics/doc.m2")
 load (currentFileDirectory | "StringTorics/test.m2")
 
 end--
+
+restart
+  uninstallAllPackages()
+
+restart
+  installPackage "IntegerEquivalences" -- works, lots of warnings
+  installPackage "DanilovKhovanskii"
+  installPackage "StringTorics"
+
+
+  check IntegerEquivalences -- 8 checks, finishes to completion.
+  check DanilovKhovanskii -- 10 checks, finishes, 3 take some time
+  check StringTorics -- 35 tests, finishes to completion.  3 tests take > 10 sec.
 
 restart
 needsPackage "StringTorics"

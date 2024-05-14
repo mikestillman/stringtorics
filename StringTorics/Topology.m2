@@ -831,9 +831,6 @@ integerPart Ideal := (I) -> (
     else error "internal error: somehow have two generators in ZZ in this GB"
     )
 
-hessian = method()
-hessian RingElement := F -> diff(vars ring F, diff(transpose vars ring F, F))
-
 --factorShape = method()
 -- This one is WRONG: lift(xxx, ZZ) could be positive or negative.  Those cannot be different.
 -- factorShape RingElement := F -> (

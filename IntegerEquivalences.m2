@@ -17,6 +17,7 @@ export {
     "genericLinearMap", -- genericLinearMap(R).  Constructs two new rings, T, U, a matrix A over T nxn, n = numgens R, and phi = map(U, U, transpose A).
     "invertibleMatrixOverZZ",
     "matches",
+    "hessian", -- place in Core?
     "hessianMatches",
     "selectLinear",
     "matchingData",

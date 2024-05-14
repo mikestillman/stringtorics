@@ -538,8 +538,8 @@ extremalCurveInvariant CalabiYauInToric := X -> (
     sort for a in pairs gv list {a#0, #a#1}
     )
 
-TEST ///
--- Tests of this code, 15 Jan 2023.
+///
+-- Tests of this code, 15 Jan 2023. Removed from tests, since it used created databases...
 -*
   restart
   needsPackage "StringTorics"

@@ -1146,6 +1146,58 @@ doc ///
   
 ///
 
+------------------------------------------------------------
+-- Routines for complete intersections in toric varieties --
+-- Some functionality is only for hypersurfaces! -----------
+------------------------------------------------------------
+
+///
+  Key
+      CompleteIntersectionInToric
+  Headline
+      a complete intersection in a projective toric variety
+  Description
+    Text
+      Functions for this type include allowing intersection theory on the induced
+      intersection ring
+    Text
+      @SUBSECTION "Line bundles and cohomology on complete intersections in toric varieties"@
+    Text
+      @UL {
+          -- {TO ""},
+          -- {TO ""},
+          -- {TO ""}
+          }@
+    Text
+      Here is an example of using these facilities.  We consider a hypersurface in a normal toric
+      variety.
+    Example
+      needsPackage "StringTorics"
+      V = smoothFanoToricVariety(3, 10, CoefficientRing => ZZ/32003)
+      rays V
+      max V
+      dual monomialIdeal V
+      X = completeIntersection(V, {-toricDivisor V})
+      dim X == 2      
+      -- TODO: would like to check smoothness (one way: saturate(ideal minors(1, jacobian ideal equations X), ideal V))
+      -- TODO: codim
+    Example
+      pt = base(a,b,c)
+      Xa = abstractVariety(X, pt)
+      IX = intersectionRing Xa
+      numgens IX
+      L = OO_X(1,0,0)
+      hh^* L
+      hh^1 L
+      hh^10 L
+  Caveat
+  SeeAlso
+///
+
+
+
+
+
 -*
 ///
   Key

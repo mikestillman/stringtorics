@@ -66,6 +66,20 @@ LineBundle Sequence := (L, deg) -> (
 
 
 
+
+abstractVariety(CompleteIntersectionInToric, AbstractVariety) := opts -> (X,B) -> (
+    if not X.cache#?(abstractVariety, B) then X.cache#(abstractVariety, B) = (
+        aY := abstractVariety(ambient X, B);
+        -- Question: how best to define F??
+        bundles := X.CI/(d -> OO d);
+        F := bundles#0;
+        for i from 1 to #bundles-1 do F = F ++ bundles#i;
+        aF := abstractSheaf(ambient X, B, F);
+        sectionZeroLocus aF
+        );
+    X.cache#(abstractVariety, B)
+    )
+
 abstractVariety(CompleteIntersectionInToric, AbstractVariety) := opts -> (X,B) -> (
     if not X.cache#?(abstractVariety, B) then X.cache#(abstractVariety, B) = (
         aY := abstractVariety(ambient X, B);

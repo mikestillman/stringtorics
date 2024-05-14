@@ -25,7 +25,7 @@ CYPolytopeCache = {
     "triangulations" => {value, toString, List}
     }
 
-cyPolytope = method(Options => {ID => null})
+cyPolytope = method(Options => {ID => null, InteriorFacets => false})
 
 -- This is the main creation function.  Other functions call this.
 -- Goal: this function does NOT change vertices list
@@ -36,12 +36,13 @@ cyPolytope List := CYPolytope => opts -> vertices -> (
     cyPolytope(transpose matrix vertices, opts)
     )
 
-cyPolytope Polyhedron := opts -> P2 -> (    
+cyPolytope Polyhedron := opts -> P2 -> (
+    topdim := if opts.InteriorFacets then dim P2 - 1 else dim P2 - 2;
     LP := latticePointList P2;
     LPdim := for lp in LP list dim(P2, minimalFace(P2, lp));
     -- now remove the ones that are in facets (or the origin):
-    LP = for i from 0 to #LP-1 list if LPdim#i <= 2 then LP#i else continue;
-    LPdim = for i from 0 to #LP-1 list if LPdim#i <= 2 then LPdim#i else continue;
+    LP = for i from 0 to #LP-1 list if LPdim#i <= topdim then LP#i else continue;
+    LPdim = for i from 0 to #LP-1 list if LPdim#i <= topdim then LPdim#i else continue;
     cyData := new CYPolytope from {
         symbol cache => new CacheTable,
         "rays" => LP,
@@ -50,6 +51,23 @@ cyPolytope Polyhedron := opts -> P2 -> (
     if opts.ID =!= null then cyData.cache#"id" = opts.ID;
     cyData
     )
+
+-- This version contains ALL lattice points
+-- cyPolytope Polyhedron := opts -> P2 -> (    
+--     LP := latticePointList P2;
+--     LPdim := for lp in LP list dim(P2, minimalFace(P2, lp));
+--     -- now remove the ones that are in facets (or the origin):
+--     LP = for i from 0 to #LP-1 list if LPdim#i <= 3 then LP#i else continue;
+--     LPdim = for i from 0 to #LP-1 list if LPdim#i <= 3 then LPdim#i else continue;
+--     cyData := new CYPolytope from {
+--         symbol cache => new CacheTable,
+--         "rays" => LP,
+--         };
+--     cyData.cache#"face dimensions" = LPdim;
+--     if opts.ID =!= null then cyData.cache#"id" = opts.ID;
+--     cyData
+--     )
+
 -- vertices: Matrix whose columns are the vertices of the reflexive polytope.
 cyPolytope Matrix := CYPolytope => opts -> vertices -> (
     P2 := convexHull vertices;

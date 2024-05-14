@@ -1,3 +1,9 @@
+-- several things here:
+--  1. line bundle cohomology on V (NormalToricVarieties, cohomcalg)
+--  2. basis as lists of (annotated) Laurent monomials)
+--  3. matrix of multiplication by F.
+--  4. compute ranks of matrices.  What should be stashed?  bases -- probably, matrices -- not sure, ranks -- not sure
+
 ----------------------------------------------------------------
 -- Cohomology of line bundles: obtaining a basis of fractions --
 ----------------------------------------------------------------
@@ -262,6 +268,7 @@ cohomologyFractions(NormalToricVariety, List, List) := (V, negativeSet, deg) -> 
         (V.cache.normalDegrees#5 mon)/(product(negativeSet, i -> (ring V)_i))
         )
     )
+
 --------------------------------------------------------------
 -- Cohomology for complete intersections in toric varieties --
 --------------------------------------------------------------
@@ -291,7 +298,7 @@ cohomologyVector(CompleteIntersectionInToric, List, RingElement) := (X, deg, F) 
     V := ambient X;
     rks := for i from 0 to dim ambient X list cohomologyMatrixRank(i, V, deg, F);
     -- rks is a list of (nrows, ncols, rk).
-    for j from 0 to 3 list (
+    for j from 0 to dim X list (
         (nrows1, ncols1, rk1) := rks#j;
         (nrows2, ncols2, rk2) := rks#(j+1);
         nrows1 - rk1 + ncols2 - rk2
@@ -319,11 +326,12 @@ cohomologyVector(CalabiYauInToric, List, RingElement) := (X, deg, F) -> (
 cohomologyVector LineBundle := List => L -> (
     X := variety L;
     Fs := equations X;
+    if #Fs =!= 1 then error "alas, complete intersection line bundle cohomology not yet implemented";
     cohomologyVector(X, degree L, Fs#0)
     )
 
-hh^ZZ(LineBundle) := ZZ => (i,L) -> (
-    X := ambient L;
+hh(ZZ, LineBundle) := ZZ => (i,L) -> (
+    X := variety L;
     Fs := equations X;
     cohomology(i, X, degree L, Fs#0)
     )
