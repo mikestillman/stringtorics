@@ -1,23 +1,9 @@
--- TODO: compute toricMoriCone without intersection ring?
--- 
-
-----------------------------------------------------------------  
--- gvInvariants ------------------------------------------------
--- Uses computeGV.cpp from CYtools -----------------------------
-----------------------------------------------------------------
--- moriCone = method()
--- -- Not functional...
--- moriCone NormalToricVariety := List => (V) -> (
---     IV := intersectionRing (abstractVariety V);
---     Cs := matrix for x in orbits(V, 1) list (
---         c := product(x, i -> IV_i);
---         for d in gens IV list integral(c*d)
---         );
---     M := posHull transpose lift(Cs, QQ);
---     GLSM := matrix degrees ring V;
---     entries transpose((rays M) // GLSM)
---     )
-
+---------------------------------------
+-- gvInvariants
+-- Gopakumar-Vafa invariants (similar to Gromov-Witten invariants)
+-- Contains code to call the external C++ program `computeGV` from CYTools
+-- This requires computing some information first (intersection numbers, mori cone cap, etc).
+---------------------------------------
 
 toricMoriCone(NormalToricVariety, List) := Cone => (V, basisIndices) -> (
     IV := intersectionRing (abstractVariety V);
@@ -39,6 +25,7 @@ hilbertBasisGenerators Cone := List => C -> (
     )
 
 -- This function returns a very large heft vector.  Not so good!
+-- TODO: this appears to be computing the toricMoriCone, which it is not using!?
 heft CalabiYauInToric := List => X -> (
     C := toricMoriCone X;
     heft1 := sum entries transpose rays dualCone C;
@@ -47,13 +34,13 @@ heft CalabiYauInToric := List => X -> (
     heft2
     )
 
+-- TODO: use findProgram/runProgram methods in M2 to handle access to computeGV.
 gvInvariants = method(Options => {
     Mori => null, -- null means: compute rays of the Mori cone of V (in ZZ^(h11))
     Heft => null, -- null means: compute it
     DegreeLimit => infinity,
     Precision => 150,
     FilePrefix => "foo",
---    Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV-good/computeGV",
     Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV-good/computeGV",
     KeepFiles => true
     })
@@ -80,13 +67,11 @@ gvInput = (moriGenerators, heftval, GLSM, intersectionnums, degreelimit, prec) -
     concatenate between("\n", {str1, toString {}, str3, str4, toString {}, str5, str6})
     )
 
--- TODO: make the gvInvariants code not go through NormalToricVarieties.
---  and use only info obtained from data we have in CalabiYauInToric.
---  requires: intersectionNumbersOfCY
---            toricMoriCone
+filenameCounter := 0; -- TODO: not used? or change to use it?
 
-filenameCounter := 0;
-
+-- TODO: use findProgram/runProgram to get this...
+-- TODO: Also: there should be one function which calls computeGV.
+-- Here there are two...
 gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices) -> (
     -- Compute intersection numbers for X in V (using this basis)
     -- Compute mori cone (if needed) (?? requires basis too...)
@@ -153,6 +138,7 @@ gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
     (lines contents)/value//hashTable
     )
 
+-- Not used anymore??  See `extremalRayGVs`
 gvRay = method(Options => options gvInvariants)
 gvRay(CalabiYauInToric, List) := HashTable => opts -> (X, curveClass) -> (
     -- This doesn't seem to be correct
@@ -248,57 +234,6 @@ findLinearMaps(HashTable, HashTable) := List => (gv1, gv2) -> (
     Ms
     )
 
-----------------------------
--- new code ----------------
-----------------------------
--- GVInvariants class
---  has X in cache, or way to rerun gv's at higher invarisnts, rays, etc.
---  
-
--- Design: What should a GVInvariants class look like?
---  1. Has hash table as it does now.
---  2. Knows its degree limit, and grading vector.
---  3. Can compute "infinity cone": actually, should be done for 2 or 3 different degrees,
---       then compare them?
---  4. Compute ray of GV values out some distance.
---    This should use special features of the code?  Does it work on non-extremal rays?
--- The following is perhaps not part of this class...
---  5. Determine what kind of extremal ray a ray is:
---    1. nilpotent (type I)
---    2. nilpotent (type II0, type IIg)
---    3. potent ray.
---    4. is a ray in the closure of the infinity cone?  Or can we not consider this possibility?
--- For non-general CY3's it is possible for a curve to be effective, but have gv ray all 0's.
-
--- GVInvariants = new Type of HashTable
--- gvInvariantsObject = method(Options => {
---         Mori => null, 
---         Heft => null,
---         DegreeLimit => 5,
---         Precision => 150,
---         FilePrefix => "foo",
---         Executable => "~/src/git-from-others/cytools-private/external/gv/computeGV",
---         KeepFiles => true
---     })
---gvInvariantsObject()
- -- need: intersection numbers
- --       mori cone hilbert basis gens
- --       degrees
-
-moriConeGVs = method()
-moriConeGVs(CalabiYauInToric, ZZ) := (X, deglimit) ->(
-    -- deglimit that the GV invariants were computed to.
-    -- loop thru the toric mori cone cap generators, and for each,
-    -- look at the gv ray. -- then return a hash table whose keys are among
-    --   {TYPEII, {gv vals on ray} (potent ray: all non-zero, or infinitely many at least, nonzero)
-    --   {FLOP, {gv vals on ray}, 
-    --   {TYPEIII0, {gv vals on ray},
-    --   {TYPEIIIg, {gv vals on ray}} might be indistinguishable from FLOP, in part because in general moduli these likely become FLOP's,
-    --   {ZERO} -- this means that 
-    --   {...}, C^perp has D^3 = 0.  Not sure what the gv invariants are in this case...
-    -- and whose values are the list of curve classes with that type.
-    )
-
 gvRay(HashTable, List, ZZ, List) := opts -> (GVHash, C, deglimit, degvector) -> (
     contentC := gcd C;
     if contentC =!= 1 then C = C // contentC;
@@ -310,7 +245,7 @@ gvRay(HashTable, List, ZZ, List) := opts -> (GVHash, C, deglimit, degvector) -> 
     rayC
     )
 
-count = 0;
+count = 0; -- used to give a unique index to each ZERO ray.
 
 classifyExtremalCurve = method()
 
@@ -341,12 +276,76 @@ classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvec
     else return {"TYPEII", {rayC#0, rayC#1, rayC#2, "..."}}
     )
 
+gvTopMoriConeCapDegree = method()
+gvTopMoriConeCapDegree CalabiYauInToric := X -> (
+    if not isFavorable X then error "expected a favorable polytope";
+    degvec := heft X;
+    max for c in toricMoriConeCap X list dotProduct(degvec, c)
+    )
+
+classifyExtremalCurves = method(Options => {
+        Verbose => 0,
+        DegreeLimit => null,
+        MoriHilbertGens => null
+        })
+classifyExtremalCurves(HashTable, List, ZZ, List) := (GVHash, Cs, deglimit, degvector) -> (
+    partition(c -> classifyExtremalCurve(GVHash, c, deglimit, degvector), Cs)
+    )
+
+classifyExtremalCurves CalabiYauInToric := opts -> X -> (
+    if not isFavorable X then error "expected favorable CY3-fold";
+    mori := if opts.MoriHilbertGens === null then toricMoriConeCap X else opts.MoriHilbertGens;
+    deglimit := 3 * gvTopMoriConeCapDegree X;
+    if opts.Verbose > 1 then << "*** mori cone cap degree limit is " << deglimit << " ***" << endl;
+    degvec := if opts.DegreeLimit === null then heft X else opts.DegreeLimit;
+    gvX := gvInvariants(X, DegreeLimit => deglimit);
+    partition(c -> classifyExtremalCurve(gvX, c, deglimit, degvec), mori)
+    )
+
+-- Good one here, I think.
+extremalRayGVs = method(Options => {Limit => 4, Heft => null})
+extremalRayGVs(CalabiYauInToric, List) := opts -> (X, curveClass) -> (
+    if not isFavorable X then return null; -- later, maybe we can modify this...
+    degvec := if opts.Heft =!= null then opts.Heft else heft X;
+    deglimit := opts.Limit * dotProduct(degvec, curveClass);
+    gvHash := gvInvariants(X,Mori => {curveClass}, DegreeLimit => deglimit, Heft => degvec);
+    for i from 1 to opts.Limit list (
+        c := toSequence(i * curveClass);
+        if gvHash#?c then gvHash#c else 0
+        )
+    )
+
+classifyExtremalCurves CalabiYauInToric := opts -> X -> (
+    if not isFavorable X then error "expected favorable CY3-fold";
+    if not X.cache#?"toric mori cone gvs" then (
+        mori := toricMoriConeCap X;
+        val := hashTable for c in mori list (
+            gvs := extremalRayGVs(X, c, Limit => 4);
+            c => classifyExtremalCurve gvs
+            );
+        X.cache#"toric mori cone gvs" = partition(c -> val#c, mori)
+        );
+    X.cache#"toric mori cone gvs"
+    )
+
+extremalCurveInvariant = method()
+extremalCurveInvariant CalabiYauInToric := X -> (
+    gv := classifyExtremalCurves X;
+    sort for a in pairs gv list {a#0, #a#1}
+    )
+
+
+
+
+-------------------------------------------------------------------------
+-- some tests -----------------------------------------------------------
 
 
 ///
   restart
   debug needsPackage "StringTorics" -- the debug is because some functions are not yet exported.
   DB3 = "../Databases/cys-ntfe-h11-3.dbm"
+  DB3 = "./StringTorics/Databases/cys-ntfe-h11-3.dbm"
   RZ = ZZ[a,b,c]
   RQ = QQ (monoid RZ);
   (Qs, Xs) = readCYDatabase(DB3, Ring => RZ);
@@ -403,32 +402,6 @@ classifyExtremalCurve(HashTable, List, ZZ, List) := (GVHash, C, deglimit, degvec
 
 ///
 
-gvTopMoriConeCapDegree = method()
-gvTopMoriConeCapDegree CalabiYauInToric := X -> (
-    if not isFavorable X then error "expected a favorable polytope";
-    degvec := heft X;
-    max for c in toricMoriConeCap X list dotProduct(degvec, c)
-    )
-
-classifyExtremalCurves = method(Options => {
-        Verbose => 0,
-        DegreeLimit => null,
-        MoriHilbertGens => null
-        })
-classifyExtremalCurves(HashTable, List, ZZ, List) := (GVHash, Cs, deglimit, degvector) -> (
-    partition(c -> classifyExtremalCurve(GVHash, c, deglimit, degvector), Cs)
-    )
-
-classifyExtremalCurves CalabiYauInToric := opts -> X -> (
-    if not isFavorable X then error "expected favorable CY3-fold";
-    mori := if opts.MoriHilbertGens === null then toricMoriConeCap X else opts.MoriHilbertGens;
-    deglimit := 3 * gvTopMoriConeCapDegree X;
-    if opts.Verbose > 1 then << "*** mori cone cap degree limit is " << deglimit << " ***" << endl;
-    degvec := if opts.DegreeLimit === null then heft X else opts.DegreeLimit;
-    gvX := gvInvariants(X, DegreeLimit => deglimit);
-    partition(c -> classifyExtremalCurve(gvX, c, deglimit, degvec), mori)
-    )
-
 ///
   restart
   debug needsPackage "StringTorics"
@@ -457,86 +430,86 @@ classifyExtremalCurves CalabiYauInToric := opts -> X -> (
   gvX = gvInvariants(X, DegreeLimit => deglimit)
   partition(c -> classifyExtremalCurve(gvX, c, deglimit, degvec), mori)
 ///
--- GVInvariantsTable = new Type of HashTable
 
--- makeGVInvariantsTable = (intersectionNums, moriGens, GLSM, heftvec, deglimit) -> (
---     new GVInvariantsTable from {
---         IntersectionNumbers => intersectionNums,
---         MoriHilbertGens => moriGens, -- a list of curve classes (each a list of n integers).
---         Degrees => GLSM, -- format: a list if all the toric degrees.
---         Heft => heftvec, -- format: a list of integers, of same length as each GLSM degree
---         cache => new CacheTable from {
---             "GV" =>  new MutableHashTable -- keys: (degreelimit, precision), value: a hash table c => gv.
---             }
---         }
---     )
-
--- gvInvariantsTable = method()
-
--- gvInvariantsTable CalabiYauInToric := GVInvariantsTable => X -> (
---     makeGVInvariantsTable (
---     )
-
-moriConeCapGVInvariants = method()
-moriConeCapGVInvariants CalabiYauInToric := X -> (
-    )
-
--- How to write down this invariant.
--- Note: if ZERO is present, then comaring it is indeterminate.
-
--- If all toric mori cone cap rays have a non-zero gv invariant, then
--- Two routines: (1) gives the matching.
---               (2) is just the invariant.
-
--- How to do this function best?
--- return type: {true/unknown, invariant, matching}
--- Input: X
---    or: gvInvariants of X.
---        
+TEST ///
+-- Good test
 -*
-step 1: compute the degrees of the toric mori cone cap curves
-step 2: compute gv's up to the max of these degrees (or retrieve those)
-step 3: if all gv#?c then true mori cone.
-  -- question: can we have n1=0, n2 != 0.
-
-
+  restart
+  needsPackage "StringTorics"
 *-
+  -- hh^(1,1) == 3
+  -- label (5,0)
+  rys = {{-1, -1, 1, 0}, {-1, -1, 1, 1}, {-1, -1, 2, 1}, {-1, 3, -2, -1}, {1, -1, 0, 0}, {2, -1, 0, 0}, {-1, 1, 0, 0}}
+  cones4 = {{0, 1, 2, 4}, {0, 1, 2, 6}, {0, 1, 3, 4}, {0, 1, 3, 6}, {0, 2, 4, 5}, {0, 2, 5, 6}, {0, 3, 4, 5}, {0, 3, 5, 6}, {1, 2, 4, 5}, {1, 2, 5, 6}, {1, 3, 4, 5}, {1, 3, 5, 6}}
+  Q = cyPolytope(rys, ID => 5)
+  label Q
+  assert(rays Q == rys)
+  assert(hh^(1,1) Q == 3)
+  assert(hh^(1,2) Q == 57)
 
-computeGVInvariants = method()
-computeGVInvariants(CalabiYauInToric, List, ZZ) := (X, degvec, deglimit) -> (
-    )
+  RZ = ZZ[a,b,c]
+  Xs = findAllCYs(Q, Ring => RZ)
+  X = Xs#0
+  label X == (5,0)
+  assert(max X === cones4)
+  assert(rays X === rys)
 
--- Good one here, I think.
-extremalRayGVs = method(Options => {Limit => 4, Heft => null})
-extremalRayGVs(CalabiYauInToric, List) := opts -> (X, curveClass) -> (
-    if not isFavorable X then return null; -- later, maybe we can modify this...
-    degvec := if opts.Heft =!= null then opts.Heft else heft X;
-    deglimit := opts.Limit * dotProduct(degvec, curveClass);
-    gvHash := gvInvariants(X,Mori => {curveClass}, DegreeLimit => deglimit, Heft => degvec);
-    for i from 1 to opts.Limit list (
-        c := toSequence(i * curveClass);
-        if gvHash#?c then gvHash#c else 0
-        )
-    )
+  -- OK, now we are ready to test functions in this file
+  C = toricMoriCone X;
+  heft1 = sum entries transpose rays dualCone C
 
-classifyExtremalCurves CalabiYauInToric := opts -> X -> (
-    if not isFavorable X then error "expected favorable CY3-fold";
-    if not X.cache#?"toric mori cone gvs" then (
-        mori := toricMoriConeCap X;
-        val := hashTable for c in mori list (
-            gvs := extremalRayGVs(X, c, Limit => 4);
-            c => classifyExtremalCurve gvs
-            );
-        X.cache#"toric mori cone gvs" = partition(c -> val#c, mori)
-        );
-    X.cache#"toric mori cone gvs"
-    )
+  rays toricMoriCone X
+  morirays = toricMoriConeCap X
+  assert(sort morirays === sort {{0, 0, 1}, {0, 1, 0}, {1, -1, 0}, {1, 0, -1}})
+  assert(morirays === {{0, 0, 1}, {0, 1, 0}, {1, -1, 0}, {1, 0, -1}}) -- not required.
+  heft X-- why not {2,1,1}??
 
-extremalCurveInvariant = method()
-extremalCurveInvariant CalabiYauInToric := X -> (
-    gv := classifyExtremalCurves X;
-    sort for a in pairs gv list {a#0, #a#1}
-    )
+  gv = gvInvariants(X, DegreeLimit => 15)
+  (keys oo)/toList//matrix//transpose//posHull//rays
+  gv#(0,1,1)
+  
+  assert(extremalRayGVs(X, {0,0,1}, Limit => 5) == {60, 0, 0, 0, 0})
+  assert(extremalRayGVs(X, {0,1,0}, Limit => 5) == {6, 0, 0, 0, 0})
+  assert(extremalRayGVs(X, {1,-1,0}, Limit => 5) == {252, -9252, 848628, -114265008, 18958064400})
+  assert(extremalRayGVs(X, {1,0,-1}, Limit => 5) == {56, -272, 3240, -58432, 1303840})
+
+  assert(extremalRayGVs(X, {1,-1,-3}, Heft => {5,1,1}, Limit => 5) == {0,0,0,0,0}) -- all zeros...
+
+  -- Note: if the curve class is in the interior, the answer from extremalRayGVs is NOT correct.
+  -- Also: a zero vector means either that the curve class is not effective on X,
+  --  or that there is an elliptic ruled surface of some sort on X.  If one jiggles this X,
+  --  such surfaces go away, ie. in general moduli, an extrmeal ray has zero GV's iff
+  --  every class along that curve ray is NOT effective.
+
+  --------------
+  -- gvCone ----
+  -- this is the cone of all non-zero GV curves.  This either matches the Mori cone, or is possibly
+  -- a subset (as some rays can contain effective curves, all of whose GV invariants (in the ray)
+  -- are zero.
+  --------------
+  assert(set entries transpose rays gvCone X == set toricMoriConeCap X) -- for this example,
+  -- the intersection of the Mori cones for the various simplicial
+  -- toric varieties (which is always contains the Mori cone of X),
+  -- all has non-zero GV invariants, so if one believes the GV
+  -- computation, this is exactly the Mori cone of X, so we know the
+  -- nef/Kahler cone for X too
+
+--  gvInvariantsAndCone(X, 15)-- doesn't work at the momemnt... BUG -- remove?
+
+  partitionGVConeByGV X -- not completely what we want?
+
+  classifyExtremalCurve extremalRayGVs(X, {0,0,1}, Limit => 5)
+  classifyExtremalCurve extremalRayGVs(X, {0,1,0}, Limit => 5)
+  classifyExtremalCurve extremalRayGVs(X, {1,-1,0}, Limit => 5)
+  classifyExtremalCurve extremalRayGVs(X, {1,0,-1}, Limit => 5)
+
+  classifyExtremalCurves X
+  heft X
+
+  debug needsPackage "StringTorics" -- for gvTopMoriConeCapDegree
+  assert(gvTopMoriConeCapDegree X == 2) -- not exported
+///
+
 
 ///
 -- Tests of this code, 15 Jan 2023. Removed from tests, since it used created databases...
@@ -692,4 +665,3 @@ extremalCurveInvariant CalabiYauInToric := X -> (
       )
   
 ///
-

@@ -2,3 +2,60 @@
 -- Idea: remove cruft from StringTorics and other packages.
 -- All todo items should go here.  Maybe also for now tests that
 --  don't have a home?
+
+-- TODO: 12 June 2023
+--   add in CICY list (bit vague, as we don't handle well CI in toric yet)
+--   create h11=4 database as a single file?
+--   what about h11=5, 6, 7?
+--   add in flop code
+--   understand Constantin-Lukas flop arguments in CICY paper(s).
+--   handle torsion in Pic V
+--   handle Pic group in non-favorables?
+--   compute Hesse form of a cubic in 3 variables
+
+
+-- TODO (Aug 2022)
+-- some notes:
+--  KSEntry --> Matrix
+--  Matrix --> LP's matrix
+--  LP matrix --> Triangulation (regular, fine, star)
+--  Triangulation --> NormalToricVarity
+--                --> CalabiYauInToric
+--  Matrix --> CalabiYauInToric (same options as NormalToricVarity)
+--  Matrix --> Triangulation
+--             List of Triangulation's
+--             a single FRST
+-- compute cubic and linear forms without h11, h12?  Or are those fast now so it doesn't matter?
+-- rename: findAllFRSTs ReflexivePolytope.
+--   there should be a function: `allCYs P` ? This returns a list of CalabiYauInToric's
+
+-- TODO Aug 2022:
+--   - construct the intersectionNumbers ring in the non-favorable case.
+--   - Given X CalabiYauInToric (or a reflexive polytope Q), find H^2(X, ZZ), H^3(X, ZZ) (i.e. find the torsion).
+--   - For now, require a polytope to be favorable to get the topology...
+
+-- TODO (Nov 2019)
+-- 1. documentation
+-- 2. Extra polyhedral functions (do we still need these?  Probably...)
+--    Make sure they work with non reflexive polytopes too!
+--    Or say they onyl work for reflexives?
+-- 3. Triangulations
+--    Computing FRST's
+-- 4. Cohomology of line bundles on a toric variety
+-- 5. Complete Intersections in torics
+-- 6. Intersection rings (especially intersection numbers).
+--      In particular, I think there is a bug in computing intersection numbers.
+--      Also, handle non-favorable case.
+-- 7. Mori cones
+
+-----------------------------------------
+-- Todo for ToricCompleteIntersections --
+-- allow basis of Pic?
+-- use Danilov-Khovanskii to compute Hodge numbers?
+-- If a curve, what is the genus?
+-- Does this really handle complete intersections, not just hypersurfaces?
+-- Compute c2, intersection form too, with a given basis
+-- where is the code to create the intersection ring?
+--   also have the basis element h? (h = a_1 t_1 + ..., for a basis t_i of the degree 1 part?)
+-----------------------------------------
+

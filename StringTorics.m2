@@ -1,48 +1,3 @@
--- TODO: 12 June 2023
---   add in CICY list (bit vague, as we don't handle well CI in toric yet)
---   create h11=4 database as a single file?
---   what about h11=5, 6, 7?
---   add in flop code
---   understand Constantin-Lukas flop arguments in CICY paper(s).
---   handle torsion in Pic V
---   handle Pic group in non-favorables?
---   compute Hesse form of a cubic in 3 variables
-
-
--- TODO (Aug 2022)
--- some notes:
---  KSEntry --> Matrix
---  Matrix --> LP's matrix
---  LP matrix --> Triangulation (regular, fine, star)
---  Triangulation --> NormalToricVarity
---                --> CalabiYauInToric
---  Matrix --> CalabiYauInToric (same options as NormalToricVarity)
---  Matrix --> Triangulation
---             List of Triangulation's
---             a single FRST
--- compute cubic and linear forms without h11, h12?  Or are those fast now so it doesn't matter?
--- rename: findAllFRSTs ReflexivePolytope.
---   there should be a function: `allCYs P` ? This returns a list of CalabiYauInToric's
-
--- TODO Aug 2022:
---   - construct the intersectionNumbers ring in the non-favorable case.
---   - Given X CalabiYauInToric (or a reflexive polytope Q), find H^2(X, ZZ), H^3(X, ZZ) (i.e. find the torsion).
---   - For now, require a polytope to be favorable to get the topology...
-
--- TODO (Nov 2019)
--- 1. documentation
--- 2. Extra polyhedral functions (do we still need these?  Probably...)
---    Make sure they work with non reflexive polytopes too!
---    Or say they onyl work for reflexives?
--- 3. Triangulations
---    Computing FRST's
--- 4. Cohomology of line bundles on a toric variety
--- 5. Complete Intersections in torics
--- 6. Intersection rings (especially intersection numbers).
---      In particular, I think there is a bug in computing intersection numbers.
---      Also, handle non-favorable case.
--- 7. Mori cones
-
 newPackage(
         "StringTorics",
         Version => "0.7", -- bumped on 12 April.
@@ -69,8 +24,8 @@ newPackage(
             "IntegerEquivalences"
             },
         PackageImports => {
-            --"Graphs", 
-            "LLLBases"}
+            "LLLBases"
+            }
         )
 
 export {
@@ -163,12 +118,18 @@ export {
         
     -- gvInvariants
     "gvInvariants",
-    "gvRay",
     "gvCone",
     "partitionGVConeByGV",
-    "findLinearMaps",
     "classifyExtremalCurves",
+    "extremalRayGVs",
 
+    -- remove these gvInvariant functions?
+    "classifyExtremalCurve",
+    "gvInvariantsAndCone",
+    --    "gvRay",
+    "findLinearMaps",
+
+    
     -- Invariants
     "hubschInvariants",
     "PointCounter",
@@ -337,7 +298,7 @@ load (currentFileDirectory | "StringTorics/Invariants.m2")
 load (currentFileDirectory | "StringTorics/Topology.m2")
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- has some util code, but not much.  TODO: clean that up.
 load (currentFileDirectory | "StringTorics/DatabaseCreation.m2")
-
+load (currentFileDirectory | "StringTorics/Extras.m2")
 
   findAllConnectedStarFine = method()
   findAllConnectedStarFine Triangulation := (T) -> (

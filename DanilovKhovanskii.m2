@@ -499,13 +499,13 @@ computeHodgeDeligne CYPolytope := opts -> P -> (
 computeHodgeDeligne CalabiYauInToric := opts -> X -> computeHodgeDeligne(cyPolytope(X))
 
 --check non-degeneracy; not the same as for CYPolytope!
-computeHodgeDeligne ToricDivisor := D -> computeHodgeDeligne(polytope(D))
+computeHodgeDeligne ToricDivisor := opts -> D -> computeHodgeDeligne(polytope(D), opts)
 
-computeHodgeDeligne NormalToricVariety := V -> (
+computeHodgeDeligne NormalToricVariety := opts -> V -> (
     D := sum for i from 0 to #rays(V) - 1 list (
 	V_i
 	);
-    computeHodgeDeligne(polytope(D))
+    computeHodgeDeligne(polytope(D), opts)
     )
 
 --For (a hypersurface in) a toric variety that is a subset of the projective normal toric variety that has polytope P.
