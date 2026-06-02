@@ -9,15 +9,21 @@ newPackage(
     DebuggingMode => true
     )
 
-export {"Cheap",
-    "vdot",
+export {
+    -- currently vetted functions
+    "HodgeDeligne",
+    "MutableHodgeDeligne",
+    
+    -- previous interface
+    "Cheap",
+    "vdot", -- TODO: why is this here?
     "torusFactor",
     "stdVector",
     "manyMatricesToLargeMatrix",
     "manyPolyhedraToLargeMatrix",
     "manyPolyhedraToLargeOne",
+    "ehrhartNumeratorNaive",
     "ehrhartNumerator",
-    "ehrhartNumeratorQuicker",
     "computeSumqeZ",
     "getSparseeZ",
     "eZ2hZ",
@@ -30,10 +36,88 @@ export {"Cheap",
     "computeHodgeDeligneInPToric",
     "computeHodgeDeligneAffineAndTorus",
     "computeHodgeDeligneTorusCI",
+    "hodgeDeligne", -- TODO: make a name for these polynomials, this should be "show"?
     "FaceInfo",
-    "EmptyValue"}
+    "EmptyValue",
+    "Headers",
+    }
 
 -* Code section *-
+HodgeDeligne = new Type of HashTable
+MutableHodgeDeligne = new Type of MutableHashTable
+
+  -- operations on these:
+  -- +, -, ZZ *, f[2,3] -- entry
+  -- hodgeNumbers
+  -- show
+  -- toHodgeDeligne
+  -- matrix HodgeDeligne
+  -- matrix MutableHodgeDeligne
+ 
+  MutableHodgeDeligne Array := 
+  HodgeDeligne Array := (F, vals) -> (
+      pq := toSequence vals;
+      F#pq ?? 0
+      )
+
+  MutableHodgeDeligne + MutableHodgeDeligne :=
+  HodgeDeligne + HodgeDeligne := (F, G) -> (
+      merge(F, G, (x,y) -> (a := x+y; if a === 0 then continue else a))
+      )
+
+  MutableHodgeDeligne - MutableHodgeDeligne :=
+  HodgeDeligne - HodgeDeligne := (F, G) -> (
+      merge(F, G, (x,y) -> (a := x-y; if a === 0 then continue else a))
+      )
+
+  ZZ * MutableHodgeDeligne :=
+  ZZ * HodgeDeligne := (n, F) -> (
+      if n == 0 then return new HodgeDeligne;
+      applyPairs(F, (k,v) -> (k, n*v))
+      )
+
+  matrix(MutableHodgeDeligne, ZZ) :=
+  matrix(HodgeDeligne, ZZ) := Matrix => opts -> (F, topsize) -> (
+    matrix for n from 0 to topsize list
+	for m from 0 to topsize list
+	    F#(m, n) ?? 0
+    )
+
+  matrix MutableHodgeDeligne :=
+  matrix HodgeDeligne := Matrix => opts -> F -> matrix(F, max((keys F)/max))
+
+  show MutableHodgeDeligne :=
+  show HodgeDeligne := Net => eZ -> (
+    ks := keys eZ;
+    maxp := ks/first//max; -- max p value
+    maxq := ks/last//max; -- max q value
+    M := for n from 0 to maxq list (
+        for m from 0 to maxp list (
+            if eZ#?(m, n) then eZ#(m, n) else ""
+            )
+	);
+    line0 := prepend(" \\ p"||"q \\ ", toList(0..maxp));
+    restlines := for i from 0 to #M-1 list prepend(i, M_i);
+    netList prepend(line0, restlines)
+    )
+
+--   hodgeDeligne = method(Options => {EmptyValue => "", Headers => true})
+-- hodgeDeligne MutableHashTable := List => opts -> eZ -> hodgeDeligne(hashTable eZ, opts)
+-- hodgeDeligne HashTable := List => opts -> eZ -> (
+--     ks := keys eZ;
+--     maxp := ks/first//max; -- max p value
+--     maxq := ks/last//max; -- max q value
+--     M := for n from 0 to maxq list (
+--         for m from 0 to maxp list (
+--             if eZ#?(m, n) then eZ#(m, n) else opts.EmptyValue
+--             )
+-- 	);
+--     line0 := prepend(" \\ p"||"q \\ ", toList(0..maxp));
+--     restlines := for i from 0 to #M-1 list prepend(i, M_i);
+--     prepend(line0, restlines)
+--     )
+  
+-- utility functions  
 stdVector = method();--index from 0
 stdVector (ZZ, ZZ) := (n, i) -> (
     for j from 0 to n - 1 list (if j == i then 1 else 0)
@@ -61,8 +145,14 @@ manyPolyhedraToLargeOne List := Ps -> (
     convexHull manyPolyhedraToLargeMatrix(Ps)
     )
 
-ehrhartNumerator = method();
-ehrhartNumerator Polyhedron := P -> (
+-- TODO: ehrhartSeries (like hilbertSeries)
+--       ehrhartPolynomial, gives the polynomial.
+--       maybe also ehrhartNumerator gives a polynomial, if given a variable.
+-- ehrHartPoly2Numerator
+-- ehrHartNumerator2Poly
+-- ehrhartNumerator' -- uses interior points?
+ehrhartNumeratorNaive = method()
+ehrhartNumeratorNaive Polyhedron := P -> (
     d := dim P;
     t := getSymbol "t";
     R := QQ[t];
@@ -76,8 +166,8 @@ ehrhartNumerator Polyhedron := P -> (
 	)
     )
 
-ehrhartNumeratorQuicker = method();
-ehrhartNumeratorQuicker Polyhedron := P -> (
+ehrhartNumerator = method();
+ehrhartNumerator Polyhedron := P -> (
     d := dim P;
     Ps := for i from 1 to ceiling(d / 2) list i * P;
     l := prepend(1, for i from 1 to ceiling(d / 2) list (
@@ -188,6 +278,7 @@ toeZMatrix MutableHashTable := opts -> H -> (
     M
     )
 
+    
 vdot = method();
 vdot (List, List) := (a, b) -> if #a == #b then (
     sum for i from 0 to #a-1 list a#i*b#i) else (error "Lengths not compatible.")
@@ -377,14 +468,15 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
 	(Pfan2, P'fan2)
         )
     else opts.FaceInfo#3;
-        
+    --error "debug me0";
     --determine dimension of P and of the ambient space
     d := dim P;
     FanDim := dim P'fan;
     D := opts.FaceInfo#2;
     if D == -1 then (
 	D = FanDim;
-	); print("poly dim = "| d | ", ambient dim = " | D, topdim);
+	);
+    print("poly dim = "| d | ", ambient dim = " | D, topdim);
    
     eZ := new MutableHashTable;
     eZbar := new MutableHashTable;
@@ -404,7 +496,8 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
 	eZbar = torusFactor(eZbar, d, D);
 	return (new HashTable from eZ, new HashTable from eZbar, new HashTable from {})
 	);-- print("not 0 or 1");
-    
+
+    --error "debug me0a";    
     --Begin by computing eZ of the varieties corresponding to each cone of the [subdivided] normal fan, P'fan.
     --This is known by induction. Build up from lowest dimension, 1.
     eZcones := new MutableHashTable from opts.FaceInfo#1;
@@ -430,6 +523,8 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
 		    eZfaces#Fverts
 		    )
 		else (
+                    << "about to recurse" << endl;
+                    --error "debug me recurse";
 		    e2 := computeHodgeDeligne(F, FaceInfo => {false, eZcones2, Fdim, (Pfan, P'fan)});
 		    eZfaces#Fverts = e2#0;-- print(eZfaces#Fverts);
 		    eZfaces#Fverts
@@ -443,12 +538,14 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
 		); print("done " | n);
 	    );
 	);-- print("faces done");--Hodge-Deligne numbers of the face.
-    
+
+    --error "debug me1";
     --A couple of Lefschetz-type theorems and Gysin homomorphisms give eZ#(p, q) for p + q > d - 1
     --in terms of eT^d#(p + 1, q + 1)
     --For p + q > d - 1, eZ#(p, q) is 0 for p != q and is (-1)^(d + p + 1) * binomial(d, p + 1) for p == q.
     for p from floor(d / 2) to d - 1 do eZ#(p, p) = (-1)^(d + p + 1) * binomial(d, p + 1); --print("p + q > d - 1");
-    
+
+    --error "debug me2";    
     --This gives eZbar for p + q > d - 1.
     --Poincare dualtiy then gives eZbar#(d - 1 - p, d - 1 - q) = eZbar#(p, q).
     --Since eZbar#(p, q) is then known for p + q < d - 1, one can compute obtains eZ#(p, q) for p + q < d - 1.
@@ -464,10 +561,11 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
 		); --print"c";
 	    );
 	); --print("p + q < d - 1");
-    
+
+    --error "debug me3";    
     --The last remaining number, eZ#(p, d - 1 - p), is then the difference Sum_q eZ#(p, q) - Sum_{q != d - 1 - p} eZ#(p, q).
     --Sum_q eZ#(p, q) can be calculated from the number of lattice points in the interior of each face.
-    psi := ehrhartNumeratorQuicker(P);
+    psi := ehrhartNumerator(P);
     for p from 0 to d - 1 do (
 	eZ#(p, d - 1 - p) = computeSumqeZ(P, psi, p) - sum (
 	    for q from 0 to d - 1 list (
@@ -479,8 +577,10 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
 	    );
 	); --print("p + q = d - 1");
     --hZ := eZ2hZ(P, eZ);
+    --error "debug me4";    
     eZ = torusFactor(eZ, d, D);
     eZbar = torusFactor(eZbar, d, D);
+    --error "debug me5";
     if topdim then (print("topdim = true");
         for k in keys(eZcones) do (
             eZcones#k = torusFactor(eZcones#k, d, D);
@@ -489,7 +589,7 @@ computeHodgeDeligne Polyhedron := opts -> P -> (
     (new HashTable from eZ, new HashTable from eZbar, new HashTable from eZcones)
     )
 
-computeHodgeDeligne CYPolytope := opts -> P -> (
+computeHodgeDeligne ReflexivePolytope := opts -> P -> (
     PM := polytope(P, "M");
     PMfan := normalFan PM;
     PM'fan := fan reflexiveToSimplicialToricVariety PM;
@@ -498,7 +598,7 @@ computeHodgeDeligne CYPolytope := opts -> P -> (
 
 computeHodgeDeligne CalabiYauInToric := opts -> X -> computeHodgeDeligne(cyPolytope(X))
 
---check non-degeneracy; not the same as for CYPolytope!
+--check non-degeneracy; not the same as for ReflexivePolytope!
 computeHodgeDeligne ToricDivisor := opts -> D -> computeHodgeDeligne(polytope(D), opts)
 
 computeHodgeDeligne NormalToricVariety := opts -> V -> (
@@ -640,42 +740,170 @@ Headline
   Computing Hodge-Deligne polynomials of toric hypersurfaces
 Description
   Text
-References
-Caveat
+    This package implements the Danilov-Khovanskii algorithm for computing
+    Hodge-Deligne numbers $e^{p,q}(Z)$ of hypersurfaces $Z$ in algebraic tori
+    and toric varieties, as well as complete intersections in tori.
+
+    The Hodge-Deligne numbers are a refinement of the Euler characteristic
+    that encode mixed Hodge structure information.  For a smooth projective
+    variety, $e^{p,q}(Z) = (-1)^{p+q} h^{p,q}(Z)$ recovers the usual Hodge numbers.
+
+    @SUBSECTION "Main functions"@
+  Text
+    The central function is @TO computeHodgeDeligne@, which takes a lattice polytope
+    (the Newton polytope of a generic hypersurface in a torus) and returns the
+    Hodge-Deligne numbers as hash tables.
+
+    For complete intersections in tori, use @TO computeHodgeDeligneTorusCI@.
+
+    For hypersurfaces in subtoric varieties or in products $T^n \times \CC^r$,
+    use @TO computeHodgeDeligneInPToric@ or @TO computeHodgeDeligneAffineAndTorus@.
+
+    @SUBSECTION "Utility functions"@
+  Text
+    Several helper functions support the computation:
+
+    $\bullet$ @TO ehrhartNumerator@ and @TO ehrhartNumeratorNaive@ compute the
+    $h^*$-polynomial of a lattice polytope.
+
+    $\bullet$ @TO eZ2hZ@ converts Hodge-Deligne numbers to Hodge numbers for
+    smooth projective varieties.
+
+    $\bullet$ @TO toeZMatrix@ displays Hodge-Deligne numbers as a matrix.
+
+    $\bullet$ @TO manyPolyhedraToLargeOne@ and related functions construct the
+    auxiliary polytope needed for complete intersection computations.
+  Text
+    @SUBSECTION "A simple example"@
+  Text
+    We compute the Hodge-Deligne numbers of a generic hypersurface in a
+    3-dimensional torus, defined by a polynomial with Newton polytope $P$.
+  Example
+    P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
+    eZ
+    eZbar
+    toeZMatrix eZ
+  Text
+    For reflexive polytopes, we can also compute via the @TO ReflexivePolytope@ type.
+  Example
+    topes = kreuzerSkarke 3;
+    Q = cyPolytope topes_50
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(Q);
+    toeZMatrix eZbar
 SeeAlso
+  computeHodgeDeligne
+  computeHodgeDeligneTorusCI
+  computeHodgeDeligneAffineAndTorus
+  ehrhartNumerator
+  eZ2hZ
+///
+
+doc ///
+Key
+  HodgeDeligne
+Headline
+  type for Hodge-Deligne number data
+Description
+  Text
+    A @TO HodgeDeligne@ object is a @TO HashTable@ whose keys are pairs $(p,q)$
+    of non-negative integers and whose values are the corresponding Hodge-Deligne
+    numbers $e^{p,q}$.
+
+    Supported operations include addition, subtraction, scalar multiplication,
+    array access, @TO (matrix, HodgeDeligne)@, and @TO (show, HodgeDeligne)@.
+  Example
+    P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
+    show eZ
+SeeAlso
+  MutableHodgeDeligne
+  toeZMatrix
+  eZ2hZ
+///
+
+doc ///
+Key
+  MutableHodgeDeligne
+Headline
+  mutable type for Hodge-Deligne number data
+Description
+  Text
+    A @TO MutableHodgeDeligne@ object is a @TO MutableHashTable@ version of
+    @TO HodgeDeligne@.  It supports the same operations (addition, subtraction,
+    scalar multiplication, array access, matrix conversion, show) but allows
+    mutation of entries.
+SeeAlso
+  HodgeDeligne
 ///
 
 doc ///
 Key
   computeHodgeDeligne
   (computeHodgeDeligne, Polyhedron)
-  (computeHodgeDeligne, CYPolytope)
+  (computeHodgeDeligne, ReflexivePolytope)
   (computeHodgeDeligne, CalabiYauInToric)
   (computeHodgeDeligne, ToricDivisor)
   (computeHodgeDeligne, NormalToricVariety)
+  [computeHodgeDeligne, FaceInfo]
 Headline
-  compute the Hodge-Deligne polynomial of a hypersurface in a torus.
+  compute the Hodge-Deligne numbers of a hypersurface in a torus
 Usage
-  computeHodgeDeligne(P)
+  (eZ, eZbar, eZcones) = computeHodgeDeligne P
 Inputs
   P:Polyhedron
-    a lattice polytope
+    a lattice polytope (or @ofClass ReflexivePolytope@, @ofClass CalabiYauInToric@,
+    @ofClass ToricDivisor@, or @ofClass NormalToricVariety@)
+  FaceInfo => List
+    internal option for recursive calls (not intended for direct use)
 Outputs
-  :Sequence
-    of three HashTables $e_Z$, $e_{\bar{Z}}$, and all of the $e_{Z_\Gamma}$ for $\Gamma \leq P$ a face
+  eZ:HashTable
+    the Hodge-Deligne numbers $e^{p,q}(Z)$ of the hypersurface $Z$
+  eZbar:HashTable
+    the Hodge-Deligne numbers $e^{p,q}(\bar{Z})$ of the compactification $\bar{Z}$
+  eZcones:HashTable
+    the Hodge-Deligne numbers for each face of $P$
 Description
   Text
-    The Hodge-Deligne polynomial encodes information 
+    Given a lattice polytope $P$, computes the Hodge-Deligne numbers of a
+    generic hypersurface $Z$ in the torus $T^d$ defined by a Laurent polynomial
+    with Newton polytope $P$.  The algorithm follows Danilov and Khovanskii.
+
+    The output consists of three hash tables:
+
+    $\bullet$ {\tt eZ}: the Hodge-Deligne numbers $e^{p,q}(Z)$ of the open
+    hypersurface $Z \subset T^d$.
+
+    $\bullet$ {\tt eZbar}: the Hodge-Deligne numbers of the closure $\bar{Z}$
+    in the projective toric variety associated to $P$.
+
+    $\bullet$ {\tt eZcones}: Hodge-Deligne data for the strata corresponding
+    to faces of $P$.
   Example
     P = convexHull matrix {{-1, 4, -1, -1, 0, -1}, {-1, -1, 4, 0, -1, -1}, {-1, -1, -1, 1, 1, 1}}
     latticePoints(P)
     (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
     eZ
     eZbar
+  Text
+    For a @TO ReflexivePolytope@ from the Kreuzer-Skarke database, the compactified
+    Hodge-Deligne numbers recover the Hodge numbers of the corresponding Calabi-Yau.
+  Example
+    topes = kreuzerSkarke 3;
+    Q = cyPolytope topes_50
+    hh^(1,1) Q
+    hh^(1,2) Q
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(Q);
+    toeZMatrix eZbar
 Caveat
+  The {\tt FaceInfo} option is used internally for recursive computation
+  and should not normally be set by the user.
 SeeAlso
   computeHodgeDeligneInPToric
+  computeHodgeDeligneAffineAndTorus
   computeHodgeDeligneTorusCI
+  eZ2hZ
+  toeZMatrix
 ///
 
 doc ///
@@ -809,6 +1037,78 @@ SeeAlso
 
 doc ///
 Key
+  ehrhartNumeratorNaive
+  (ehrhartNumeratorNaive, Polyhedron)
+Headline
+  compute the numerator of the rational function expression for the Ehrhart series of a polytope
+Usage
+  ehrhartNumeratorNaive P
+Inputs
+  P:Polyhedron
+Outputs
+  :List
+    the coefficients of the numerator, with the i-th position corresponding to the i-th power of t (beginning from 0)
+Description
+  Text
+    The {\it Ehrhart} series of a lattice polytope $P$ is the rational function $\displaystyle\sum_{i\ge 0} \ell(i P) t^i = \frac{h^*(t)}{(1-t)^{dim(P)+1}}$,
+    where $\displaystyle h_P^*(t) = 1 + h_1^* t + \ldots + h_d^* t^d$ is a polynomial with non-negative integer coefficients, and $\ell(i \cdot P)$
+    is the number of lattice points in the $i$-th dilation of $P$.
+    This numerator is called the {\it Ehrhart numerator}, and this method returns the coefficients of this polynomial.
+  Example
+    R = QQ[x];
+    P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
+    elapsedTime eNum = ehrhartNumeratorNaive P
+    elapsedTime eNum = ehrhartNumerator P
+    h = sum for i from 0 to #eNum - 1 list (
+        eNum#i * x^i
+        )
+    a = 1 + sum for i from 1 to 10 list (
+        #latticePoints(i * P) * x^i
+        )
+    assert((a * (1 - x)^3)%x^11 == h)
+  Text
+    The Ehrhart numerator of a reflexive polytope has a nice symmetry.
+  Example
+    A = transpose matrix {
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {0, 0, 1, 3},
+        {1, 1, 1, 1},
+        {1, 1, 1, 3},
+        {-1, -1, -3, -5},
+        {1, -1, 1, 1},
+        {-1, 1, 1, 1}}
+    P = convexHull A
+    isReflexive P
+    elapsedTime ehrhartNumeratorNaive P
+    elapsedTime ehrhartNumerator P
+    elapsedTime ehrhartNumeratorNaive polar P
+    elapsedTime ehrhartNumerator polar P
+    #latticePointList(P) == 23
+    #latticePointList(2*P) == 163
+    #latticePointList(3*P) == 613
+    #latticePointList(4*P) == 1661
+    #interiorLatticePoints(P) == 1
+    #interiorLatticePoints(2*P) == 23
+    #interiorLatticePoints(3*P) == 163
+    elapsedTime for i from 1 to 5 list # interiorLatticePoints(i*P)
+    elapsedTime hP = ehrhart P
+    for i from 1 to 10 list sub(hP, (ring hP)_0 => i)
+    QQ[t]
+    elapsedTime ep = ehrhartNumeratorNaive P
+    ep = sum for i from 0 to #ep-1 list ep#i * t^i
+    ((1 + 23*t + 163*t^2 + 613*t^3 + 1661*t^4) * (1-t)^5) % t^5 === ep
+Caveat
+SeeAlso
+  ehrhartNumerator
+  "Polyhedra::ehrhart"
+  computeSumqeZ
+  computeHodgeDeligne
+///
+
+doc ///
+Key
   ehrhartNumerator
   (ehrhartNumerator, Polyhedron)
 Headline
@@ -837,42 +1137,7 @@ Description
     assert((a * (1 - x)^3)%x^11 == h)
 Caveat
 SeeAlso
-  ehrhartNumeratorQuicker
-  computeSumqeZ
-  computeHodgeDeligne
-///
-
-doc ///
-Key
-  ehrhartNumeratorQuicker
-  (ehrhartNumeratorQuicker, Polyhedron)
-Headline
-  compute the numerator of the rational function expression for the Ehrhart series of a polytope
-Usage
-  ehrhartNumeratorQuicker(P)
-Inputs
-  P:Polyhedron
-Outputs
-  :List
-    the coefficients of the numerator, with the i-th position corresponding to the i-th power of t (beginning from 0)
-Description
-  Text
-    The Ehrhart series of a polytope, P, in which the coefficient of $t^i$ is the number of lattice points in the i-th dilation of P, can be expressed as a rational function with a certain form.
-    Namely, one has $Ehr_P(t) = \frac{h^*(t)}{(1-t)^{dim(P)+1}}$, where $h^*(t)$ is a polynomial of degree $dim(P)$.
-  Example
-    R = QQ[x]
-    P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
-    eNum = ehrhartNumeratorQuicker(P)
-    h = sum for i from 0 to #eNum - 1 list (
-        eNum#i * x^i
-        )
-    a = 1 + sum for i from 1 to 10 list (
-        #latticePoints(i * P) * x^i
-        )
-    assert((a * (1 - x)^3)%x^11 == h)
-Caveat
-SeeAlso
-  ehrhartNumerator
+  ehrhartNumeratorNaive
   computeSumqeZ
   computeHodgeDeligne
 ///
@@ -901,13 +1166,13 @@ Description
     It is used in one of the last step of the Danilov-Khovanskii algorithms to compute $e^{p,q}(Z)$ for $p + q = d - 1$, since for fixed $p$, all other $e^{p,q}(Z)$'s will have been computed and $e^{p,d-1-p}(Z) = \sum_q e^{p,q}(Z) - \sum_{q\neqd-1-p} e^{p,q}(Z)$.
   Example
     P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
-    psi = ehrhartNumerator(P)
+    psi = ehrhartNumeratorNaive(P)
     computeSumqeZ(P, psi, 0)
     computeSumqeZ(P, psi, 1)
 Caveat
 SeeAlso
+  ehrhartNumeratorNaive
   ehrhartNumerator
-  ehrhartNumeratorQuicker
   computeHodgeDeligne
 ///
 
@@ -1182,12 +1447,194 @@ SeeAlso
   computeHodgeDeligneAffineAndTorus
 ///
 
+doc ///
+Key
+  FaceInfo
+Headline
+  option for computeHodgeDeligne controlling recursive face data
+Description
+  Text
+    An option for @TO computeHodgeDeligne@ used internally during recursive calls
+    to pass previously computed face data.  The value is a list
+    {\tt \{isTopLevel, faceData, ambientDim, fanPair\}}.
+
+    This option is not intended for direct use.
+SeeAlso
+  computeHodgeDeligne
+///
+
+doc ///
+Key
+  Cheap
+  [computeHodgeDeligneAffineAndTorus, Cheap]
+Headline
+  option controlling computation strategy for affine-torus hypersurfaces
+Description
+  Text
+    An option for @TO computeHodgeDeligneAffineAndTorus@.  When {\tt Cheap => true},
+    uses a faster method based on selecting columns from the vertex matrix.
+    When {\tt Cheap => false}, uses a more general method involving intersections
+    of half-spaces (not yet fully implemented).
+
+    The {\tt Cheap} method is the one used internally by @TO computeHodgeDeligneTorusCI@.
+SeeAlso
+  computeHodgeDeligneAffineAndTorus
+  computeHodgeDeligneTorusCI
+///
+
+doc ///
+Key
+  EmptyValue
+  [toeZMatrix, EmptyValue]
+Headline
+  option for toeZMatrix specifying the value for missing entries
+Description
+  Text
+    An option for @TO toeZMatrix@ that specifies what value to use for
+    $(p,q)$ entries that are not present in the hash table.  Default is 0.
+  Example
+    P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
+    toeZMatrix(eZ, EmptyValue => ".")
+SeeAlso
+  toeZMatrix
+///
+
+doc ///
+Key
+  Headers
+Headline
+  option symbol (not currently in use)
+Description
+  Text
+    This symbol is exported but not currently used.  It was intended for
+    a display function for Hodge-Deligne numbers.
+///
+
+doc ///
+Key
+  hodgeDeligne
+Headline
+  display function for Hodge-Deligne numbers (not currently in use)
+Description
+  Text
+    This function is exported but its implementation is currently commented out.
+    Use @TO (show, HodgeDeligne)@ or @TO toeZMatrix@ instead for displaying
+    Hodge-Deligne data.
+SeeAlso
+  toeZMatrix
+  HodgeDeligne
+///
+
+doc ///
+Key
+  matchCones
+  (matchCones, Cone, HashTable)
+Headline
+  find a cone in a cone table that contains a given cone
+Usage
+  c1 = matchCones(c, Pcones)
+Inputs
+  c:Cone
+  Pcones:HashTable
+    a cone table as produced by @TO makeConeTable@
+Outputs
+  c1:Cone
+    the smallest cone in Pcones containing $c$
+Description
+  Text
+    Searches through a cone table (indexed by dimension) to find a cone that
+    contains the given cone $c$.  This is used internally to match cones between
+    a simplicial subdivision fan and the original normal fan.
+SeeAlso
+  makeConeTable
+  fanRayList
+///
+
+doc ///
+Key
+  fanRayList
+  (fanRayList, Cone, Fan)
+Headline
+  find the indices of rays of a cone within a fan
+Usage
+  L = fanRayList(C, F)
+Inputs
+  C:Cone
+  F:Fan
+Outputs
+  L:List
+    the sorted list of indices of rays of $F$ that are rays of $C$
+Description
+  Text
+    Given a cone $C$ whose rays are a subset of the rays of a fan $F$,
+    returns the sorted list of ray indices (in $F$) corresponding to the rays of $C$.
+    Handles lineality correctly.
+SeeAlso
+  matchCones
+  makeConeTable
+  makeConeToFaceDict
+///
+
+doc ///
+Key
+  makeConeToFaceDict
+  (makeConeToFaceDict, Polyhedron, Fan)
+Headline
+  create a dictionary from cones of a normal fan to faces of a polytope
+Usage
+  D = makeConeToFaceDict(P, Pfan)
+Inputs
+  P:Polyhedron
+  Pfan:Fan
+    the normal fan of $P$
+Outputs
+  D:HashTable
+    keys are sorted ray index lists of cones, values are lists of vertex indices
+    of the corresponding dual face
+Description
+  Text
+    For each cone $\sigma$ in the normal fan of a polytope $P$, the dual face
+    $F_\sigma$ consists of the vertices of $P$ that achieve the minimum inner
+    product with rays of $\sigma$.  This function builds a dictionary mapping
+    cone ray lists to vertex index lists.
+SeeAlso
+  makeConeTable
+  fanRayList
+  computeHodgeDeligne
+///
+
+doc ///
+Key
+  makeConeTable
+  (makeConeTable, Fan)
+Headline
+  organize the cones of a fan by dimension
+Usage
+  T = makeConeTable F
+Inputs
+  F:Fan
+Outputs
+  T:HashTable
+    keys are dimensions (from 0 to dim $F$), values are lists of cones
+    of that dimension
+Description
+  Text
+    Creates a hash table organizing the cones of a fan by their dimension.
+    Used internally by @TO computeHodgeDeligne@ to iterate over cones
+    in order of increasing dimension.
+SeeAlso
+  matchCones
+  fanRayList
+  makeConeToFaceDict
+///
+
 -* Test section *-
 TEST /// -* [insert short title for this test] *-
   R = QQ[x]
   P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
-  eNum = ehrhartNumerator(P)
-  eNum2 = ehrhartNumeratorQuicker(P)
+  eNum = ehrhartNumeratorNaive(P)
+  eNum2 = ehrhartNumerator(P)
   h = sum for i from 0 to #eNum - 1 list (
       eNum#i * x^i
       )
@@ -1199,7 +1646,7 @@ TEST /// -* [insert short title for this test] *-
 
 TEST ///
   P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
-  psi = ehrhartNumerator(P)
+  psi = ehrhartNumeratorNaive(P)
   assert (computeSumqeZ(P, psi, 0) == -8)
   assert (computeSumqeZ(P, psi, 1) == 0)
   (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
@@ -1214,7 +1661,7 @@ TEST ///
   isReflexive PM
   latticePoints PM
   faces(1,PN)
-  psi = ehrhartNumerator(PM)
+  psi = ehrhartNumeratorNaive(PM)
   assert (computeSumqeZ(PM, psi, 0) == 33)
   assert (computeSumqeZ(PM, psi, 1) == 27)
   assert (computeSumqeZ(PM, psi, 2) == 2)
@@ -1318,7 +1765,7 @@ TEST ///
       fs := faces(i, P);
       Fs := facesAsPolyhedra(i, P);
       for j from 0 to #fs - 1 do (
-          print("vertices = " | toString(fs#j#0), ehrhartNumeratorQuicker(Fs#j), ehrhartNumerator(Fs#j));
+          print("vertices = " | toString(fs#j#0), ehrhartNumerator(Fs#j), ehrhartNumeratorNaive(Fs#j));
 	  for k from 1 to d - i do (
 	      print(k | ": " | #latticePoints(k * Fs#j))
 	      );
@@ -1397,7 +1844,7 @@ TEST ///
       fs := faces(i, P);
       Fs := facesAsPolyhedra(i, P);
       for j from 0 to #fs - 1 do (
-          assert(ehrhartNumeratorQuicker(Fs#j) == ehrhartNumerator(Fs#j));
+          assert(ehrhartNumerator(Fs#j) == ehrhartNumeratorNaive(Fs#j));
 	  );
       )
 ///
@@ -1408,7 +1855,7 @@ end--
 -* Development section *-
 restart
 debug needsPackage "DanilovKhovanskii"
-check "DanilovKhovanskii"
+check "DanilovKhovanskii2"
 
 uninstallPackage "DanilovKhovanskii"
 restart

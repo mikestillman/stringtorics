@@ -49,15 +49,7 @@ intersectionNumbers = method()
 --   no ring involved.
 ------------------------
 
--- toBasisIntersectionNumbers: An internal function for computeIntersectionNumbers
--*
-toBasisIntersectionNumbers = (toricIntersectionNumbers, basIndices) -> (
-    H := hashTable for i from 0 to #basIndices-1 list basIndices#i => i;
-    for t in toricIntersectionNumbers list (
-        if isSubset(t#0, basIndices) then t#0/(a -> H#a)//sort => t#1 else continue
-        )
-    )
-*-
+-- Old toBasisIntersectionNumbers moved to ScratchIntersectionNumbers.m2
 
 toBasisIntersectionNumbers = (toricIntersectionNumbers, basIndices, nonfavsHash) -> (
     -- toricIntersectionNumbers: list of {i,j,k} => intersection number.
@@ -170,20 +162,17 @@ computeC2(List, List, HashTable) := (toricIntersectionNumbers, basIndices, nonfa
 -- computeIntersectionNumbers: An internal function for intersectionNumbers. toricIntersectionNumbers, and c2.
 computeIntersectionNumbers = method()
 computeIntersectionNumbers CalabiYauInToric := X -> (
-    if not X.cache#?"toric intersection numbers" then  (
+    if not X.cache#?"toricIntersectionNumbers" then  (
         Q := cyPolytope X;
         basIndices := basisIndices Q;
         A := transpose matrix rays Q;
         nonfavs := hashTable findTwoFaceInteriorDivisors Q;
         T2 := restrictTriangulation X;
         result := computeToricIntersectionNumbers(A, T2);
-        X.cache#"toric intersection numbers" = result;
-        --X.cache#"intersection numbers" = toBasisIntersectionNumbers(result, Q.cache#"toric basis indices");
-        X.cache#"intersection numbers" = toBasisIntersectionNumbers(result, basIndices, nonfavs);
+        X.cache#"toricIntersectionNumbers" = result;
+        X.cache#"intersectionNumbers" = toBasisIntersectionNumbers(result, basIndices, nonfavs);
         X.cache#"c2" = computeC2(result, basIndices, nonfavs);
-        --X.cache#"c2" = computeC2(result, basIndices);
         );
-    --{result, toBasisIntersectionNumbers(result, basIndices)}
     )
 
 --------------------------------------------
@@ -191,14 +180,13 @@ computeIntersectionNumbers CalabiYauInToric := X -> (
 --------------------------------------------
 intersectionNumbers CalabiYauInToric := X -> (
     computeIntersectionNumbers X;
-    X.cache#"intersection numbers"
-    --intersectionNumbersOfCY(ambient X, basisIndices X)
+    X.cache#"intersectionNumbers"
     )
 
 toricIntersectionNumbers = method()
 toricIntersectionNumbers CalabiYauInToric := X -> (
     computeIntersectionNumbers X;
-    X.cache#"toric intersection numbers"
+    X.cache#"toricIntersectionNumbers"
     )
 
 c2 = method();
@@ -214,50 +202,6 @@ c2 CalabiYauInToric := X -> (
 
 -- TODO: if X is not favorable, need to redo the basis, and intersection numbers (and also then the c2 form)
 
-TEST ///
--*
-  restart
-  debug needsPackage "StringTorics"
-*-
-  vs = {{-1, -1, -1, 0}, {-1, -1, 0, 0}, {-1, -1, 1, -1}, {-1, 0, -1, 0}, {0, -1, 2, -1}, {0, 0, -1, 0}, {0, 1, -1, 0}, {1, 1, -1, 1}, {1, 1, 0, 1}}
-  cones4 = {{0, 1, 2, 3}, {0, 1, 2, 4}, {0, 1, 3, 7}, {0, 1, 4, 7}, {0, 2, 3, 5}, {0, 2, 4, 5}, {0, 3, 5, 7}, {0, 4, 5, 7}, {1, 2, 3, 8}, {1, 2, 4, 8}, {1, 3, 7, 8}, {1, 4, 7, 8}, {2, 3, 5, 6}, {2, 3, 6, 8}, {2, 4, 5, 6}, {2, 4, 6, 8}, {3, 5, 6, 7}, {3, 6, 7, 8}, {4, 5, 6, 7}, {4, 6, 7, 8}}
-  Q = cyPolytope(vs, ID => 1000)
-  rays Q == vs
-  X = calabiYau(Q, cones4, ID => 0)
-  rays X == vs
-  max X == cones4
-
-  elapsedTime intersectionNumbers X
-  toRingElement(oo, X.cache#"pic ring")
-  elapsedTime toricIntersectionNumbers X
-  assert(intersectionNumbers X === intersectionNumbersOfCY X)
-  elapsedTime c2 X
-  c2Form X
-  cubicForm X
-
-  elapsedTime intersectionNumbers X
-  elapsedTime intersectionNumbersOfCY X
-
-  elapsedTime topologicalData X
-  
-  -- F = openDatabase "polytopes-h11-5.dbm"
-  --   V = cyPolytope F#"1000"
-  --   close F
-  -- X = makeCY(V, ID => label V, Ring => (RZ = ZZ[a,b,c,d,e]))
-
-  -- elapsedTime intersectionNumbers X
-  -- toRingElement(oo, X.cache#"pic ring")
-  -- elapsedTime toricIntersectionNumbers X
-  -- assert(intersectionNumbers X === intersectionNumbersOfCY X)
-  -- elapsedTime c2 X
-  -- c2Form X
-  -- cubicForm X
-
-  -- elapsedTime intersectionNumbers X
-  -- elapsedTime intersectionNumbersOfCY X
-
-  -- elapsedTime topologicalData(X, ZZ[a..e])
-///
 
 -----------------------------------------------
 -- Utility functions --------------------------
@@ -330,85 +274,6 @@ cubicForm CalabiYauInToric := RingElement => X -> (
     toRingElement(intersectionNumbers X, RZ)
     )
 
-TEST ///
--- test of the (currently internal) routines: exponentsToProduct,
--- productToExponents, multinomial, toCOO, toRingElement.
-  debug StringTorics
-  assert(exponentToProduct {} == {})
-  assert(exponentToProduct {3} == {0, 0, 0})
-  assert(exponentToProduct {0, 3, 1} == {1, 1, 1, 2})
-  assert(exponentToProduct {1, 2, 1, 0, 1, 0, 0, 0} == {0, 1, 1, 2, 4})
-  assert(exponentToProduct {1, 1, 1, 1, 1} == {0, 1, 2, 3, 4})
-
-  assert(productToExponents({}, 0) == {})
-  assert(productToExponents({}, 3) == {0, 0, 0})
-  assert(productToExponents({0, 0, 0}, 1) == {3})
-  assert(productToExponents({1, 1, 1, 2}, 3) == {0, 3, 1})
-  assert(productToExponents({0, 1, 2, 3, 4}, 5) == {1, 1, 1, 1, 1})  
-  assert(productToExponents({0, 1, 1, 2, 4}, 8) == {1, 2, 1, 0, 1, 0, 0, 0})
-
-  assert(multinomial {3, 0, 0} == 1)  
-  assert(multinomial {1,0,2} == 3)
-  assert(multinomial {1, 1, 1} == 6)
-
-  RZ = ZZ[a,b,c]
-  F = (a+2*b+3*c)^3 
-  G = toCOO F  
-  F' = toRingElement(G, RZ)
-  assert(F == F')
-  G' = toCOO F'
-  assert(G === G')
-
-  L = 3*a+c
-  toCOO L
-  assert(toRingElement(toCOO L, RZ) == L)
-
-  L = 1_RZ
-  toCOO L
-  assert(toRingElement(toCOO L, RZ) == L)
-
-  L = 0_RZ
-  toCOO L
-  assert(toRingElement(toCOO L, RZ) == L)
-///
-
-
-TEST ///
--- As it turns out, 'monoms' is much faster than first creating the basis,
--- and applying exponentToProduct to (the exponent vector of) every monomial
--- e.g. on MES's Apple M1 Max, 2022, doing nv = 81 the latter way gives .32 + 1.6 seconds
--- instead of .25 seconds.
-  debug StringTorics
-  elapsedTime assert(# monoms(3, 0, 10) == binomial(13,3))
-  elapsedTime assert(# monoms(3, 0, 12) == binomial(15,3))
-  elapsedTime assert(# monoms(3, 0, 20) == binomial(23,3))
-  elapsedTime assert(# monoms(3, 0, 50) == binomial(53,3))
-  elapsedTime assert(# monoms(3, 0, 80) == binomial(83,3)) -- .25 seconds
-  elapsedTime assert(# monoms(3, 0, 200) == binomial(203,3)) -- 1.5 seconds
-
-  -- commented out so 'check' doesn't take too long
-  --elapsedTime assert(# monoms(3, 0, 300) == binomial(303,3)) -- 5.2 seconds
-  --elapsedTime assert(# monoms(3, 0, 400) == binomial(403,3)) -- 14.2 seconds
-  --elapsedTime assert(# monoms(3, 0, 495) == binomial(498,3)) -- 31 seconds
-  --elapsedTime assert(# monoms(3, 0, 490) == binomial(493,3)) -- 36 seconds, why longer?
-  
-  RZ = ZZ[t_1..t_20]
-  elapsedTime B = flatten entries basis(3, RZ);
-  #B
-  mons1 = B/(b -> exponentToProduct first exponents b)
-  mons2 = monoms(3, 0, 19)
-  mons1 === mons2 -- in the same order
-
-  -- nv = 81 gives the timing above.
-  -- the order should be the same,  For testing, we use a smaller value of nv.
-  nv = 10
-  RZ = ZZ[t_1..t_nv]
-  elapsedTime B = flatten entries basis(3, RZ);
-  assert(#B == binomial(nv+2, 3))
-  elapsedTime mons1 = B/(b -> exponentToProduct first exponents b);
-  elapsedTime mons2 = monoms(3, 0, nv-1);
-  assert(mons1 === mons2) -- in the same order
-///
 
 ------------------------------------
 -- Intersection numbers via intersection ring in Schubert2
@@ -466,95 +331,16 @@ intersectionNumbersOfCY CalabiYauInToric := X -> (
 -- computing intersection numbers of a CY 3-fold.
 ------------------------------------------
     
-TEST ///
-  -- Let's test the basis intersection numbers code at slightly higher h11...
-  -- TODO: This fails, as it uses old naming...
--*
-  restart
-  needsPackage "StringTorics"
-*-  
-  topes = kreuzerSkarke(7, Limit => 50);    
-  assert(#topes == 50)
-  topes_30
-  -- Here it is:
-  ks = KSEntry "4 10  M:33 10 N:12 8 H:7,29 [-44] id:30
-   1   0   0   1  -1   1  -1  -1  -2   0
-   0   1   1   0  -2   0  -2   2  -1   1
-   0   0   2   0  -4   2  -2   2  -2   2
-   0   0   0   2  -2   2  -2   0  -2   2
-   "
---  A = matrix ks   
-  Q = cyPolytope ks
-  elapsedTime Xs1 = findAllCYs(Q, Automorphisms => false, NTFE => false, Ring => ZZ[a_0..a_6]);
-  -- need a way to get one FRST, or perhaps a smaller number than "all".
-  Xs = findAllCYs Q;
-  X = Xs#0
-
-  toricMoriConeCap X
-  classifyExtremalCurves X
-  #Xs
-  X = first Xs
-  peek X
-  V = ambient X
-  assert isWellDefined V
-  assert isProjective V
-  assert isSimplicial V
-
-  debug StringTorics  
-  coo = intersectionNumbers X
-  RZ = ZZ[t_0..t_6]
-  F = toRingElement(coo, RZ)
-  assert(sort coo === sort toCOO F)
-
-  X = findOneFRST P    
-  V = ambient X
-  isWellDefined V
-  
-  coo = intersectionNumbers X
-  RZ = ZZ[t_0..t_6]
-  F = toRingElement(coo, RZ)
-  assert(sort coo === sort toCOO F)
-///   
-
-TEST ///
-  -- Let's see how high we can go with this simplistic routine.
--*  
-  restart
-  debug needsPackage "StringTorics"
-*-
-  h11 = 20
-  topes = kreuzerSkarke(h11, Limit => 50);    
-  assert(#topes == 50)
-
-  -- BUG: this is not giving h11=20... reason: topes_30 not favorable!
-  A = matrix topes_25
-  P1 = convexHull A
-  P2 = polar P1
-  annotatedFaces P2
-  elapsedTime P = reflexivePolytope A
-  isFavorable P
-  h11OfCY P
-  h21OfCY P
-
-  elapsedTime X = makeCY P
-  elapsedTime coo = intersectionNumbers X; -- 4 seconds at h11=20.  3.2 seconds of this is computing the intersection ring.
-  assert(#coo == 175)
-
-  RZ = ZZ[t_0..t_(h11-1)]
-  F = toRingElement(coo, RZ)
-  assert(sort coo === sort toCOO F)
-///
 
 
 ------------------------------
--- REMOVE: tripleProductsCY --
+-- tripleProductsCY --
 ------------------------------
--- This code is no longer simpler than current code.
 -- Simpler code, used to debug the algorithm/implementation above.
 tripleProductsCY = method()
 tripleProductsCY NormalToricVariety := (V) -> (
     elapsedTime AV := abstractVariety(V, point);
-    IV := intersectionRing AV; 
+    IV := intersectionRing AV;
     h := sum gens IV; -- Calabi-Yau hyperplane class in V.
     J := ideal select((ideal IV)_*, f -> size f == 1);
     forceGB gens J;
@@ -572,7 +358,7 @@ tripleProductsCY NormalToricVariety := (V) -> (
     )
 
 ------------------------------
--- REMOVE: possibleNonZeros --
+-- possibleNonZeros --
 ------------------------------
 possibleNonZeros = (V) -> (
     -- assumption currently: V has dim 4, is reflexive, and X is the anti-canonical CY3 divisor.
@@ -596,7 +382,7 @@ possibleNonZeros = (V) -> (
     )
 
 --------------------------------------
--- REMOVE: CY3NonzeroMultiplicities --
+-- CY3NonzeroMultiplicities --
 --------------------------------------
   CY3NonzeroMultiplicities = method()
   CY3NonzeroMultiplicities NormalToricVariety := (V) -> (
@@ -610,7 +396,7 @@ possibleNonZeros = (V) -> (
            );
       multvec := ij -> (
           for ell from 0 to #rays V-1 list (
-              if member(ell,ij) then 0 
+              if member(ell,ij) then 0
               else (
                   s := sort append(ij,ell);
                   if mult3#?s then mult3#s else 0
@@ -634,7 +420,7 @@ possibleNonZeros = (V) -> (
       )
 
 ------------------------------
--- REMOVE: CY3Intersections --
+-- CY3Intersections --
 ------------------------------
 CY3Intersections = method()
 CY3Intersections(NormalToricVariety, List) := (V, indexOfDs) -> (

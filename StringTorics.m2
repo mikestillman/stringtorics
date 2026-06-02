@@ -1,7 +1,7 @@
 newPackage(
         "StringTorics",
-        Version => "0.7", -- bumped on 12 April.
-        Date => "12 April 2024",
+        Version => "0.8", -- bumped on 18 April 2025
+        Date => "18 April 2025",
         Authors => {
             {Name => "Mike Stillman", 
             Email => "mike@math.cornell.edu", 
@@ -10,6 +10,7 @@ newPackage(
         Headline => "toric variety functions for string theory",
         DebuggingMode => true,
         AuxiliaryFiles => true,
+        Configuration => { "computeGV" => "~/src/M2-workshops/Workshop-2024-Utah/ComputeGV/computeGV" },
         PackageExports => {
             "FourTiTwo", -- where is this used?
             "SimplicialComplexes",
@@ -21,7 +22,8 @@ newPackage(
             "Topcom",
             "Triangulations",
             "InverseSystems",
-            "IntegerEquivalences"
+            "IntegerEquivalences",
+            "PALPInterface"
             },
         PackageImports => {
             "LLLBases"
@@ -30,20 +32,42 @@ newPackage(
 
 export {
     -- Types defined here
+    "ReflexivePolytope",
     "CYPolytope", -- rename to CYReflexivePair?  How about CYPolytope?
     "CalabiYauInToric",
     "CYToolsCY3", -- we should have a superclass for CalabiYauInToric, CYToolsCY3
     "TopologicalDataOfCY3",
+    "GVTable",
+    "CY3",
 
+    ---------------------------------------------------------------------------
+    -- polyhedral and cone utilities (avoiding slower routines in Polyhedra. --
+    -- These will likely move to another package). ----------------------------
+    ---------------------------------------------------------------------------
+    "boundedLatticePoints",
+    "latticePointsNormaliz",
+    -- options for these
+    "Bound",
+    "NodeLimit",
+    
+    -- ReflexivePolytope
+    "reflexivePolytope",
+    "reflexive" => "reflexivePolytope", -- TODO: a synonym, or just the same behavior?
+    "computeBasics",
+    
     -- CYPolytope, CalabiYauInToric
     "InteriorFacets",
     "ID",
     "cyPolytope",
     "dump",
     "label",
+    "findTwoFaceInteriorDivisors",
+    "faceDimensions",
+    "faceDimension",
     
     "cyData",
     "makeCY",
+    "makeCYs",
     "calabiYau", -- versions might include:
        -- calabiYau(CYPolytope, Triangulation, Ring => RZ, Label => (a,i))
        -- The following are all taking the CY3 from a database:
@@ -73,15 +97,26 @@ export {
     "latticePointHash",
     "interiorLatticePointList",
     "annotatedFaces",
+    "latticePointsAndDimensions",
     "automorphisms",
+    "automorphismsAsPermutations",
 
-    -- current triangulation code
-    "findAllFRSTs",
+    -- current triangulation code for ReflexivePolytope type...
+    "isTriangulationOfPolytope",
+    "findAllSimplicialFans",
+    "findOneFRST",
+    "findAllFRSTs", -- fine regular, point triangulations
+    "findAllFRVTs", -- fine regular, but NOT point triangulations. This often crashes using topcom...
+    -- finding one triangulation
+    -- using opt level code to investigate nearby triangulations
+    "partitionFRSTsByDFaceEquivalence",
     "findAllCYs",
-    "findAllConnectedStarFine",
-    "findStarFineGraph",
+    "findAllConnectedStarFine", -- ??
+    "findStarFineGraph", -- ??
+
+
     
-    -- older triangulation code (still useful?)
+    -- older triangulation code (still useful?) 
     "Origin",
     "pointConfiguration",
     "regularStarTriangulation",
@@ -116,19 +151,33 @@ export {
     "toricMoriCone",
     "toricMoriConeCap",
         
-    -- gvInvariants
+    -- gvInvariants. Which do we really want to keep here?
     "gvInvariants",
     "gvCone",
     "partitionGVConeByGV",
     "classifyExtremalCurves",
     "extremalRayGVs",
+    "GVs", -- field in GVTable hash table
+    "MoriConeCap",
 
+    -- new gv code, maybe replace previous ones?  (Except: need to be able to handle extremal curves faster?)
+    "gvInvariantsNew", -- TODO: rename this as gvInvariants...
+    "gvByRay", -- should this be private?
+    "gvTable",
+    "gvRays",
+    "gvRay",
+    "isNilpotent",
+
+    -- CY3: flopping via curves
+    "makeCY3",
+    "negatedCurves",
+    "performFlop",
+    "moriCone",
+    
     -- remove these gvInvariant functions?
     "classifyExtremalCurve",
     "gvInvariantsAndCone",
-    --    "gvRay",
     "findLinearMaps",
-
     
     -- Invariants
     "hubschInvariants",
@@ -158,7 +207,7 @@ export {
     "equivalences",
     "IgnoreSingles",
     "separateIfDifferent",
-    
+    "Defer",
         
     -- CompleteIntersectionInToric's
     "completeIntersection",
@@ -175,7 +224,9 @@ export {
 
     -- Creating databases of polytopes (with precomputed data).
     "hodgeNumbers", -- of KSEntry: gives (h11, h12) from KSEntry.  Should be in ReflexivePolytopesDB?
-    "createCYDatabase",
+    "createCYDatabaseFiles",
+    "combineCYDatabaseFiles",
+
     "addToCYDatabase",
     "readCYDatabase",
     "readCYs",
@@ -246,6 +297,7 @@ export {
     
     -- Flop chains, Mori cones
 
+    "BasisIndices",
     "IntersectionNumbers",
     "MoriHilbertGens",
     "Automorphisms",
@@ -255,13 +307,24 @@ export {
     "Count",
     "Hodge",
     "NTFE",
-    "PicardRing"
+    "PicardRing",
+    "GVRays",
+--    "h11",
+--    "h12",
+    "Label",
+    "NegatedCurves"
     }
 
 --- kludge to access parts of the 'Core'
 hasAttribute = value Core#"private dictionary"#"hasAttribute";
 getAttribute = value Core#"private dictionary"#"getAttribute";
 ReverseDictionary = value Core#"private dictionary"#"ReverseDictionary";
+
+-- The following is to access currently private engine routines
+-- The code is in MyPolyhedra.m2 (currently).
+protect Bound
+protect NodeLimit
+importFrom_"Core" { "rawGVInvariants", "raw", "rawLatticePoints", "rawLatticePointsNormaliz" }
 
 ------------------------------------
 -- New types -----------------------
@@ -299,7 +362,9 @@ findEquivalence(CalabiYauInToric, CalabiYauInToric) := (X1, X2) -> (
     )
 
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
-load (currentFileDirectory | "StringTorics/CYPolytope.m2")
+--load (currentFileDirectory | "StringTorics/CYPolytope.m2")
+cyPolytope = reflexivePolytope
+load (currentFileDirectory | "StringTorics/ReflexivePolytopes.m2")
 load (currentFileDirectory | "StringTorics/CalabiYauInToric.m2")
 load (currentFileDirectory | "StringTorics/IntersectionNumbers.m2")
 load (currentFileDirectory | "StringTorics/Invariants.m2")
@@ -827,53 +892,61 @@ exampleP111122'44 = () -> (value /// () -> (
      Ts1 := select(Ts, isStar);
      --<< "Ts1 = (after): " << netList Ts1 << endl;
      assert all(Ts1, tri -> all(max tri, s -> s#-1 == numcols A));
-     Ts1/(t -> (entries transpose A, (max t)/(s -> drop(s, -1))))
-     )
- findAllFRSTs Polyhedron := List => (P) -> (
-     L := latticePointList P;
-     assert all(L#-1, a -> a == 0);
-     L = drop(L, -1);
-     A := transpose matrix L;
-     findAllFRSTs A
+     result := Ts1/(t -> (entries transpose A, (max t)/(s -> drop(s, -1))));
+     result/last -- get rid of the actual vertices, which should match columns of A
      )
 
+-- This function finds all regular, simplicial fans with the given rays.
+-- If Fine => true is given, then only triangulations that use all of the rays are considered.
+-- Return value: a list of triangulations of the vector configuration.
 
--- Being rewritten 22 Aug 2023.
--- findAllCYs = method(Options => {Ring => null}) -- opts.Ring: ZZ[h11 variables].
--- findAllCYs CYPolytope := List => opts -> Q -> (
---     Ts := findAllFRSTs Q;
---     RZ := if opts#Ring === null then (
---         a := getSymbol "a";
---         h11 := hh^(1,1) Q;
---         ZZ[a_1 .. a_h11]
---         )
---     else (
---         opts#Ring
+-- TODO
+--  1. note: we want to call allTriangulations once, but for some
+--    reason, every now and then, it comes back with no triangulations.
+--  2. Using Homogenize=>false, RegularOnly=>true, (maybe Fine=>true), sometimes givevs no triangulations.
+--    So: we use ConnectedToRegular=>false, and check regularity at the end, if Regular is set to true.
+findAllSimplicialFans = method(Options => {Fine => true, RegularOnly => true})
+-- findAllSimplicialFans Matrix := List => opts -> (A) -> (
+--     Ts := allTriangulations(A, Homogenize => false, RegularOnly => true, Fine => opts.Fine); -- TODO: bug? if Fine => true, get crash?
+--     if #Ts === 0 or #Ts#0 == 0 then (
+--         count := 0;
+--         while count < 100 and (#Ts === 0 or #Ts#0 == 0) do (
+--             Ts = allTriangulations(A, Homogenize => false, RegularOnly => true, Fine => opts.Fine);
+--             count = count + 1;
+--             );
+--         --if #Ts == 0 then error "no triangulation could be found";
+--         << "WARNING: TOPCOM failed to find triangulations, then found them after " << 
+--         count << " attempt(s)" << endl;
 --         );
---     for i from 0 to #Ts - 1 list cyData(Q, Ts#i, ID => i, Ring => RZ)
+--     Ts
 --     )
 
-
--- keys: id, cypolytopedata, triangulation, cache.  The id is what? (id of polytope, which triangulation)
---  write date: for cypolytopedata, just writes the id.
---  read data: given id, need to be able to get at which polytope it is.
---    maybe a table with id => CYPolytope, or a function which takes an integer and returns 
---    the CYPolytope object to use, with this id.
---  construct one from a CYPolytope, id, triangulation.
---  what is in the cache?
---    ambient toric
---    CYInToric?
---    abstract toric variety (depends on base)
---    abstract variety for CY3 (depends on base)
---    intersectionNumbers
---    cubicForm (string or polynomial? or intersection numbers only?)
---    c2Form (string or list or polynomial?)
---    mori cone info?
---    gv invariants?
-
-
-----------------------------------------------------------------
-
+findAllSimplicialFans Matrix := List => opts -> (A) -> (
+    Arays := entries transpose A;
+    Ts := topcomAllTriangulations(A,
+             Homogenize => false,
+             RegularOnly => false,
+             ConnectedToRegular => false, -- setting to true gives no triangulations some times.
+             Fine => opts.Fine); -- TODO: bug? if Fine => true, get crash?
+    if #Ts === 0 or #Ts#0 == 0 then (
+        count := 0;
+        while count < 100 and (#Ts === 0 or #Ts#0 == 0) do (
+            Ts = topcomAllTriangulations(A,
+                    Homogenize => false,
+                    RegularOnly => false,
+                    ConnectedToRegular => false,
+                    Fine => opts.Fine);
+            count = count + 1;
+            );
+        --if #Ts == 0 then error "no triangulation could be found";
+        << "WARNING: TOPCOM failed to find triangulations, then found them after " << 
+           count << " attempt(s)" << endl;
+        );
+    elapsedTime if opts.RegularOnly then (
+        Ts = select(Ts, t -> isProjective normalToricVariety(Arays, t))
+        );
+    Ts
+    )
 
 ----------------------------------------------------------------
 -- FRST Triangulations (Fine, regular, star triangulations) ----
@@ -892,6 +965,7 @@ reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
 
 
 load (currentFileDirectory | "StringTorics/GVInvariants.m2")
+load (currentFileDirectory | "StringTorics/Flops.m2")
 
 -- This file refers to many of the method names defined earlier, applied to CYToolsCY3
 load (currentFileDirectory | "StringTorics/CYTools.m2")
@@ -907,8 +981,23 @@ beginDocumentation()
 -- . triangulations can be too big
 -- . what else can be too big?
 
-load (currentFileDirectory | "StringTorics/doc.m2")
-load (currentFileDirectory | "StringTorics/test.m2")
+load (currentFileDirectory | "StringTorics/Doc.m2")
+load (currentFileDirectory | "StringTorics/DocMyPolyhedra.m2")
+load (currentFileDirectory | "StringTorics/DocCYPolytope.m2")
+load (currentFileDirectory | "StringTorics/DocCalabiYauInToric.m2")
+load (currentFileDirectory | "StringTorics/DocDatabases.m2")
+load (currentFileDirectory | "StringTorics/DocCI.m2")
+load (currentFileDirectory | "StringTorics/DocIntersectionNumbers.m2")
+load (currentFileDirectory | "StringTorics/DocTopology.m2")
+load (currentFileDirectory | "StringTorics/DocInvariants.m2")
+load (currentFileDirectory | "StringTorics/DocLineBundleCohomology.m2")
+load (currentFileDirectory | "StringTorics/DocGVInvariants.m2")
+load (currentFileDirectory | "StringTorics/Test.m2")
+load (currentFileDirectory | "StringTorics/TestCYPolytope.m2")
+load (currentFileDirectory | "StringTorics/TestToricCIs.m2")
+load (currentFileDirectory | "StringTorics/TestIntersectionNumbers.m2")
+load (currentFileDirectory | "StringTorics/TestInvariants.m2")
+load (currentFileDirectory | "StringTorics/TestTopology.m2")
 
 end--
 
@@ -916,14 +1005,20 @@ restart
   uninstallAllPackages()
 
 restart
-  installPackage "IntegerEquivalences" -- works, lots of warnings
-  installPackage "DanilovKhovanskii"
-  installPackage "StringTorics"
-
-
-  check IntegerEquivalences -- 8 checks, finishes to completion.
-  check DanilovKhovanskii -- 10 checks, finishes, 3 take some time
-  check StringTorics -- 35 tests, finishes to completion.  3 tests take > 10 sec.
+  installPackage "IntegerEquivalences" -- works, lots of warnings, 1 failure 4/30/2026
+  installPackage "DanilovKhovanskii" -- 1 failure 4/30/2026
+  installPackage "PALPInterface"
+  elapsedTime installPackage "StringTorics"  -- 44.4909s elapsed TODO: improve this!
+    -- now 60.4s on 26 Jan 2026, now 69 sec, 4/30/26.
+  
+  check IntegerEquivalences -- 8 checks, finishes to completion, 1 takes 6.6 sec (now it takes 9.7 sec 4/30/2026)
+  check "DanilovKhovanskii" -- 10 checks, finishes, 3 take some time (3.9sec, 4.9sec, 16.5 sec).  One test error (#8) (hmmm, I see 9 checks, not 10...)
+    -- the error is because we use ReflexivePolytope...
+  time check "StringTorics" -- used 53.257s (cpu); 23.9121s (thread); 0s (gc) (one uses 5 sec, 6.6 sec, 4.5 sec, 4.1 sec)) Now 68 sec... 
+  elapsedTime check "StringTorics" -- 39.87 sec.  
+    -- currently: 43 tests, finishes to completion.  Longest test: 6.2 sec
+    -- 4/30/2026: affineCircuits doesn't exist: renamed to flipCandidates in Triangulations.m2
+    -- however, one test seems to connect to KS database.
 
 restart
 needsPackage "StringTorics"

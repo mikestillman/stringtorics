@@ -10,7 +10,7 @@ topologicalData = method()
 --         "h11" => hh^(1,1) cyPolytope X,
 --         "h21" => hh^(2,1) cyPolytope X,
 --         "c2" => c2 X,
---         "intersection numbers" => intersectionNumbers X
+--         "intersectionNumbers" => intersectionNumbers X
 --         }
 --     )
 
@@ -28,7 +28,7 @@ topologicalData CalabiYauInToric := TopologicalDataOfCY3 => X -> (
     --     "h11" => hh^(1,1) cyPolytope X,
     --     "h21" => hh^(2,1) cyPolytope X,
     --     "c2" => c2 X,
-    --     "intersection numbers" => intersectionNumbers X
+    --     "intersectionNumbers" => intersectionNumbers X
     --     }
     -- )
 
@@ -91,10 +91,44 @@ TopologySet = new Type of MutableHashTable
 topologySet = method()
 topologySet(List, HashTable) := TopologySet => (labels, Xs) -> (
     new TopologySet from {
-        "Sets" => {for k in labels list {k}},
+        "Sets" => {for k in labels list {k}}, -- sort?
         "CYHash" => Xs
         }
     )
+buckets = method(Options => {IgnoreSingles => false})
+buckets TopologySet := List => opts -> T -> (
+    if opts.IgnoreSingles then select(T#"Sets", x -> #x > 1) else T#"Sets"
+    )
+
+-- write "Sets" part to a string, so use: `filename << toString T << close` to write to disk
+toString TopologySet := String => T -> (
+    concatenate for x in buckets T list (toString x | "\n")
+    )
+
+toString(TopologySet, Symbol) := String => (T, sym) -> (
+    concatenate for x in buckets(T, IgnoreSingles => true) list (toString x | "\n")
+    )
+
+nonsingles = method()
+nonsingles(TopologySet) := String => (T) -> (
+    concatenate for x in buckets(T, IgnoreSingles => true) list (toString x | "\n")
+    )
+
+-- read "Sets" part from a string (so use topologySet(get "filename", Xs) to get it from a file).
+topologySet(String, HashTable) := TopologySet => (str, Xs) -> (
+    new TopologySet from {
+        "Sets" => (lines str)/value,
+        "CYHash" => Xs
+        }
+    )
+
+readTopologySet = method()
+readTopologySet(String, HashTable) := (filename, Xs) -> topologySet(get filename, Xs)
+
+writeTopologySet = method()
+writeTopologySet(String, TopologySet) := (filename, T) -> filename << toString T << close
+
+show TopologySet := T -> netList T#"Sets"
 
 info TopologySet := T -> (
     << "Total number of objects considered:         " << T#"Sets"/(x -> (x/length//sum))//sum << endl;
@@ -126,6 +160,27 @@ equivalences TopologySet := opts -> T -> (
         )
     )
 
+checkEquivalences = method()
+checkEquivalences TopologySet := T -> (
+    Xs := T#"CYHash";
+    E := equivalences T;
+    bad := {};
+    for k in sort keys E do (
+        X1 := Xs#k;
+        for x in E#k do (
+            X2 := Xs#(first x);
+            mat := last x;
+            if not isEquivalent(X1, X2, mat) then bad = append(bad, {k,first x});
+            )
+        );
+    if #bad > 0 then (
+        << "the following equivalences failed: " << bad << endl;
+        return false
+        );
+    << "topology set equivalences all check" << endl;
+    true
+    )
+
 separateIfDifferent = method()
 separateIfDifferent(TopologySet, Function) := (T, fun) -> (
     -- fun takes a CalabiYauInToric, and returns some value.
@@ -143,7 +198,7 @@ separateIfDifferent(TopologySet, Function) := (T, fun) -> (
             )
         );
     new TopologySet from {
-        "Sets" => newsets,
+        "Sets" => newsets, -- /sort//sort,
         "CYHash" => T#"CYHash"
         }
     )
@@ -162,10 +217,64 @@ combineIfSame(TopologySet, Function) := (T, fun) -> (
         -- TODO XXX: the previous line should add in identity maps
         );
     new TopologySet from {
-        "Sets" => newsets,
+        "Sets" => newsets/sort//sort,
         "CYHash" => T#"CYHash"
         }
     )
+
+---------- new code for combining GV, combining+separating bucket by findEquivalence -----
+combineAndSeparateBucketviaFE = method()  -- FE: findEquivalence
+combineAndSeparateBucketviaFE(List, HashTable) := (todo, Xs) -> (
+  newsets := new MutableList;
+  newincomps := {};
+  for x in todo do (
+      rep := x#0;
+      rest := drop(x, 1);
+      found := false;
+      incomp := false;
+      for y from 0 to #newsets-1 do (
+          lab := first newsets#y;
+          << "comparing " << rep << " and " << lab << endl;
+          (stat, A) := findEquivalence(Xs#rep, Xs#lab);
+          << "  result: " << (stat, A) << endl;
+          if stat === CONSISTENT then (
+              -- combine x list and y list.
+              A = transpose A^-1; -- HACK: we should fix findEquivalence, or make it deal with same matrix as isEquivalent works with
+              newset' := for z in rest list if instance(z, Sequence) then {z, A} else {z#0, z#1 * A};
+              newsets#y = join(newsets#y, {{rep, A}}, newset');
+              found = true;
+              break;
+              )
+          else if stat === INDETERMINATE then
+              incomp = true;
+          );
+      if not found then (
+          if incomp then
+              newincomps = append(newincomps, x)
+          else -- new topology
+              newsets#(#newsets) = x;
+          );
+      );
+  {toList newsets, newincomps}
+  )
+
+combineAndSeparateByFindEquivalence = method(Options => {Defer => {}})
+combineAndSeparateByFindEquivalence TopologySet := opts -> T -> (
+    Xs := T#"CYHash";
+    defer := set opts.Defer; -- list of labels, which should be the first element of some elem in buckets
+    result := for x in T#"Sets" list (
+        if member(x#0#0, defer) then x else combineAndSeparateBucketviaFE(x, Xs);
+        );
+    bads := result/last;
+    result = result/first;
+    result = flatten result;
+    result = result/(x -> {x});
+    (new TopologySet from {
+        "Sets" => result/sort//sort,
+        "CYHash" => Xs
+        }, flatten bads)
+    )
+---------- new code above this line 2026.03.07 -------------------------------------------
 
 -- REMOVE THIS ONE: use combineByGV...
 separateByGV = method(Options => {DegreeLimit => 15})
@@ -189,7 +298,99 @@ separateByGV = method(Options => {DegreeLimit => 15})
 --         }
 --     )
 
+-- TODO: replace using MatchingData and IntegerEquivalences.
+findLinearMaps = method()
+findLinearMaps(HashTable, HashTable) := List => (gv1, gv2) -> (
+    -- gv1, gv2: result of partitionGVConeByGV
+    if sort keys gv1 =!= sort keys gv2 then return {};
+    for k in keys gv1 do if #gv1#k =!= #gv2#k then return {};
+    for k in keys gv1 do if #gv1#k >= 7 then return {}; -- do not waste time (1) trying to separate these?
+    n := # (first values gv1)_0; -- we should check if all the values are lists of integers of this size.
+    t := symbol t;
+    T := QQ[t_(1,1)..t_(n,n)];
+    M := genericMatrix(T, n, n);
+    -- now we make the ideals for each key, and each permutation.
+    ids := for k in keys gv1 list (
+        perms := permutations(#gv1#k);
+        mat1 := transpose matrix gv1#k;
+        mat2 := transpose matrix gv2#k;
+        for p in perms list (
+            I := trim ideal (M * mat1 - mat2_p); 
+            if I == 1 then continue else I
+            )
+        );
+    topval := ids/(x -> #x - 1);
+    zeroval := ids/(x -> 0);
+    fullIdeals := for a in zeroval .. topval list (
+        J := trim sum for i from 0 to #ids-1 list ids#i#(a#i);
+        if J == 1 then continue else J
+        );
+    Ms := for i in fullIdeals list M % i;
+    --newMs := select(Ms, m -> (d := det m; d == 1 or d == -1));
+    --if any(newMs, m -> support m =!= {}) then << "some M is not reduced to a constant" << endl;
+    Ms
+    )
+
+-- NOT tested yet
+findEquivalenceByGV = method(Options => {DegreeLimit => 15})
+findEquivalenceByGV(Sequence, Sequence, HashTable, HashTable) := opts -> (lab1, lab2, Xs, GVs)  -> (
+    GV1 := GVs#lab1;
+    GV2 := GVs#lab2;
+    if GV1 === null or GV2 === null then return (INDETERMINATE, null); -- might be non-favorables...
+    X1 := Xs#lab1;
+    X2 := Xs#lab2;
+    Ms := findLinearMaps(GV1, GV2);
+    if Ms === {} then return (INDETERMINATE, null); -- can't combine, but they could still be equivalent...
+    Ms = for m in Ms list try lift(m, ZZ) else continue;
+    Ms = select(Ms, m -> (d := det m; d === 1 or d === -1));
+    isIsos := Ms/(m -> mapIsIsomorphism(m, X1, X2));
+    if any(isIsos, x -> x == true) then (
+        mi := position(isIsos, x -> x == true);
+        return (CONSISTENT, Ms#mi)
+        )
+    else
+        return (INDETERMINATE, null)
+    )
+
+-- NOT tested yet
 combineBucketByGV = method(Options => {DegreeLimit => 15})
+combineBucketByGV(List, HashTable) := opts -> (bucket, Xs) -> (
+    n := #bucket;
+    if n <= 1 then return bucket;
+    groups := new MutableList from bucket;
+    representatives := bucket/first;
+    GVs := hashTable for lab in representatives list lab => partitionGVConeByGV(Xs#lab, opts);
+    for i from 0 to n-1 do (
+        if groups#i === null then continue;
+        lab1 := groups#i#0; -- first element on each list (and it doesn't have a corresponding matrix.
+        for j from i+1 to n-1 do (
+            if groups#j === null then continue;
+            lab2 := groups#j#0;
+            (stat, M) := findEquivalenceByGV(lab1, lab2, Xs, GVs);
+            if stat === CONSISTENT then (
+                --M = M;
+                newEntries1 := {{lab2, M}};
+                newEntries2 := for x in drop(groups#j, 1) list {x#0,  x#1 * M};
+                << "combining groups " << lab1 << " and " << lab2 << endl;
+                if #(groups#j) > 1 then (
+                    << "MERGING GROUPS" << endl;
+                    for x in newEntries2 do (
+                        if not isEquivalent(Xs#lab1, Xs#(x#0), x#1) then
+                          error "non-equivalent pair";
+                        );
+                    );
+                groups#i = join(groups#i, newEntries1, newEntries2);
+                groups#j = null;
+                );
+            -- if not consistent, do nothing, and continue.
+            )
+        );
+    -- now combine these new buckets.
+    for x in groups list if x === null then continue else x -- is this correct? or {x} ?
+    )
+
+-- HOPEFULLY OBSOLETE AFTER TODAY
+-*
 combineBucketByGV(List, HashTable) := opts -> (Ls, Xs) -> (
     if #Ls === 1 then Ls
     else (
@@ -206,6 +407,7 @@ combineBucketByGV(List, HashTable) := opts -> (Ls, Xs) -> (
 --        if #(keys P) > 1 then error "debug me";
         newlist
     ))
+*-
 
 combineByGV = method(Options => {DegreeLimit => 15})
 combineByGV TopologySet := opts -> T -> (
@@ -215,7 +417,7 @@ combineByGV TopologySet := opts -> T -> (
         );
     new TopologySet from {
         "CYHash" => Xs,
-        "Sets" => newSets
+        "Sets" => newSets/sort//sort
         }
     )
 
@@ -404,190 +606,7 @@ separateAndCombineViaAnsatz(List, HashTable, Ring) := List => (Ls, Ts, RQ) -> (
 --     )
 
 
-///
-  -- Analyze h11=3 examples
-restart
-debug needsPackage "StringTorics"
-  RZ = ZZ[a,b,c]
-  RQ = QQ (monoid RZ);
-  --(Qs, Xs) = readCYDatabase("../m2-examples/foo-cys-ntfe-h11-3.dbm", Ring => RZ);
-  (Qs, Xs) = readCYDatabase("./Databases/cys-ntfe-h11-3.dbm", Ring => RZ);
-  -- First, let's only consider those with torsion free class group.
-   torsions = for k in keys Qs list (
-      istor := prune coker matrix rays Qs#k != ZZ^3;
-      if istor then k else continue
-      )
-
-  allXs = sort select(keys Xs, x -> not member(x#0, torsions))
-  allXs = sort keys Xs
-  allT = topologySet(allXs, Xs);
-
-  allT1 = combineIfSame(allT, X -> (c2Form X, cubicForm X))
-  info allT1 
-
-  elapsedTime allT = separateIfDifferent(allT, invariantsAll) -- 17 sec
-  info allT
-
-  elapsedTime allT3 = separateByGV allT2 -- 44 sec
-  info allT3
-
-  onestocheck = for x in allT3#"Sets" list if #x == 1 then continue else (
-      x/first
-      )
-  
-  flatten for x in onestocheck list (
-      flatten for y in subsets(x, 2) list (
-        print y;
-        ans := getEquivalenceIdeal(y#0, y#1, Xs);
-        print ans;
-        ans
-        )
-      )
-  
-///  
-  
-///
-restart
-debug needsPackage "StringTorics"
-  R = ZZ[a,b,c,d]
-  RQ = QQ (monoid R);
-  (Qs, Xs) = readCYDatabase("mike-ntfe-h11-4.dbm", Ring => R);
-
-  allT = topologySet(sort keys Xs, Xs);
-  #allT#"Sets" == 1
-  #allT#"Sets"#0 == 1994
-  info allT
-
-  allT1 = combineIfSame(allT, X -> (c2Form X, cubicForm X))
-  -- only 14 are the same as any other, and if two are the same, they also have same hh^(1,2).
-  -- (checked this explicitly).
-  info allT1 -- note very few are the same!
-  netList allT1#"Sets"
-  for x in allT1#"Sets" list (x/length)//tally
-
-  elapsedTime allT2 = separateIfDifferent(allT1, invariantsAll) -- 270 sec
-  elapsedTime allT3 = separateByGV allT2 -- 870 sec
-  info allT3
-
-  for x in allT3#"Sets" list if #x == 1 then continue else (
-      x/first
-      )
-  onestocheck = {
-      {(163, 2), (163, 3)}, 
-      {(811, 0), (882, 3)}, 
-      {(387, 1), (387, 3)}, 
-      {(339, 1), (337, 1)}, 
-      {(1001, 0), (982, 0)}, 
-      {(436, 1), (433, 1)}, 
-      {(364, 0), (344, 1)}, 
-      {(1094, 2), (1090, 2)}, 
-      {(246, 0), (249, 1)}, 
-      {(1147, 0), (1146, 0)}, 
-      {(436, 0), (433, 0)}, 
-      {(831, 0), (806, 0)}, 
-      {(1121, 0), (1122, 0)}, 
-      {(1067, 0), (1076, 0)}, 
-      {(930, 6), (927, 2)}, 
-      {(981, 0), (997, 0)}, 
-      {(364, 1), (377, 0)}, 
-      {(455, 0), (451, 0)}, 
-      {(403, 0), (408, 2)}, 
-      {(1090, 0), (1094, 0)}, 
-      {(714, 0), (707, 0), (695, 5), (709, 0)}, 
-      {(991, 0), (998, 3)}, 
-      {(1002, 1), (979, 0), (1005, 4)}, 
-      {(716, 3), (705, 0)}, 
-      {(851, 0), (814, 0), (810, 0)}, 
-      {(1123, 0), (1124, 0)}, 
-      {(478, 1), (473, 0)}, 
-      {(1085, 0), (1082, 0), (1086, 0)}, 
-      {(334, 1), (329, 1)}, 
-      {(316, 0), (322, 0)}, 
-      {(1004, 0), (994, 0)}, 
-      {(265, 1), (250, 0), (254, 5), (228, 1)}, 
-      {(647, 0), (645, 0)}, 
-      {(529, 0), (510, 0)}, 
-      {(935, 4), (915, 0)}, 
-      {(628, 0), (653, 3)}, 
-      {(943, 0), (958, 0)}, 
-      {(329, 0), (334, 0)}, 
-      {(319, 0), (321, 0), (302, 0)}, 
-      {(875, 0), (854, 0)}, 
-      {(1183, 2), (1182, 0)}, 
-      {(449, 2), (419, 0)}, 
-      {(383, 0), (356, 1)}, 
-      {(250, 1), (213, 1)}, 
-      {(938, 3), (933, 0)}, 
-      {(1082, 5), (1077, 3)}, 
-      {(668, 1), (649, 1), (626, 0)}, 
-      {(80, 3), (72, 0), (80, 6)}, 
-      {(616, 0), (606, 0)}, 
-      {(540, 0), (545, 0)}, 
-      {(331, 0), (337, 0), (339, 2)}, 
-      {(397, 0), (350, 0)}, 
-      {(900, 0), (901, 0)}, 
-      {(930, 1), (927, 8)}, 
-      {(559, 0), (577, 0)}, 
-      {(938, 10), (933, 4)}, 
-      {(931, 0), (932, 2)}, 
-      {(884, 0), (820, 0)}, 
-      {(650, 3), (656, 1), (630, 0)}, 
-      {(976, 0), (989, 0)}, 
-      {(552, 0), (551, 2)}, 
-      {(924, 0), (937, 0)}}
-
-  176 == # flatten for x in onestocheck list flatten for y in subsets(x,2) list y
-  
-  flatten for x in onestocheck list (
-      flatten for y in subsets(x, 2) list (
-        print y;
-        ans := getEquivalenceIdeal(y#0, y#1, Xs);
-        print ans;
-        ans
-        )
-      )
-  select(oo, i -> numgens i > 1)
-  getEquivalenceIdeal((163, 2), (163, 3), Xs)
-  getEquivalenceIdeal((1123,0),(1124,0), Xs)
-
-  lab1 = (163,2)
-  lab2 = (163,3)
-  X1 = Xs#lab1;
-  X2 = Xs#lab2;
-  LF1 = (c2Form X1, cubicForm X1);
-  LF2 = (c2Form X2, cubicForm X2);
-  RQ = QQ (monoid ring LF1_0);
-  (A,phi) = genericLinearMap RQ;
-  T = target phi;
-  B = ring A;
-  LF1' = LF1/(f -> sub(f, T));
-  LF2' = LF2/(f -> sub(f, T));
-  I0 = sub(ideal last coefficients(phi LF1'_0 - LF2'_0), B);
-  A0 = A % I0;
-  phi0 = map(T, T, A0);
-  I1 = sub(ideal last coefficients (phi0 LF1'_1 - LF2'_1), B)
-  gens gb(I0 + I1)
-
-  select(allT3#"Sets", x -> #x > 1)
-  -- now we need to check that (hopefully) each set is not homeomorphic to any other set.
-  -- It seems that now an ansatz might work?
-  
-  TbyH12s = separateIfDifferent(allT, X -> hh^(1,2) X);
-  info TbyH12s
-  #TbyH12s#"Sets"
-  for x in TbyH12s#"Sets" list #x
-  
-  
-  smallset = select(sort keys Xs, lab -> hh^(1,2) Xs#lab == 148) -- 
-  T = topologySet(sort smallset, Xs)
-  allTsame = combineIfSame(T, X -> (c2Form X, cubicForm X))
-  info allTsame
-  elapsedTime T1 = separateIfDifferent(allTsame, X -> invariantsAll X)
-  info T1
-  netList T1#"Sets"
-  T2 = separateByGV T1
-          
-///
+-- h11=3 and h11=4 analysis examples moved to ScratchTopology.m2
 
   getEquivalenceIdealHelper = (LF1, LF2, A, phi) -> (
       T := target phi;
@@ -958,6 +977,19 @@ invariantsAll(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
      }
     )
 
+invariantsHessianSings = method()
+invariantsHessianSings(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> (
+    RQ := QQ (monoid ring L);
+    H := det hessian sub(F, RQ);
+    singH := ideal H + ideal jacobian H;
+    comps := decompose singH;
+    comps/(i -> betti gens i)//tally
+    )
+invariantsHessianSings(CalabiYauInToric) := (X) -> (
+    F := cubicForm X;
+    invariantsHessianSings(c2Form X, F, hh^(1,1) X, hh^(1,2) X)
+    )
+
 invariantsAll CalabiYauInToric := X -> invariantsAll(c2Form X, cubicForm X, hh^(1,1) X, hh^(1,2) X)
 
 mapIsIsomorphism = method()
@@ -1083,49 +1115,6 @@ linearEquationConstraintsIdeal(Matrix, RingMap, List, List) := Sequence => (A, p
     I := sum for L in Ls list ideal sub(last coefficients(phi L_0 - L_1), T);
     I)
 
-TEST ///
-  debug StringTorics
-  R = QQ[a..d]
-  (A, phi) = genericLinearMap R
-  TR = target phi
-  assert(source phi === TR)
-  assert(ring A === coefficientRing TR)
-  for i from 0 to 3 do 
-    assert(phi TR_i == (A^{i} * (transpose vars TR))_(0,0))
-    
-  linearEquationConstraints(A, phi, {}, {
-          {{1,0,0,0}, {1,1,0,0}},
-          {{0,1,0,0}, {1,1,3,7}},
-          {{0,0,1,0}, {5,6,-2,8}},
-          {{0,0,0,1}, {0,1,0,0}}}
-      )
-
-  F1 = -2*a^3-6*a^2*b+6*b^2*c-12*a^2*d+12*a*b*d+12*b^2*d+36*b*c*d+30*a*d^2+60*b*d^2+54*c*d^2+76*d^3
-  F7 = -2*a^3+6*a^2*b-6*a*b^2+2*b^3-6*a*c^2-4*c^3+6*a^2*d-6*a*d^2+2*d^3
-
-  (A0, phi0, I1) = linearEquationConstraints(A, phi, {
-          {b+2*d, a-d},
-          {b+3*d, a+c},
-          {a+b+2*d, a-b},
-          {F1, F7}
-          }, {
-          }
-      )
-  phi0 F1 == F7
-
-  -- this one isn't correct yet.
-  (A0, phi0, I1) = linearEquationConstraints(A, phi, {
-          {b+2*d, a-d},
-          {b+3*d, a+c},
-          {a+b+2*d, a-b}
-          }, {
-          {{0,0,1,0}, {1,1,-1,1}}
-          }
-      )
---          
-
-  A0 % sub(trim ideal last coefficients(phi0 F1 - F7), coefficientRing TR)
-///
 
 findMaps = (top1, top2, A, phi, RQ) -> (
     TR := target phi;

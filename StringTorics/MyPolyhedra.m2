@@ -9,6 +9,26 @@
 --   polar P -- used often
 --   dim P -- used often
 
+-- These are not exported yet...  They should appear elsewhere?
+boundedLatticePoints = method(Options => {
+        Bound => null,
+        Limit => null,
+        NodeLimit => 100000 -- set higher if you get an error.
+        })
+boundedLatticePoints(Matrix, Matrix) := Matrix => opts -> (A, b) -> (
+    -- Input: A (m x n) represents a cone {x : Ax <= b} in RR^n, A, b, are integral
+    -- Ouput: B (n x N) N is the number of lattice points, B is over ZZ.
+    matrix map(ZZ, rawLatticePoints(raw A, raw b, opts.Bound, opts.Limit, opts.NodeLimit))
+    )
+
+normalizLatticePoints = method()
+-- (A, b) represents the polytope Ax <= b, I believe (that is, we translate this to what normaliz uses.
+normalizLatticePoints(Matrix, Matrix) := Matrix => (A, b) -> (
+    matrix map(ZZ, rawLatticePointsNormaliz(raw A, raw b))
+    )
+
+
+
 -- Our plan: stash into a Polyhedron, the information here
 protect TCILatticePointList
 protect TCIVertexList
@@ -31,20 +51,7 @@ vertexMatrix Polyhedron := (cacheValue symbol TCIVertexMatrix) (P -> (
     ))
 
 faceDimensionHash = method()
-if Polyhedra#Options#Version == "1.3" then ( -- version of Polyhedra in M2 <= 1.9.2
-  faceDimensionHash Polyhedron := (cacheValue symbol TCIFaceDimensionHash) ((P) -> (
-    L := vertexList P;
-    vertexHash := hashTable for i from 0 to #L - 1 list (L#i => i);
-    hashTable flatten for i from 0 to dim P list for f in faces(dim P-i,P) list (
-        -- USING INFO FROM POLYHEDRA
-        verts := vertices f;
-        --if liftable(verts,ZZ) then verts = lift(verts,ZZ);
-        verts = try lift(verts,ZZ) else verts;
-        (sort for v in entries transpose verts list vertexHash#v) => i
-        )
-    ))
-) else (
-  faceDimensionHash Polyhedron := (cacheValue symbol TCIFaceDimensionHash) ((P) -> (
+faceDimensionHash Polyhedron := (cacheValue symbol TCIFaceDimensionHash) ((P) -> (
     L := vertexList P;
     M := vertices P; -- different ordering, possibly, and also a matrix over QQ
     M = try lift(M,ZZ) else M;
@@ -59,7 +66,6 @@ if Polyhedra#Options#Version == "1.3" then ( -- version of Polyhedra in M2 <= 1.
         newverts => i
         )
     ))
-)
 
 dim(Polyhedron, List) := (P,f) -> (faceDimensionHash P)#f
 
@@ -177,113 +183,14 @@ annotatedFaces(ZZ,Polyhedron) := List => (i,P1) -> (
       )
     )
 
--- -- private function for `isomorphisms`
--- findCombinatorialData = (aP, i) -> (
---     -- aP: List, coming from annotated faces.
---     -- i: integer index: for a given vertex.
---     -- returns: list, of
---     --  {genus, edges: genus => number, 2faces: {#vertices, genus} => number}, 3faces: {#vertices, genus} => ZZ
---     -- these are counts for all faces containing i
---     -- or, maybe one hash table, {#vertices, genus} => count
---     -- #vertices can be 1,2,3.
---     sort for x in aP list if member(i, x#1) then {x#0, #x#1, x#3, x#4} else continue
---     )
+latticePointsAndDimensions = method()
+latticePointsAndDimensions Polyhedron := P2 -> (
+    LP := latticePointList P2;
+    LPdim := for lp in LP list dim(P2, minimalFace(P2, lp));
+    (LP, LPdim))
 
--- -- private function for `isomorphisms`
--- findPossibleMatchings = (matchings) -> (
---     -- matchings: List of (alpha, beta), alpha and beta lists of integers of the same length >= 1.
---     -- returns a list of {i1 => j1, ..., ir => jr}.
---     -- the possible matchings.
---     if #matchings === 0 then error "incorrect logic on my part, apparently";
---     hd := matchings#0;
---     hdmatchings0 := permutations(#hd#0);
---     hdmatchings := for p in hdmatchings0 list for i from 0 to #hd#0-1 list hd#0#i => hd#1#(p#i);
---     if #matchings === 1 then return hdmatchings;
---     tl := drop(matchings, 1);
---     restmatchings := findPossibleMatchings tl;
---     Ps := permutations hd#1;
---     flatten for p in hdmatchings list for q in restmatchings list (
---         sort join(p,q)
---         )
---     )
 
--- ///
---   findPossibleMatchings{({0,1,2}, {0,1,2})}
---   findPossibleMatchings{({0,3}, {0,1})}
--- ///
-
--- checkPossibleMatching = (A, perm, verticesP, verticesQ) -> (
---     -- A is a n x n generic matrix over n^2 variables.
---     -- perm is a list {i1 => j1, ...} of indices into verticesP to indices into verticesQ
---     trim sum for ab in perm list (
---         a := transpose matrix{verticesP _ (first ab)};
---         b := transpose matrix{verticesP _ (last ab)};
---         ideal (A * a - b)
---         )
---     )
-
--- matchings = method()
--- matchings(List, List, ZZ) := (aP, aQ, nvertices) -> (
---     HP := partition(i -> findCombinatorialData(aP, i), toList(0..nvertices - 1));
---     HQ := partition(i -> findCombinatorialData(aQ, i), toList(0..nvertices - 1));
---     if sort keys HP =!= sort keys HQ then (
---         << "note: vertex data does not match" << endl;
---         return {};
---         );
---     if not all(keys HP, k -> #HP#k == #HQ#k) then (
---         << "note: vertex number data does not match" << endl;
---         return {};
---         );
---     matchings := for k in keys HP list (
---         HP#k, HQ#k
---         );
---     matchings
---     )
-
--- isomorphisms = method()
--- isomorphisms(Polyhedron, Polyhedron) := (P, Q) -> (
---     -- for now, we assume both are full dimensional?
---     vP := vertexList P;
---     vQ := vertexList Q;
---     n := #vP#0; -- TODO: check that all vP, vQ elements have the same length, n == dim P == dim Q
---     if #vP =!= #vQ then return {};
---     -- Step 1: get numerical invariants for each vertex.
---     aP := annotatedFaces P;
---     aQ := annotatedFaces Q;
---     HP := partition(i -> findCombinatorialData(aP, i), toList(0..#vP - 1));
---     HQ := partition(i -> findCombinatorialData(aQ, i), toList(0..#vQ - 1));
---     if sort keys HP =!= sort keys HQ then (
---         << "note: vertex data does not match" << endl;
---         return {};
---         );
---     if not all(keys HP, k -> #HP#k == #HQ#k) then (
---         << "note: vertex number data does not match" << endl;
---         return {};
---         );
---     matchings := for k in keys HP list (
---         HP#k, HQ#k
---         );
---     possibles := findPossibleMatchings matchings;
---     if #possibles > 1000 then (
---         << "#possibles == " << #possibles << endl;
---         return isomorphisms2(P, Q)
---         );
---     --return {possibles, matchings, HP, HQ};
---     t := getSymbol "t";
---     R := QQ[t_(0,0)..t_(n-1,n-1)];
---     A := genericMatrix(R, n, n);
---     As := for p in possibles list (
---         J := checkPossibleMatching(A, p,vP, vQ);
---         if J == 1 then continue; -- not an isomorphism!
---         A0 := A % J;
---         A0 = try lift(A0, ZZ) else null;
---         if A0 === null then continue;
---         (A0, p/last)
---         );
---     As
---     )
-
--- private function for isomorphisms2
+-- private function for isomorphisms
 partialPermutations = (elems, num) -> (
     if num == 1 then return elems/(a -> {a});
     flatten for i from 0 to #elems-1 list for p in partialPermutations(drop(elems,{i,i}), num-1)
@@ -291,93 +198,7 @@ partialPermutations = (elems, num) -> (
         prepend(elems#i, p)
     )
 
--- TODO: isomorphisms and isomorphisms2 should be combined in a smarter way:
--- use the known matches to restrict the possible maps.
--- then use this on only some of the vertices?
--- Vague description because I don't know how best to fix it yet.
--- isomorphisms2 = method()
--- isomorphisms2(Polyhedron, Polyhedron) := (P, Q) -> (
---     -- here we don't bother with matchings.
---     -- instead we first find a set of n vertices which do not lie on a hyperplane.
---     -- and then we compute all possible matrices 
---     VP := vertexMatrix P;
---     VQ := vertexMatrix Q;
---     m := numcols VP;
---     HP := hashTable for i from 0 to m-1 list (vertexList P)#i => i;
---     HQ := hashTable for i from 0 to m-1 list (vertexList Q)#i => i;
---     if m =!= numcols VQ then return {};
---     n := numrows VP;
---     if n =!= numrows VQ then error "expected polytopes in the same space";
---     indepset := for p in subsets(#vertexList P, n) list if det VP_p != 0 then break p;
---     t := getSymbol "t";
---     R := QQ[t_(0,0)..t_(n-1,n-1)];
---     A := genericMatrix(R, n, n);
---     VP0 := VP_indepset;
---     for q in partialPermutations(splice{0..#vertexList Q - 1}, n) list (
---         J := trim ideal(A * VP0 - VQ_q);
---         if J == 1 then continue;
---         A0 := A % J;
---         A0 = try lift(A0, ZZ) else null;
---         if A0 === null then continue;
---         if abs(det A0) != 1 then continue;
---         newverts := entries transpose(A0 * VP);
---         if any(newverts, v -> not HQ#?v) then continue;
---         perm := for v in newverts list HQ#v;
---         (A0, perm)
---         )
---     )
-
--- Based on code in CYTools.
--- Assumption: P, Q are full rank polyhedra (i.e. dim = #rows of vertices matrix).
--- Idea: find a facet of P with the smallest cardinality.
---       find a subset of these vertices that define a full dimensional set.
---       for each 
-
 isomorphisms = method()
--- isomorphisms(Polyhedron, Polyhedron) := (P, Q) -> (
---     nrows := numrows vertexMatrix P;
---     if nrows != dim P or nrows != dim Q or nrows != numrows vertexMatrix Q
---     then error "expected polytoeps to be full dimensional and same dimension";
-    
---     -- Step 1. Find a facet of P with the smallest size.
---     facetsP := (annotatedFaces(3, P))/first;
---     minsizeP := facetsP/length//min;
---     facetsMinsizeP := select(facetsP, f -> #f === minsizeP);
---     facetA := first facetsMinsizeP;
-
---     -- Step 2. Find all facets of Q with this smallest size minsizeP, or return {}.
---     facetsQ := (annotatedFaces(3, Q))/first;
---     minsizeQ := facetsQ/length//min;
---     if minsizeQ =!= minsizeP then return {};
---     facetsMinsizeQ := select(facetsQ, f -> #f === minsizeP);
-
---     -- Now find a subset of nrows elements if facetA which are full dimensional
---     if #facetA > nrows then (
---         -- we need to take a subset of these of size nrows that have full rank.
---         -- we then call these facetA again.  We don't actually need facetA again,
---         -- the only thing we use is Ainv.
---         C := ((vertexMatrix P)_facetA) ** QQ;
---         facetA = facetA _ (columnRankProfile mutableMatrix C);
---         if #facetA != nrows then error "my logic is missing a case";
---         );
---     A := (vertexMatrix P)_facetA;
---     Ainv := (A ** QQ)^-1;
-
---     -- now we loop through all possible maps from facetA to other facets,
---     -- and if it gives an integer matrix, we add it to the list.
---     vertsP := (vertexList P)/(v -> transpose matrix {v});
---     vertsQ := (vertexList Q)/(v -> transpose matrix {v});
---     hashQ := hashTable for i from 0 to #vertsQ-1 list vertsQ#i => i;
---     elapsedTime isos := flatten for f in facetsMinsizeQ list (
---         for perm in partialPermutations(f, nrows) list (
---             B := (vertexMatrix Q)_perm;
---             M := B * Ainv;
---             try (M = lift(M, ZZ)) else continue;
---             if all(vertsP, v -> hashQ#?(M * v)) then M else continue
---             )
---         );
---     isos
---     )
 
 isomorphisms(Polyhedron, Polyhedron, List, List) := (P, Q, annotatedFacesP, annotatedFacesQ) -> (
     nrows := numrows vertexMatrix P;
@@ -431,51 +252,240 @@ automorphisms = method()
 automorphisms Polyhedron := P -> isomorphisms(P, P)
 
 ///
+-- This is code to test where things stand for speed.
+-- TODO: update this to include the latest lattice point code.
   restart
   debug needsPackage "StringTorics"
   topes = kreuzerSkarke 3;
+
+  P1s = elapsedTime for tope in topes list elapsedTime (
+        convexHull matrix tope
+        ); -- .25s
+
+  P2s = elapsedTime for P1 in P1s list elapsedTime (
+        polar P1
+        ); -- .7s
+
+  LPs = elapsedTime for P2 in P2s list elapsedTime (
+        latticePointList P2
+        ); -- 29.6s
+
+  LPs = elapsedTime for P2 in P2s list elapsedTime (
+        latticePoints P2
+        ); -- 9 sec
+
+  iLP2s = elapsedTime for P2 in P2s list elapsedTime (
+        interiorLatticePoints P2
+        ); -- 6 sec
+    
+  LP1s = elapsedTime for P1 in P1s list elapsedTime (
+        latticePoints P1
+        ); -- 20 sec.
+
+  iLP1s = elapsedTime for P1 in P1s list elapsedTime (
+        interiorLatticePoints P1 -- this is expensive!
+        ); -- 84.9 sec
+    
+    
+  Qs = elapsedTime for P2 in P2s list elapsedTime (
+        cyPolytope P2
+        ); -- .45 s
+
+  -- here we put these together
+  Qs = elapsedTime for tope in topes list elapsedTime (
+        cyPolytope tope
+        ); -- 33.2s
+    
+
+  debug Polyhedra    
+  peek Qs_0 .cache
+  peek Qs_0 .cache#"N polytope".cache
+  peek Qs_0 .cache#"N polytope".cache.computedPolar.cache
+
+  
+  Ps = elapsedTime for Q in Qs list elapsedTime (
+        polytope(Q, "N")
+        ); -- .23s
+
+  Ps = elapsedTime for Q in Qs list elapsedTime (
+        latticePointList polytope(Q, "N")
+        ); -- .2s
+    
+  aF = elapsedTime for Q in Qs list elapsedTime (
+        annotatedFaces Q
+        ); -- 76.4s, or 57.4s  STILL PRETTY LONG...
+
+  autQs = elapsedTime for Q in Qs list elapsedTime (
+        P := polytope(Q, "N");
+        automorphisms P
+        ); -- 62.0s after annotatedFaces.  Why so slow?
+    
+  for tope in topes list elapsedTime (
+      Q := cyPolytope tope;
+      P := polytope(Q, "N");
+      ans := isomorphisms(P, P);
+      if ans === null then (
+        << "--- tope: " << label Q << " TOO LARGE FOR NOW" << endl
+        )
+      else
+        << "--- tope: " << label Q << " #aut=" << #ans << " auts: " << netList ans << endl;
+      ans
+      );
+
   Q = cyPolytope topes_20
   Q = cyPolytope topes_0
   P = polytope(Q, "N")
   vertexList P
   annotatedFaces P
-
-  isomorphisms3(Q,Q)
--- code I'm working on now
-  elapsedTime isomorphisms3(P, P)
-  elapsedTime isomorphisms(P,P)
-
-  (Qs, Xs) = readCYDatabase "../Databases/cys-ntfe-h11-3.dbm";
-  (Qs, Xs) = readCYDatabase "../Databases/cys-ntfe-h11-4.dbm";
-  (Qs, Xs) = readCYDatabase "../Databases/cys-ntfe-h11-5.dbm";
-
-  -- This one is long, I think because the annotated faces for P is not stashed.
-  elapsedTime for lab in sort keys Qs list (
-      automorphisms Qs#lab
-      );
-
-  elapsedTime for lab in sort keys Qs list (
-      P := polytope Qs#lab;
-      annotatedFaces P);
-
-
--- older code
-  netList isomorphisms(P,P)
-  isomorphisms2(P,P)
-  first oo
-  netList oo
-
-  for tope in topes list (
-      Q := cyPolytope tope;
-      P := polytope(Q, "N");
-      ans := isomorphisms(P, P);
-      if ans == null then 
-        << "--- tope: " << label Q << " TOO LARGE FOR NOW" << endl;
-      else
-        << "--- tope: " << label Q << " #aut=" << #ans << " auts: " << netList ans << endl;
-      ans
-      );
-  
+  isomorphisms(Q,Q)
 ///
+
+-*
+restart
+needsPackage "StringTorics"
+*-
+TEST /// -- lattice points of a polytope, Nate MacFadden's code.
+  H = matrix{{1, 1}, {-1, 0}, {0, -1}}
+  rhs = transpose matrix {{1,1,1}}
+  LP0 = boundedLatticePoints(H, rhs, Bound => 10, Limit => 10000)
+
+  -- check this against Polyhedra
+  P = polyhedronFromHData(H, rhs)
+  LPofP = matrix{latticePoints P}
+  assert(set entries transpose LP0 === set entries transpose LPofP)
+///  
+
+-*
+restart
+needsPackage "StringTorics"
+*-
+TEST ///
+  ks = KSEntry "4 15  M:41 15 N:11 9 H:6,36 [-60] id:100
+         1   0   0   0   0   0   2  -1  -1  -2   2   1  -2  -2   0
+         0   1   0   0   0   0  -1   2  -1   2  -2  -2   1   0  -2
+         0   0   1   1  -1  -1  -1  -1   2  -1  -1   0   0   1   1
+         0   0   0   2  -2   0  -1  -1   2   0  -2  -2   2   2   0
+         "
+  Q = reflexivePolytope ks
+  transpose matrix vertices Q
+  Q' = polar Q
+
+  -- objects to test and compare:
+  -- Player #1: polytope polar to ks, with 11 vertices, 15 halfplane constraints
+  P1 = polytope Q
+  (first facets P1) * (vertices P1)
+    assert(max flatten entries oo == 1)
+  assert(numrows first facets P1 == 15)
+
+  -- the following is tested against Polyhedra below.
+  (A, b) = facets P1
+  A = lift(A, ZZ)
+  rhs = lift(b, ZZ)
+  LP0 = boundedLatticePoints(A, rhs, Bound => 10, Limit => 10000)
+  
+  -- Player #2: A polytope constructed from facets directly.
+  (A, b) = facets P1
+  A = lift(A, ZZ)
+  b = lift(b, ZZ)
+  P2 = polyhedronFromHData(A, b)
+  P1 == P2
+  assert(vertices P2 === vertices P1)
+  LP2 = entries transpose matrix{latticePoints P2}
+  LP1 = entries transpose matrix{latticePoints P1}
+  assert(LP2 === LP1)
+
+  -- Now let's check that the lattice points of P2 match the new code.
+  A * matrix LP0
+    assert(max flatten entries(A * LP0) == 1)
+  LP2 = matrix {latticePoints P1}
+  assert(set entries transpose LP0 == set entries transpose LP2)
+
+  -- d=4 dilation
+  LP2d4 = matrix{latticePoints(4*P1)}
+  LP0d4 = boundedLatticePoints(A, 4*rhs, Bound => 20, Limit => 10000)
+  numcols LP0d4
+  assert(set entries transpose LP2d4 === set entries transpose LP0d4)
+  assert(numcols LP0d4 == 611)
+///
+
+-*
+restart
+needsPackage "StringTorics"
+*-
+TEST ///
+  ks = KSEntry "4 9  M:11 9 N:58 14 H:50,6 [88] id:300
+    1   -1    0    0    0    1    0   -1    2
+    0    0    1    0   -1   -1    0    0   -1
+    0    0    0    1   -1    0    0    1   -1
+    0    0    0    0    0    0    1   -1    0
+    "
+
+  Q = reflexivePolytope ks
+  P1 = polytope Q
+  (first facets P1) * (vertices P1)
+    assert(max flatten entries oo == 1)
+  assert(numrows first facets P1 == 9)
+  elapsedTime latticePoints Q
+
+  -- Construct Ax <= b directly from P1.
+  (A, b) = facets P1
+  A = lift(A, ZZ)
+  b = lift(b, ZZ)
+  P2 = polyhedronFromHData(A, b)
+  assert(P1 == P2)
+  assert(vertices P2 === vertices P1)
+  LP2 = entries transpose matrix{latticePoints P2}
+  LP1 = entries transpose matrix{latticePoints P1}
+  assert(LP2 === LP1)
+
+  LP0 = boundedLatticePoints(A, b, Bound => 10, Limit => 10000)
+  assert(max flatten entries(A * LP0) == 1)
+  LP2 = matrix {latticePoints P1}
+  assert(set entries transpose LP0 == set entries transpose LP2)
+
+  elapsedTime LP1d = boundedLatticePoints(A, 5*b, Bound => 31*3, Limit => 100000);
+  assert(numcols LP1d === 10026) -- the number is what the following line gives.
+  -- elapsedTime matrix{latticePoints(5*P1)}; -- 11.7 sec too long! (2 June 2026).
+///
+
+-*
+restart
+needsPackage "StringTorics"
+*-
+TEST /// -- of rawFourierMotzkin, vs FourierMotzkin package.
+  debug Core -- for rawFourierMotzkin, raw.
+  needsPackage "FourierMotzkin"
+
+  ks = KSEntry "4 9  M:11 9 N:58 14 H:50,6 [88] id:300
+    1   -1    0    0    0    1    0   -1    2
+    0    0    1    0   -1   -1    0    0   -1
+    0    0    0    1   -1    0    0    1   -1
+    0    0    0    0    0    0    1   -1    0
+    "
+  A = matrix ks
+  A1 = A || matrix{{9:1}}
+
+  B1 = rays dualCone posHull A1 -- dualCone is B1 s.t. (transpose A1) * A1 >= 0
+  assert all(flatten entries ((transpose A1) * B1), a -> a >= 0)
+
+  B1' = - first fourierMotzkin A1 -- columns of B1' are the same as columns of B1 (up to order)
+  assert(set entries transpose B1 === set entries transpose B1')
+
+  B1'' = - transpose map(ZZ, rawFourierMotzkin raw transpose A1)
+  assert(set entries transpose B1 === set entries transpose B1'')
+
+  A = matrix ks
+  A1 = (A | A) || matrix{{18:1}}
+
+  B1 = rays dualCone posHull A1 -- dualCone is B1 s.t. (transpose A1) * A1 >= 0
+  (transpose A1) * B1
+
+  B1' = - first fourierMotzkin A1 -- columns of B1' are the same as columns of B1 (up to order)
+  assert(set entries transpose B1 === set entries transpose B1')
+
+  B1'' = - transpose map(ZZ, rawFourierMotzkin raw transpose A1)
+  assert(set entries transpose B1 === set entries transpose B1'')
+///
+
 end--
 
