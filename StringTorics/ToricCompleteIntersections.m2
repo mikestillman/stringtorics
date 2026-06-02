@@ -8,13 +8,6 @@
 --------------------------------------------------------
 -- Code for complete intersections in toric varieties --
 --------------------------------------------------------
-export { -- TODO; place this in StringTorics.m2
-    "LinearForm",
-    "Basis"
-    }
-
-CompleteIntersectionInToric = new Type of HashTable
-
 completeIntersection = method(Options => {
         Equations => true,
         Basis => null, -- a list of integer indices of rays taht form a basis

@@ -215,12 +215,17 @@ c2 CalabiYauInToric := X -> (
 -- TODO: if X is not favorable, need to redo the basis, and intersection numbers (and also then the c2 form)
 
 TEST ///
+-*
   restart
   debug needsPackage "StringTorics"
-  F = openDatabase "polytopes-h11-5.dbm"
-    V = cyPolytope F#"1000"
-    close F
-  X = makeCY(V, ID => label V, Ring => (RZ = ZZ[a,b,c,d,e]))
+*-
+  vs = {{-1, -1, -1, 0}, {-1, -1, 0, 0}, {-1, -1, 1, -1}, {-1, 0, -1, 0}, {0, -1, 2, -1}, {0, 0, -1, 0}, {0, 1, -1, 0}, {1, 1, -1, 1}, {1, 1, 0, 1}}
+  cones4 = {{0, 1, 2, 3}, {0, 1, 2, 4}, {0, 1, 3, 7}, {0, 1, 4, 7}, {0, 2, 3, 5}, {0, 2, 4, 5}, {0, 3, 5, 7}, {0, 4, 5, 7}, {1, 2, 3, 8}, {1, 2, 4, 8}, {1, 3, 7, 8}, {1, 4, 7, 8}, {2, 3, 5, 6}, {2, 3, 6, 8}, {2, 4, 5, 6}, {2, 4, 6, 8}, {3, 5, 6, 7}, {3, 6, 7, 8}, {4, 5, 6, 7}, {4, 6, 7, 8}}
+  Q = cyPolytope(vs, ID => 1000)
+  rays Q == vs
+  X = calabiYau(Q, cones4, ID => 0)
+  rays X == vs
+  max X == cones4
 
   elapsedTime intersectionNumbers X
   toRingElement(oo, X.cache#"pic ring")
@@ -233,7 +238,25 @@ TEST ///
   elapsedTime intersectionNumbers X
   elapsedTime intersectionNumbersOfCY X
 
-  elapsedTime topologicalData(X, ZZ[a..e])
+  elapsedTime topologicalData X
+  
+  -- F = openDatabase "polytopes-h11-5.dbm"
+  --   V = cyPolytope F#"1000"
+  --   close F
+  -- X = makeCY(V, ID => label V, Ring => (RZ = ZZ[a,b,c,d,e]))
+
+  -- elapsedTime intersectionNumbers X
+  -- toRingElement(oo, X.cache#"pic ring")
+  -- elapsedTime toricIntersectionNumbers X
+  -- assert(intersectionNumbers X === intersectionNumbersOfCY X)
+  -- elapsedTime c2 X
+  -- c2Form X
+  -- cubicForm X
+
+  -- elapsedTime intersectionNumbers X
+  -- elapsedTime intersectionNumbersOfCY X
+
+  -- elapsedTime topologicalData(X, ZZ[a..e])
 ///
 
 -----------------------------------------------
@@ -445,9 +468,11 @@ intersectionNumbersOfCY CalabiYauInToric := X -> (
     
 TEST ///
   -- Let's test the basis intersection numbers code at slightly higher h11...
+  -- TODO: This fails, as it uses old naming...
+-*
   restart
   needsPackage "StringTorics"
-  
+*-  
   topes = kreuzerSkarke(7, Limit => 50);    
   assert(#topes == 50)
   topes_30
@@ -458,10 +483,16 @@ TEST ///
    0   0   2   0  -4   2  -2   2  -2   2
    0   0   0   2  -2   2  -2   0  -2   2
    "
-  A = matrix ks   
-  P = reflexivePolytope A
+--  A = matrix ks   
+  Q = cyPolytope ks
+  elapsedTime Xs1 = findAllCYs(Q, Automorphisms => false, NTFE => false, Ring => ZZ[a_0..a_6]);
   -- need a way to get one FRST, or perhaps a smaller number than "all".
-  elapsedTime Xs = findAllFRSTs P
+  Xs = findAllCYs Q;
+  X = Xs#0
+
+  toricMoriConeCap X
+  classifyExtremalCurves X
+  #Xs
   X = first Xs
   peek X
   V = ambient X
@@ -487,9 +518,10 @@ TEST ///
 
 TEST ///
   -- Let's see how high we can go with this simplistic routine.
+-*  
   restart
   debug needsPackage "StringTorics"
-
+*-
   h11 = 20
   topes = kreuzerSkarke(h11, Limit => 50);    
   assert(#topes == 50)

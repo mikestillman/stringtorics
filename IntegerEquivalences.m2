@@ -9,6 +9,7 @@ newPackage(
     )
 
 export {
+    "findEquivalence",
     "MatchingData",
     "equivalenceIdeal",
     "extendToMatrix", -- extendToMatrix(List of integers) ==> Matrix (over ZZ).
@@ -358,7 +359,7 @@ hessianMatches(RingElement, RingElement) := MatchingData => (F1, F2) -> (
     fac2 := factorsByType(det hessian F2);
     keys1 := sort select(keys fac1, k -> k =!= {1,0}); -- remove constant
     keys2 := sort select(keys fac2, k -> k =!= {1,0}); -- remove constant
-    if keys1 =!= keys2 then return null; -- no matches.
+    if keys1 =!= keys2 then return matchingData{}; -- no matches.
     matchingData for k in keys1 list {SignedPermutations, fac1#k, fac2#k}
     )
 
@@ -372,7 +373,7 @@ singularPoints RingElement := List => F -> (
     kk := coefficientRing R;
     n := numgens R;
     singlocus := trim saturate(ideal F + ideal jacobian F);
-    if singlocus == 1 then return {};
+    if singlocus == 1 then return matchingData{};
     comps := (decompose singlocus);
     comps0 := select(comps, c -> codim c == n-1 and degree c === 1); -- zero-dimensional rational points
     comps1 := select(comps, c -> not(codim c == n-1 and degree c === 1)); -- the rest
@@ -405,10 +406,44 @@ singularMatches = method()
 singularMatches(RingElement, RingElement) := MatchingData => (F1, F2) -> (
     sing1 := trim saturate(ideal F1 + ideal jacobian F1);
     sing2 := trim saturate(ideal F2 + ideal jacobian F2);
-    if sing1 == 1 then return null;
+    if sing1 == 1 then return matchingData{};
     comps1 := (decompose sing1)/trim;
     comps2 := (decompose sing2)/trim;
     idealsByBetti(comps1, comps2)
+    )
+
+findEquivalence = method()
+findEquivalence(List, List) := (LF1, LF2) -> (
+    (L1, F1) := toSequence LF1;
+    (L2, F2) := toSequence LF2;
+    R := ring L1;
+    -- TODO: check that R is the ring of all 4 of these.
+    -- TODO: check that coefficient ring is ZZ, QQ, finite field, or what else is allowed?
+    RQ := R;
+    toRQ := identity;
+    if coefficientRing R === ZZ then (
+        RQ = QQ (monoid R); -- change ZZ to QQ, leave finite fields alone.
+        toRQ = map(RQ, R, vars RQ);
+        );
+    L1 = toRQ L1;
+    L2 = toRQ L2;
+    F1 = toRQ F1;
+    F2 = toRQ F2;
+    (A, phi) := genericLinearMap RQ;
+    md := hessianMatches(F1, F2) |
+          singularMatches(F1, F2) |
+          matchingData {L1 => L2, F1 => F2};
+--    linmd := selectLinear md;
+    --result := tryEquivalences(linmd, RQ, (A,phi));
+    -- if result is INDETERMINATE, try the entire matching data
+    -- TODO: if we get a consistent match, try that first!
+    -- only if that fails should we move on to this.
+    tryEquivalences(md, RQ, (A, phi))
+    -- if result#0 =!= INCONSISTENT then (
+    --     result2 := tryEquivalences(md, RQ, (A,phi));
+    --     (result, result2)
+    --     )
+    -- else result
     )
 
 TEST ///
@@ -441,6 +476,10 @@ TEST ///
       2*d^3+12*c*d*e+6*d^2*e-12*c*e^2-8*e^3
   F3 = 8*a^3-12*a^2*b+6*a*b^2-12*a^2*c+12*a*b*c-6*b^2*c+6*a*c^2-c^3+
       3*c^2*d-3*c*d^2+d^3-6*c*e^2-4*e^3
+
+  findEquivalence({L1, F1}, {L2, F2})
+  findEquivalence({L3, F3}, {L2, F2})
+  
   FT1 = factorsByType det hessian F1
   FT2 = factorsByType det hessian F2
   FT3 = factorsByType det hessian F3
@@ -494,7 +533,6 @@ TEST ///
   matches md
   selectLinear md
   tryEquivalences(oo, RQ, (A,phi))
-  tryEquivalences(md, RQ, (A,phi))
   tryEquivalences(md, RQ, (A,phi))
     -- XXX
 ///
@@ -589,6 +627,10 @@ TEST ///
   L1 = 24*a+10*b+8*c
   F2 = F1
   L2 = L1
+
+  use ring L1
+  findEquivalence({L1, F1}, {L1 - 2*a, F1+2*a^3})
+
   M1 = a
   M2 = b
   M3 = c
@@ -639,6 +681,7 @@ TEST ///
           };
       false
   ) else true;
+
 ///
 
 TEST ///
@@ -695,8 +738,11 @@ TEST ///
   --(L1, F1) = (c2Form Xs#(26,0), cubicForm Xs#(26,0))
   --(L2, F2) = (c2Form Xs#(37,0), cubicForm Xs#(37,0))
 
+  use RZ
   (L1, F1) = (8*a-4*b+36*c,2*a^3-3*a^2*b-3*a*b^2+8*b^3-6*a^2*c+6*a*b*c-6*b^2*c+6*a*c^2)
   (L2, F2) = (-4*a+8*b+36*c,8*a^3-3*a^2*b-3*a*b^2+2*b^3-6*a^2*c+6*a*b*c-6*b^2*c+6*b*c^2)
+  findEquivalence({L1, F1}, {L2, F2})
+
   --factorsByType det hessian F1
   
   MD = matchingData {

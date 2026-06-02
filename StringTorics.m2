@@ -169,6 +169,8 @@ export {
     "equations",
     "LineBundle",
     "lineBundle",
+    "LinearForm",
+    "Basis",
     
 
     -- Creating databases of polytopes (with precomputed data).
@@ -268,11 +270,14 @@ ReverseDictionary = value Core#"private dictionary"#"ReverseDictionary";
 TopologicalDataOfCY3 = new Type of List
   -- contains c2, cubic intersection form, h11, h12
 
+CompleteIntersectionInToric = new Type of HashTable
+  
 CYPolytope = new Type of HashTable
 CalabiYauInToric = new Type of HashTable
 CYToolsCY3 = new Type of HashTable
 
 LineBundle = new Type of HashTable
+
 lineBundle = method()
 equations = method()
 
@@ -289,6 +294,9 @@ dotProduct(List, List) := (v,w) -> (
     sum for i from 0 to #v-1 list v#i * w#i
     )
 
+findEquivalence(CalabiYauInToric, CalabiYauInToric) := (X1, X2) -> (
+    findEquivalence({c2Form X1, cubicForm X1}, {c2Form X2, cubicForm X2})
+    )
 
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
 load (currentFileDirectory | "StringTorics/CYPolytope.m2")
