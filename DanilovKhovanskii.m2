@@ -815,7 +815,8 @@ Description
   Example
     P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
     (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
-    show eZ
+    show new HodgeDeligne from eZ
+    show new HodgeDeligne from eZbar
 SeeAlso
   MutableHodgeDeligne
   toeZMatrix
@@ -1855,7 +1856,7 @@ end--
 -* Development section *-
 restart
 debug needsPackage "DanilovKhovanskii"
-check "DanilovKhovanskii2"
+check "DanilovKhovanskii"
 
 uninstallPackage "DanilovKhovanskii"
 restart

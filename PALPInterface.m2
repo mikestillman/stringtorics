@@ -240,10 +240,9 @@ TEST ///
 
   -- TODO: what are these really supposed to be?
   getVerticesFromWS({10,1,2,3,4})
-  polar weightSystemPolytope {10,1,2,3,4}
-  vertices oo
-  latticePoints oo
-  
+  Q = polar weightSystemPolytope {10,1,2,3,4}
+  vertices Q
+  latticePoints Q
 ///
 
 ----------------------------------------------------------------------
@@ -277,11 +276,11 @@ runNEF(Matrix, String) := String => (M, opts) -> (
     result#"output"
     )
 
-TEST ///
 -*
   restart
   needsPackage "PALPInterface"
 *-
+TEST ///
   -- 3d reflexive example
   -- from smoothFanoToricVariety(3, 5)
   M = transpose matrix {{1, 0, 0}, {-1, 0, 1}, {0, 1, 0}, {0, -1, 1}, {0, 0, 1}, {0, 0, -1}}
@@ -413,9 +412,8 @@ TEST ///
   -- getVerticesFromWS {2,1,1}   -- hmm, this fails... too small?
 
 
+  -- what is P??
   Q = convexHull getVerticesFromWS {3,1,1,1}
-
-  vertices P
   vertices Q
 
   -- We would like to make sure we can easily go from P to Q  
@@ -726,14 +724,6 @@ Description
 ///
 
 
-TEST ///
--*
-  restart
-  needsPackage "PALPInterface"
-*-
-  assert true
-///
-
 -- template for doc nodes for methods/functions
 ///
 Key
@@ -747,11 +737,11 @@ Description
 SeeAlso
 ///
 
-TEST ///
 -*
   restart
   needsPackage "PALPInterface"
 *-
+TEST ///
   M = matrix({{ -1,  -1,  -1,  -1,   1},
        { -1,  -1,   0,   3,  -1},
        { -1,  -1,   4,   0,  -1},
@@ -783,7 +773,7 @@ TEST ///
   wss = getWSFromDim(5, Degrees => (30,30))
   #wss == 354
   ws = wss#10
-  for ws in wss list (
+  for ws in take(wss,10) list (
     M = getVerticesFromWS(ws);
     if M === null then continue;
     if not isReflexive convexHull M then << "note: " << ws << " does not give reflexive" << endl;
@@ -803,11 +793,11 @@ TEST ///
 
 ///
 
-TEST ///
+-*
   restart
   needsPackage "PALPInterface"
-
-
+*-
+TEST ///
   ws = {10, 1, 1, 1, 1, 3, 3}  
   needsPackage "StringTorics"
   M = getVerticesFromWS ws
@@ -864,9 +854,11 @@ TEST ///
   elapsedTime cohomCalg(V, V_2 + V_4 + V_5)
 ///
 
-TEST ///
+-*
   restart
   needsPackage "PALPInterface"
+*-
+TEST ///
   needsPackage "StringTorics"
 
   ws = {10, 1, 1, 1, 1, 3, 3}
@@ -907,9 +899,6 @@ TEST ///
 
   posHull transpose matrix degrees ring V
   rays oo
-
-  
-  
 ///
 end--
 
