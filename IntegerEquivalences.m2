@@ -13,6 +13,7 @@ export {
     "findEquivalence",
     -- by hand interface
     "equivalenceIdeal",
+    "equivalenceIdeals",
     "factorsByType",
     "factorType",
     "idealsByBetti",

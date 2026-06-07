@@ -108,5 +108,5 @@ TEST ///
   hh^*(OO_X(0,0)) == {1, 0, 1}
   F = first equations X
   saturate(ideal F + ideal jacobian F, ideal V) -- X is smooth
-  hh^*(OO_V(-1,3)) -- ouch!  needs to work...
+  -- hh^*(OO_V(-1,3)) -- ouch!  needs to work...
 ///

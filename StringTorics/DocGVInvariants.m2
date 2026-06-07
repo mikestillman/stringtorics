@@ -14,37 +14,23 @@ doc ///
       complex structure on $X$, they count (in a BPS sense) the number of
       curves in each homology class.
 
-      The GV invariants are computed by the external C++ program {\tt computeGV},
-      which must be installed separately and whose path is specified
-      in the package @TO Configuration@.
-      Currently, GV computation is only supported for favorable CY 3-folds.
+      As of Macaulay2 version 1.26.06, the CYTools function {\tt computeGV}
+      is included, and no external program needs to be installed.
+
+      Currently, GV computation is only supported for favorable CY 3-folds
+      hypersurfaces in a toric variety.  Favorable means that the Picard group
+      of the Calabi-Yau 3-fold is induced by the Picard group of the ambient toric variety.
     Text
       @SUBSECTION "Computing GV invariants"@
     Text
       @UL {
-          TO (gvInvariants, CalabiYauInToric),
-          TO (gvCone, CalabiYauInToric),
-          TO (gvInvariantsAndCone, CalabiYauInToric, ZZ),
-          TO (partitionGVConeByGV, CalabiYauInToric)
-      }@
-    Text
-      @SUBSECTION "GV data organized by rays"@
-    Text
-      @UL {
-          TO GVTable,
-          TO (gvTable, CalabiYauInToric),
-          TO (gvTable, HashTable),
-          TO (gvRays, GVTable)
---          TO (gvRay, GVTable, List)
-      }@
-    Text
-      @SUBSECTION "Extremal curve classification"@
-    Text
-      @UL {
-          TO (extremalRayGVs, CalabiYauInToric, List),
-          TO (classifyExtremalCurve, List),
-          TO (classifyExtremalCurves, CalabiYauInToric),
-          TO (isNilpotent, GVTable, List)
+          TO (gvInvariantsNew, CalabiYauInToric),
+          TO (rays, GVTable),
+          TO (displayRays, GVTable),
+          TO (gvCone, GVTable),
+          TO (extremalCurves, GVTable),
+          TO (extremalCurves, CalabiYauInToric, List),
+          TO GVTable
       }@
     Text
       @SUBSECTION "Finding linear maps between GV cones"@
@@ -89,10 +75,100 @@ doc ///
 ///
 
 ----------------------------------------------
--- GV invariant computation ------------------
+-- (new) GV invariant computation ------------
 ----------------------------------------------
 
 doc ///
+  Key
+    gvInvariantsNew
+    (gvInvariantsNew, CalabiYauInToric)
+    (gvInvariantsNew, NormalToricVariety, List)
+    [gvInvariantsNew, Mori]
+    [gvInvariantsNew, DegreeLimit]
+    [gvInvariantsNew, Heft]
+    [gvInvariantsNew, Precision]
+  Headline
+    compute Gopakumar-Vafa invariants of a Calabi-Yau 3-fold hypersurface
+  Usage
+    GV = gvInvariantsNew X
+    GV = gvInvariantsNew(V, basisIndices)
+  Inputs
+    X:CalabiYauInToric
+    V:NormalToricVariety
+    basisIndices:List
+      indices of divisors forming a basis for the Picard group
+    Mori => List
+      Hilbert basis generators of the Mori cone (computed if not given)
+    DegreeLimit => ZZ
+      degree bound for the computation (default: infinity)
+  Outputs
+    GV:GVTable
+      mapping curve class sequences to GV invariants (integers)
+  Description
+    Text
+      Computes Gopakumar-Vafa invariants by calling the C++ program
+      {\tt computeGV}, written by Andres Rios-Tascon for CYTools.
+      The result is a list of
+      The result is a hash table whose keys are curve classes
+      (as sequences of integers) and whose values are the corresponding GV
+      invariants.
+
+      This function requires a favorable CY 3-fold and returns {\tt null}
+      for non-favorable ones.
+
+      The {\tt DegreeLimit} option controls how far the computation goes;
+      larger values give more curve classes but take longer.
+    Example
+      Q = reflexivePolytope(
+          {{-1,-1,-1,-1},{-1,-1,-1,0},{-1,-1,0,2},
+           {-1,0,-1,-1},{0,-1,-1,-1},{1,-1,0,-1},{1,2,2,2}})
+      X = makeCY Q
+      GV = gvInvariantsNew(X, DegreeLimit => 10)
+    Text
+      The output consists of curve classes (list of integers), the heft degree of the curve,
+      and its Gopakumar-Vafa invariant (a repackaging of Gromov-Witten numbers).
+      The method used is (mathematically) conjectural, but I have not seen it give
+      incorrect values ever. Only curve classes with non-zero GV invariant are stored.
+
+      The GVTable contains the degree limit used, a list of curves => GV invariant, sorted
+      in ascending heft degree of the curve, and also stored is the hilbert basis of a (pointed) cone
+      of curves containing the actual Mori cone of all classes of irreducible curves on the CY.
+    Text
+      Other important features can be obtained directly from this table.
+    Example
+      displayRays GV
+      moriC = gvCone GV -- not needed, or cache it?
+      extremalCurves GV -- hash table, GVs are only first 4 on the ray.
+      extremalCurves(X, entries transpose rays moriC)
+    Text
+      The most important optional argument, that you will almst always use, is {\tt DegreeLimit}.
+      This, together with the degree vector (defaults to {\tt heft X}), determines
+      how far out to compute GV invariants.  All curve classes with non-zero GV invariant
+      having degree less than or equal to the DegreeLimit will be computed.
+    Text
+      The Mori option is by default is a Hilbert basis of the Mori cone of the
+      ambient toric variety.  Sometimes, if a smaller cone is known, this can speed up computations.
+      For many problems, the default option is good.  However, if $C$ is a curve class which is known to be
+      extremal, then using {\tt Mori => \{C\}} can speed things way up.  
+  Caveat
+    Only works for favorable CY 3-folds.  Giving a degree which is too low might miss extremal
+    curve classes of interest.  As the Mori cone of curves might not be polyhedral, this
+    must be considered.  If a Hilbert basis for a pointed polyhedral cone containing the Mori cone
+    is not given, then the answers could be wrong (it is generally easy to notice this).
+  SeeAlso
+    GVTable
+    displayRays
+    extremalCurves -- returns a hash table. GV is stashed in X?
+    gvCone -- returns a cone, not a list of curves.
+    partitionGVConeByGV -- a hash table, with a list of 4 entries as key, and value is a list of all curve classes with those GV values on the ray.
+///
+
+----------------------------------------------
+-- GV invariant computation ------------------
+----------------------------------------------
+
+"doc" -- disabled
+///
   Key
     gvInvariants
     (gvInvariants, CalabiYauInToric)
@@ -120,7 +196,7 @@ doc ///
     Executable => String
       path to the {\tt computeGV} executable
   Outputs
-    GV:HashTable
+    GV:GVTable
       mapping curve class sequences to GV invariants (integers)
   Description
     Text
@@ -144,15 +220,15 @@ doc ///
       GV = gvInvariants(X, DegreeLimit => 10)
       sort pairs GV
   Caveat
-    Requires the external program {\tt computeGV} to be installed and
-    configured.  Only works for favorable CY 3-folds.
+    Only works for favorable CY 3-folds.
   SeeAlso
     gvTable
     gvCone
     partitionGVConeByGV
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     gvCone
     (gvCone, CalabiYauInToric)
@@ -190,7 +266,8 @@ doc ///
     toricMoriCone
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     gvInvariantsAndCone
     (gvInvariantsAndCone, CalabiYauInToric, ZZ)
@@ -230,7 +307,8 @@ doc ///
     gvCone
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     partitionGVConeByGV
     (partitionGVConeByGV, CalabiYauInToric)
@@ -290,7 +368,8 @@ doc ///
     gvRay
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     gvTable
     (gvTable, CalabiYauInToric)
@@ -338,7 +417,8 @@ doc ///
     gvInvariants
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     gvRays
     (gvRays, GVTable)
@@ -366,7 +446,8 @@ doc ///
     gvRay
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     gvRay
 --    (gvRay, GVTable, List)
@@ -398,7 +479,8 @@ doc ///
     gvRays
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     gvByRay
     (gvByRay, HashTable, ZZ, List)
@@ -430,7 +512,8 @@ doc ///
 -- Extremal curve classification -------------
 ----------------------------------------------
 
-doc ///
+"doc" -- disabled
+///
   Key
     extremalRayGVs
     (extremalRayGVs, CalabiYauInToric, List)
@@ -458,7 +541,8 @@ doc ///
     classifyExtremalCurve
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     classifyExtremalCurve
     (classifyExtremalCurve, List)
@@ -491,7 +575,8 @@ doc ///
     extremalRayGVs
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     classifyExtremalCurves
     (classifyExtremalCurves, CalabiYauInToric)
@@ -517,7 +602,8 @@ doc ///
     toricMoriConeCap
 ///
 
-doc ///
+"doc" -- disabled
+///
   Key
     isNilpotent
     (isNilpotent, GVTable, List)

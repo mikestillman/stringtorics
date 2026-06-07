@@ -221,9 +221,69 @@ gvCone GVTable := opts -> GVT -> (
         remaining = positions(entries transpose matrix(H * curveMatrix), c -> any(c, a -> a < 0));
         deg = deg*2;
         );
-    (C, flatten entries((matrix {heft GVT}) * (rays C)))
+    GVT.cache.gvCone = entries transpose rays C;
+    C
     )
 
+-- local function, I think?
+classifyExtremalCurveClass = method()
+classifyExtremalCurveClass List := rayC -> (
+    -- rayC: a list of the gv invariants along the ray of a toric mori cone extremal curve.
+    -- these are either extremal on the CY, or not effective on the CY.
+    if #rayC <= 2 then return "OTHER";
+    if all(2..#rayC-1, i -> rayC#i == 0) then (
+        -- only first two, possibly, are non-zero.
+        if rayC#0 == 0 and rayC#1 == 0 then return "ZERO";
+        if rayC#0 == -2 or rayC#1 == -2 then return "TYPEIII0";
+        if rayC#0 >= 0 and rayC#1 >= 0 then return "FLOP"; -- these could be type IIIg as well?
+        if rayC#0 < 0 or rayC#1 < 0 then return "TYPEIIIg";
+        )
+    else return "TYPEII"
+    )
+
+extremalCurves = method(Options => {Limit => 4, Heft => null})
+extremalCurves GVTable := opts -> GVT -> (
+    -- TODO? stash extremal curves, and their GV rays (at least first 4 values).
+    -- can recreate the degrees, and also the classification, but keep: extremal curve => gvray values.
+    if opts.Heft =!= null then error "this version cannot use a degree function";
+    H := new HashTable from for x in rays GVT list x#0 => {x#1, x#2};
+    E := entries transpose rays gvCone GVT;
+    extremals := for c in E list (
+        rayC := H#c#1; -- list of GV invariants along ray of c.
+        typ := classifyExtremalCurveClass rayC;
+        c => {H#c#0, typ, take(H#c#1, opts.Limit)} -- take a max of opts.Limit values for each ray
+        );
+    hashTable extremals
+    )
+-- The following requires the extremal curves, fills in the GV info for these classes.
+extremalCurves(CalabiYauInToric, List) := opts -> (X, curveClasses) -> (
+    if not isFavorable X then return null; -- later, maybe we can modify this...
+    degvec := if opts.Heft =!= null then opts.Heft else heft X;
+    hashTable for curveClass in curveClasses list (
+        degC := dotProduct(degvec, curveClass);
+        deglimit := opts.Limit * degC;
+        GVT := gvInvariantsNew(X,Mori => {curveClass}, DegreeLimit => deglimit, Heft => degvec);
+        gvHash := hashTable GVT.GVs;
+        rayC := for i from 1 to opts.Limit list (
+            c := i * curveClass;
+            if gvHash#?c then gvHash#c else 0
+            );
+        typ := classifyExtremalCurveClass rayC;
+        curveClass => {degC, typ, rayC}
+        )
+    )
+
+nilpotentCurves = method()
+nilpotentCurves GVTable := GVT -> (
+  for x in rays GVT list (
+      thisray := x#2;
+      if (#thisray >= 4 and thisray#-1 == 0 and thisray#-2 == 0 )
+      or (#thisray <= 3 and thisray#-1 == 0)
+      then {x#0, x#1, take(x#2, 4)}  else continue
+      )
+  )
+
+-- Also stash the value?  Yes!
 -- gvCone CalabiYauInToric := Cone => opts -> X -> (
 --     if not isFavorable X then return null;
 --     gv := gvInvariants(X, opts);
@@ -231,7 +291,7 @@ gvCone GVTable := opts -> GVT -> (
 --     posHull transpose matrix ((keys gv)/toList)
 --     )
 
-
+-- also partition the extremal curve classes by first 2 values of the gv ray?
 
 ------------------------------
 -- end of new code May 2026 --
@@ -437,6 +497,7 @@ gvInvariants CalabiYauInToric := HashTable => opts -> X -> (
 
 
 -- Not used anymore??  See `extremalRayGVs`
+-- Doesn't make sense!?  Heft has 4 entries, so could only work for h11=4 case...
 gvRay = method(Options => options gvInvariants)
 gvRay(CalabiYauInToric, List) := HashTable => opts -> (X, curveClass) -> (
     -- This doesn't seem to be correct
@@ -483,7 +544,7 @@ gvInvariantsAndCone(CalabiYauInToric, ZZ) := Sequence => opts -> (X, D) -> (
 
 partitionGVConeByGV = method(Options => options gvInvariants)
 partitionGVConeByGV CalabiYauInToric := HashTable => opts -> X -> (
-    -- return null if we cannot computr GV invariants (i.e. if non-favorable).
+    -- return null if we cannot compute GV invariants (i.e. if non-favorable).
     if not isFavorable X then return null;
     gv := gvInvariants(X, opts); -- TODO: stash this?
     if gv === null then return null;

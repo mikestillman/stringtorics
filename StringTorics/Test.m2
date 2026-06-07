@@ -28,11 +28,37 @@ needsPackage "StringTorics"
   -- now given these rays, we want to make a CYPolytope with these exact rays, in order.
   netList annotatedFaces Q
 
+  fineStarTriangulation
+  regularFineTriangulation
+  regularFineStarTriangulation
+
+  -- finding one triangulation
+  A = transpose matrix rays Q
+  t = regularFineFanTriangulation A
+  assert isWellDefined t
+  assert isFine t
+  assert isRegularTriangulation t
+
+  -- given that one, find all fine regular triangulations of the fan, starting from this one.
+  fanTs = generateTriangulations(A, Limit => 100, Homogenize => false, RegularOnly => true);
+  assert all for t in fanTs list isWellDefined t
+  assert all for t in fanTs list isFine t
+  assert all for t in fanTs list isRegularTriangulation t
+
+  frsts = findAllFRSTs A;
+
+  findOneFRST reflexive A -- returns just the subsets
+  triangulation(A, oo) 
+  oo == t  -- true!
+
+methods  isTriangulationOfPolytope  
   -- this triangulation appears to be of Batyrev type.
   tri1 = {{0, 1, 2, 3}, {0, 1, 2, 4}, {0, 1, 3, 7}, {0, 1, 4, 7}, {0, 2, 3, 4}, {0, 3, 4, 7}, {1, 2, 3, 7}, {1, 2, 4, 8}, {1, 2, 7, 9}, {1, 2, 8, 9}, {1, 4, 7, 9}, {1, 4, 8, 9}, {2, 3, 4, 5}, {2, 3, 5, 6}, {2, 3, 6, 7}, {2, 4, 5, 6}, {2, 4, 6, 8}, {2, 6, 7, 9}, {2, 6, 8, 9}, {3, 4, 5, 7}, {3, 5, 6, 7}, {4, 5, 6, 8}, {4, 5, 7, 8}, {4, 7, 8, 9}, {5, 6, 7, 8}, {6, 7, 8, 9}}
   isTriangulationOfPolytope(Q, tri1)
 
   A = transpose matrix rays Q
+  allTriangulations A;
+  fineFanTriangulation A
   elapsedTime Ts = findAllFans A; -- 27s on apple M2 MBP, # = 14619.
   assert(#Ts == 14619)
   isTriangulationOfPolytope(Q, Ts_100)
@@ -215,7 +241,72 @@ restart
 needsPackage "StringTorics"
 *-
 TEST ///
-  -- readSageTriangulation
+-- This tests translation from Sage triangulation code (at least the way it was in 2020!)
+-- All of these routines are no longer exported, hence the `debug`.
+-- It is possible this is useful still, so we leave the code in the package, and in this test, for now.
+  debug needsPackage "StringTorics" -- for readSageTriangulation. matchNonZero, applyPermutation
+  sageTri = "     [[array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 4]), array([2, 3, 4, 5]), 
+array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), 
+array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]), 
+array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), 
+array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
+array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
+array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 3]), 
+array([0, 1, 3, 4]), array([1, 2, 3, 5]), array([1, 3, 4, 5]), 
+array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), 
+  array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]),   
+  array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), 
+  array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
+  array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
+  array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 3]), 
+  array([0, 1, 3, 4]), array([1, 2, 3, 5]), array([1, 3, 4, 5]), 
+  array([2, 3, 5, 8]), array([2, 5, 6, 8]), array([5, 6, 7, 8]), 
+  array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), 
+  array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), 
+  array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
+  array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
+  array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 3]), 
+  array([0, 1, 3, 4]), array([1, 2, 3, 4]), array([2, 3, 4, 5]), 
+  array([2, 3, 5, 8]), array([2, 5, 6, 8]), array([5, 6, 7, 8]), 
+  array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), 
+  array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), 
+  array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 3]), 
+  array([0, 1, 3, 4]), array([1, 2, 3, 5]), array([1, 3, 4, 5]), array([2, 3, 5, 6]), array([3, 5, 6, 8]), 
+  array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), 
+  array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
+  array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], 
+[array([0, 1, 2, 5]), array([0, 1, 4, 5]), array([0, 2, 3, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), 
+    array([2, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), 
+    array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), 
+    array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), 
+    array([1, 4, 5, 6])], [array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 4]), array([2, 3, 4, 5]), 
+    array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), 
+    array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), 
+    array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
+    array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 4]), array([0, 2, 3, 5]), array([0, 2, 4, 5]), 
+    array([0, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), array([0, 2, 3, 8]), 
+    array([0, 2, 6, 7]), array([0, 2, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), 
+    array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), 
+    array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 5]), array([0, 1, 4, 5]), 
+    array([0, 2, 3, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), 
+    array([0, 2, 3, 6]), array([0, 3, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), 
+    array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), 
+    array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 5]), 
+    array([0, 1, 4, 5]), array([0, 2, 3, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 7]), 
+    array([2, 5, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]), array([0, 1, 4, 7]), 
+    array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
+    array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], 
+[array([0, 1, 2, 4]), array([0, 2, 3, 5]), array([0, 2, 4, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), 
+    array([2, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), 
+    array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), 
+    array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), 
+    array([2, 4, 5, 6])], [array([0, 1, 2, 4]), array([0, 2, 3, 5]), array([0, 2, 4, 5]), array([0, 3, 4, 5]), 
+    array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), 
+    array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), 
+    array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
+    array([1, 2, 4, 6]), array([2, 4, 5, 6])]] "
+
+-- readSageTriangulation
   Ts = readSageTriangulations sageTri
   
   -- let's also switch to a different choice of rays
@@ -229,8 +320,11 @@ TEST ///
   Bmat = matrixFromString Bstr
   
   (fromM2, toM2) = matchNonZero(Amat, Bmat)
-  applyPermutation(toM2, Ts)
-  
+  m2T = applyPermutation(toM2, Ts)
+
+  for t in m2T do 
+      assert topcomIsTriangulation(Amat, t, Homogenize => false)
+
   assert(
       applyPermutation(toM2, {0,1,2,3}) 
       == 
@@ -294,12 +388,10 @@ TEST ///
 
   Amat = transpose matrix LP
   tri = regularFineTriangulation Amat
-  assert naiveIsTriangulation tri
   assert topcomIsTriangulation(Amat, max tri)
   
   -- check what happens if Amat is homoogenized:
   AmatH = Amat || matrix{{8:1}}
-  naiveIsTriangulation(AmatH, max tri) -- this should be false...? TODO: this is a bug!!
   assert not topcomIsTriangulation(AmatH, max tri) -- good! it complains that the index sets are not full dimensional (I think that is good?)
 
   assert(flipCandidates tri == flipCandidates(Amat, max tri))
@@ -466,7 +558,6 @@ TEST ///
   TRI2 = TRI2/sort//sort
   assert(TRI === TRI2) -- works!
   assert topcomIsTriangulation(Amat, TRI)
-  assert naiveIsTriangulation(Amat, TRI)
 
   -- let's check 'flipCandidates'
   C = flipCandidates(Amat, TRI)  
@@ -561,10 +652,11 @@ TEST ///
   needsPackage "StringTorics"
 *-
 TEST ///
+
   -- testing triangulations of fans
   -- Our plan: start with example #26 from Kreuzer-Skarke with h11=5, h12=57
   --  this one has a number of triangulations.
-  -- How do we create Amat?  This is the way:
+  -- How do we create Amat?  This is one way:
   --      4 11  M:58 11 N:10 8 H:5,51 [-92]
   -- XXXXXXXXXX This test is failing May 2022.
   mat = "  1   1   1  -1   0   1   1  -1  -3  -1  -3
@@ -577,22 +669,8 @@ TEST ///
   LP = latticePoints P2 -- these will be the origin, the extremal vertices of P2 and possibly some more.
   Amat = matrix {select(LP, x -> x != 0)}
   elapsedTime   allTRIS = generateTriangulations(Amat, RegularOnly => true); -- removed in commit 33e77a592d2890c7ebf134e13b95d5915a624039
-
-  -- now let's change these to sage indexing
-    Bstr = "[ 1 -1 -1  1 -1 -1 -1  1  1  0]
-            [ 0  1  0 -1  1  0  0 -1 -1  0]
-            [-1  0  0  0  1  1  0  0  0  0]
-            [ 2  0  0  1 -1 -1 -1 -1  0  0]"
-  -- rays coming from M2
-  Bmat = matrixFromString Bstr
-  
-  (fromM2, toM2) = matchNonZero(Amat, Bmat)
-
-  Ts = readSageTriangulations sageTri
-  -- checkFan is no longer available.
-  --elapsedTime for T in Ts do time checkFan(Bmat, T) -- this takes a while (24 seconds), too long for testing
-  --elapsedTime checkFan(Bmat, Ts_5)
-  applyPermutation(fromM2, allTRIS/max)
+  assert(# allTriangulations(Amat, Fine => true) == 47)
+  elapsedTime   allTRIS = generateTriangulations(Amat, Fine => true, RegularOnly => true); -- removed in commit 33e77a592d2890c7ebf134e13b95d5915a624039
 
   -- the following are all in this list
   time TRI = regularFineStarTriangulation Amat -- this appears to not be returning regular triangulations?
@@ -600,14 +678,6 @@ TEST ///
   wts = regularTriangulationWeights(Amat0, TRI)
   regularSubdivision(Amat0, matrix{wts})
   assert(oo == TRI)
-
-  -- make a toric variety from one of the triangulations: (fine regular star...)
-  -- elapsedTime assert({(true, true, true)} === 
-  --     unique for T in allTRIS list (
-  --     X = normalToricVariety(entries transpose Amat, max T);
-  --     time (isWellDefined X, isSimplicial X, isComplete X, isProjective X)
-  --     )
-  -- )
 ///
 
 -*
@@ -1420,6 +1490,20 @@ TEST ///
   label Q === 7
   X = makeCY Q
   assert isFavorable Q
+
+  allTs = allTriangulations(transpose matrix rays Q, Homogenize => true);
+  assert(#allTs == 187)
+
+  allTs = allTriangulations(transpose matrix rays Q, Fine => true, Homogenize => true);
+  assert(#allTs == 64)
+  
+  allTs = allTriangulations(transpose matrix rays Q, Homogenize => false);
+  assert(#allTs == 788)
+
+  allTs = allTriangulations(transpose matrix rays Q, Fine => true, Homogenize => false); -- CRASH!
+
+  # findAllCYs Q === 3
+  
   elapsedTime Xs = findAllCYs(Q, NTFE => false, Automorphisms => false); -- too long... (13 sec or so)
   assert(#Xs == 21) -- wrong? TODO: BUG. Should give I think 21?
   PXs = partition(X -> restrictTriangulation X, Xs)
@@ -1659,10 +1743,11 @@ TEST ///
   hh^(1,1) T
   hh^(1,2) T
 
-  partitionGVConeByGV(X, DegreeLimit => 10)
-  partitionGVConeByGV(X, DegreeLimit => 20)
-  hilbertBasis gvCone(X, DegreeLimit => 20)
-  gv = gvInvariantsNew(X, DegreeLimit => 20);
+  
+  extremalCurves(gvInvariantsNew(X, DegreeLimit => 10))
+  extremalCurves(gvInvariantsNew(X, DegreeLimit => 20))
+  extremalCurves(gvInvariantsNew(X, DegreeLimit => 30))
+  hilbertBasis gvCone(gvInvariantsNew(X, DegreeLimit => 10))
 
   -- test of gvInvariants
   debug StringTorics  
@@ -1671,11 +1756,13 @@ TEST ///
   heftfcn = sum entries transpose rays dualCone posHull transpose matrix mori
   curvedegs = for c in mori list dotProduct(c, heftfcn)
   assert all(curvedegs, w -> w > 0)
-  
+
+  -- remove this test?
   H = gvInvariantsNew(V, basisIndices Q, DegreeLimit => 10)
   for k in H.GVs list dotProduct(k#0, heft H)
   assert all(oo, d -> d > 0)
 
+  -- Put more asserts into here.
   H2 = gvInvariantsNew(X, DegreeLimit => 10)
   assert(H === H2)
   degreeLimit H2
@@ -1684,6 +1771,7 @@ TEST ///
   hashTable H2.GVs
 
   rays H2
+--  gvByRays(X, DegreeLimit => 10)
 ///  
 
 -*
@@ -1707,8 +1795,8 @@ TEST ///
   rays H2
   displayRays(H2, "OneOnly" => true)
 
-  elapsedTime (gvc, degs) = gvCone H2;
-  rays gvc, degs
+  elapsedTime gvc = gvCone H2;
+  rays gvc
   elapsedTime assert(numcols rays gvc == 3)
   assert(set entries transpose rays gvc === set {{-1,-1,0}, {0,1,0}, {1,0,1}})
 ///  

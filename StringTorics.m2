@@ -115,6 +115,26 @@ export {
     "findStarFineGraph", -- ??
 
 
+    -*
+    A --> reflexivePolytope
+    A --> triangulation T (of fan?  of point set?)
+    A --> all, or many, triangulations Ts
+
+    T --> CalabiYauInToric
+    (Q,T) --> normal toric variety.
+    T --> normal toric variety
+
+    partition triangulations via 2-face equiv.
+    is a T coming from a star triangulation of the polytope?
+    A --> one point config triangulation (fine, regular),
+          one FRST (but as fan, i.e. without the origin cone point
+    (A,tri) (fan triangulation) --> toric variety, or calabiYauInToric
+    A --> all triangulations (how to get all FRST's?)
+    T --> generate all from that
+    T --> toric variety
+      --> calabiYauInToric
+    *-
+
     
     -- older triangulation code (still useful?) 
     "Origin",
@@ -130,14 +150,6 @@ export {
     "singularLocusInToric",
     "normalToricVarietyFromGLSM",
 
-    -- Interfacing with Sage triangulations, triangulations from elsewhere
-    "readSageTriangulations",
-    "sortTriangulation",
-    "matchNonZero",
-    "applyPermutation",
-    "checkFan",
-    "sageTri",
-
     -- IntersectionNumbers
     "intersectionNumbers",
     "toricIntersectionNumbers",
@@ -152,16 +164,20 @@ export {
     "toricMoriConeCap",
         
     -- gvInvariants. Which do we really want to keep here?
-    "gvInvariants",
+    -- new code,  Rest will be removed?
+    "gvInvariantsNew", -- rename to gvInvariants
+    "extremalCurves",
+    "displayRays",
     "gvCone",
+    "nilpotentCurves",
+    "MoriConeCap",
+    -- the below code for GV invariants will be removed?
+    "gvInvariants",
+    --"gvCone",
     "partitionGVConeByGV",
     "classifyExtremalCurves",
     "extremalRayGVs",
     "GVs", -- field in GVTable hash table
-    "MoriConeCap",
-
-    -- new gv code, maybe replace previous ones?  (Except: need to be able to handle extremal curves faster?)
-    "gvInvariantsNew", -- TODO: rename this as gvInvariants...
     "gvByRay", -- should this be private?
     "gvTable",
     "gvRays",
@@ -373,69 +389,6 @@ load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- ha
 load (currentFileDirectory | "StringTorics/DatabaseCreation.m2")
 load (currentFileDirectory | "StringTorics/Extras.m2")
 
-  findAllConnectedStarFine = method()
-  findAllConnectedStarFine Triangulation := (T) -> (
-      stars := new MutableHashTable;
-      stars#T = 0;
-      starcount := 1;
-      oldTODO := {T};
-      radius := 0;
-      while #oldTODO > 0 do (
-          radius = radius + 1;
-          newTODO := flatten for t1 in oldTODO list for n in neighbors t1 list (
-              oldone := stars#t1;
-              t := n#1;
-              if isStar t and not stars#?t and isRegularTriangulation t then(
-                  << "adding new triangulation " << starcount << " at radius " << radius << " with circuit " << n#0 << " from " << oldone << endl;
-                  stars#t = starcount;
-                  starcount = starcount + 1;
-                  t
-                  )
-              else continue
-              );
-          oldTODO = newTODO;
-          );
-      keys stars
-      )
-
-  findStarFineGraph = method()
-  findStarFineGraph Triangulation := (T) -> (
-      -- this version returns the determined graph of the FRST's.
-      -- 3 things are returned:
-      --   1. a list of triangulations
-      --   2. a hash table: for each triangulation index: key is a list of {tri#, affine circuit used to get to that}
-      stars := new MutableHashTable;
-      edges := new MutableList;      
-      stars#T = 0;
-      starcount := 1;
-      oldTODO := {T};
-      radius := 0;
-      while #oldTODO > 0 do (
-          radius = radius + 1;
-          newTODO := flatten for t1 in oldTODO list for n in neighbors t1 list (
-              newOneIsNew := false;
-              oldone := stars#t1;
-              t := n#1;
-              alreadyThere := stars#?t;
-              if not alreadyThere then (
-                  if isStar t and isRegularTriangulation t then (
-                      stars#t = starcount;
-                      starcount = starcount + 1; 
-                      newOneIsNew = true;
-                      )
-                  else continue
-                  ); -- this is the case when we don't need to add an edge, nor place tri onto the newTODO list.
-              -- at this point both t and oldone are good. So let's add an edge.
-              edges#(#edges) = {oldone, stars#t, n#0};
-              if newOneIsNew then t else continue
-              );
-          oldTODO = newTODO;
-          );
-      starsInv := hashTable for k in keys stars list stars#k => k;
-      starsList := for i from 0 to starcount-1 list starsInv#i;
-      (starsList, new List from edges)
-      )
-
 protect nextVar
 protect nextFinalVar
 ---------------------------------------------------
@@ -582,62 +535,6 @@ reflexiveToSimplicialToricVarietyCleanDegrees Polyhedron := Sequence => opts -> 
         )
     )
 
-augmentWithOrigin = method()
-augmentWithOrigin Matrix := (A) -> (
-    -- A is a matrix over ZZ
-    -- add column of 0's, then add in a first row of 1's.
-    n := numColumns A;
-    zeros := matrix {numRows A : {0}};
-    ones := matrix {{(n+1) : 1}};
-    ones || (A | zeros)
-    )
-
-augmentBack = (A) -> (
-    -- A is a matrix over ZZ
-    -- add in a last row of 1's.  Also add in one column of zeros
-    n := numColumns A;
-    zeros1 := matrix{numRows A : {0}};
-    zeros0 := matrix {1+numRows A : {0}};
-    ones := matrix {{n+1 : 1}};
-    ((A | zeros1) || ones) --| zeros0
-    )
-
-readSageTriangulations = method()
-readSageTriangulations String := (str) -> (
-   --  "     [[array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 4]), array([2, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 5]), array([1, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 5]), array([1, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 4]), array([2, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 5]), array([1, 3, 4, 5]), array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 5]), array([0, 1, 4, 5]), array([0, 2, 3, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 4]), array([2, 3, 4, 5]), array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 4]), array([0, 2, 3, 5]), array([0, 2, 4, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 5]), array([0, 1, 4, 5]), array([0, 2, 3, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 5]), array([0, 1, 4, 5]), array([0, 2, 3, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 4]), array([0, 2, 3, 5]), array([0, 2, 4, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 4]), array([0, 2, 3, 5]), array([0, 2, 4, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])]] "
-    s1 := replace("array", "", str);
-    s2 := replace("\\(", "", s1);    
-    s3 := replace("\\)", "", s2);
-    s4 := replace("\\[", "{", s3);
-    s5 := replace("\\]", "}", s4);
-    value s5
-    )
-
-sortTriangulation = method()
-sortTriangulation List := (T) -> sort for t in T list sort t
-
-matchNonZero = method()
-matchNonZero(Matrix, Matrix) := (A,B) -> (
-    eA := entries transpose A;
-    Ah := hashTable for i from 0 to #eA-1 list (
-        if all(eA#i, x -> x == 0) then continue else eA#i => i
-        );
-    eB := entries transpose B;
-    Bh := hashTable for i from 0 to #eB-1 list (
-        if all(eB#i, x -> x == 0) then continue else eB#i => i
-        );
-    if set keys Ah =!= set keys Bh then (
-        error "non-zero columns are different";
-        );
-    AtoB := for e in eA list if Bh#?e then Bh#e else -1;
-    BtoA := for e in eB list if Ah#?e then Ah#e else -1;
-    (AtoB, BtoA)
-    )
-
-applyPermutation = method()
-applyPermutation(List, ZZ) := (P, i) -> if i >= 0 and i < #P then P#i else -1
-applyPermutation(List, List) := (P, L) -> sort for f in L list applyPermutation(P,f)
-
 ---------------------------------------
 -- Code for toric varieties packages --
 ---------------------------------------
@@ -747,66 +644,6 @@ regularStarTriangulation(ZZ,Polyhedron) := (maxdim, P2) -> (
     (LP,newtri)
     )
 
-  sageTri = "     [[array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 4]), array([2, 3, 4, 5]), 
-array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), 
-array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]), 
-array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), 
-array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
-array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
-array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 3]), 
-array([0, 1, 3, 4]), array([1, 2, 3, 5]), array([1, 3, 4, 5]), 
-array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), 
-  array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]),   
-  array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), 
-  array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
-  array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
-  array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 3]), 
-  array([0, 1, 3, 4]), array([1, 2, 3, 5]), array([1, 3, 4, 5]), 
-  array([2, 3, 5, 8]), array([2, 5, 6, 8]), array([5, 6, 7, 8]), 
-  array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), 
-  array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), 
-  array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
-  array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
-  array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 3]), 
-  array([0, 1, 3, 4]), array([1, 2, 3, 4]), array([2, 3, 4, 5]), 
-  array([2, 3, 5, 8]), array([2, 5, 6, 8]), array([5, 6, 7, 8]), 
-  array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), 
-  array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), 
-  array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 3]), 
-  array([0, 1, 3, 4]), array([1, 2, 3, 5]), array([1, 3, 4, 5]), array([2, 3, 5, 6]), array([3, 5, 6, 8]), 
-  array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), 
-  array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
-  array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], 
-[array([0, 1, 2, 5]), array([0, 1, 4, 5]), array([0, 2, 3, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), 
-    array([2, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), 
-    array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), 
-    array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), 
-    array([1, 4, 5, 6])], [array([0, 1, 2, 3]), array([0, 1, 3, 4]), array([1, 2, 3, 4]), array([2, 3, 4, 5]), 
-    array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), 
-    array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), 
-    array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
-    array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 4]), array([0, 2, 3, 5]), array([0, 2, 4, 5]), 
-    array([0, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 7]), array([2, 5, 7, 8]), array([0, 2, 3, 8]), 
-    array([0, 2, 6, 7]), array([0, 2, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), 
-    array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), 
-    array([0, 1, 2, 6]), array([1, 2, 4, 6]), array([2, 4, 5, 6])], [array([0, 1, 2, 5]), array([0, 1, 4, 5]), 
-    array([0, 2, 3, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), 
-    array([0, 2, 3, 6]), array([0, 3, 6, 8]), array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), 
-    array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), 
-    array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], [array([0, 1, 2, 5]), 
-    array([0, 1, 4, 5]), array([0, 2, 3, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), array([2, 5, 6, 7]), 
-    array([2, 5, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 7]), array([0, 2, 7, 8]), array([0, 1, 4, 7]), 
-    array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), array([4, 5, 6, 7]), 
-    array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 5, 6]), array([1, 4, 5, 6])], 
-[array([0, 1, 2, 4]), array([0, 2, 3, 5]), array([0, 2, 4, 5]), array([0, 3, 4, 5]), array([2, 3, 5, 8]), 
-    array([2, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 8]), array([0, 2, 6, 8]), array([0, 6, 7, 8]), 
-    array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), array([1, 4, 6, 7]), 
-    array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), array([1, 2, 4, 6]), 
-    array([2, 4, 5, 6])], [array([0, 1, 2, 4]), array([0, 2, 3, 5]), array([0, 2, 4, 5]), array([0, 3, 4, 5]), 
-    array([2, 3, 5, 6]), array([3, 5, 6, 8]), array([5, 6, 7, 8]), array([0, 2, 3, 6]), array([0, 3, 6, 8]), 
-    array([0, 6, 7, 8]), array([0, 1, 4, 7]), array([0, 1, 6, 7]), array([0, 3, 4, 8]), array([0, 4, 7, 8]), 
-    array([1, 4, 6, 7]), array([4, 5, 6, 7]), array([3, 4, 5, 8]), array([4, 5, 7, 8]), array([0, 1, 2, 6]), 
-    array([1, 2, 4, 6]), array([2, 4, 5, 6])]] "
 
 load (currentFileDirectory | "StringTorics/LineBundleCohomology.m2")
 
@@ -1008,31 +845,25 @@ restart
   installPackage "IntegerEquivalences" -- works, lots of warnings, 1 failure 4/30/2026
   installPackage "DanilovKhovanskii" -- 1 failure 4/30/2026
   installPackage "PALPInterface"
-  elapsedTime installPackage "StringTorics"  -- 44.4909s elapsed TODO: improve this!
-    -- now 60.4s on 26 Jan 2026, now 69 sec, 4/30/26.
+  elapsedTime installPackage "StringTorics"  -- 72 sec, 6/7/2026 
   
   check IntegerEquivalences -- 8 checks, finishes to completion, 1 takes 6.6 sec (now it takes 9.7 sec 4/30/2026)
   check "DanilovKhovanskii" -- 10 checks, finishes, 3 take some time (3.9sec, 4.9sec, 16.5 sec).  One test error (#8) (hmmm, I see 9 checks, not 10...)
     -- the error is because we use ReflexivePolytope...
   time check "StringTorics" -- used 53.257s (cpu); 23.9121s (thread); 0s (gc) (one uses 5 sec, 6.6 sec, 4.5 sec, 4.1 sec)) Now 68 sec... 
-  elapsedTime check "StringTorics" -- 39.87 sec.  
-    -- currently: 43 tests, finishes to completion.  Longest test: 6.2 sec
-    -- 4/30/2026: affineCircuits doesn't exist: renamed to flipCandidates in Triangulations.m2
-    -- however, one test seems to connect to KS database.
+  elapsedTime check "StringTorics" -- 78 sec, 6/7/2026
+    -- currently: 48 tests, finishes to completion.  Longest tests: 9.2, 7.1, 5.9 sec
+    -- works offline (so not accessing KS database).
 
-restart
-needsPackage "StringTorics"
-path = append(path, "......")
-needsPackage("StringTorics", FileName => "/Users/.../StringTorics.m2")
 restart
 uninstallPackage "StringTorics"
 restart
+needsPackage "StringTorics"
+restart
 installPackage "StringTorics"
 viewHelp oo
-
 restart
-needsPackage "StringTorics"
-check oo -- all tests currently check.
+check "StringTorics" 
 
 -- Generation of some examples
 L = kreuzerSkarke(20, Limit => 100, Access=>"wget")

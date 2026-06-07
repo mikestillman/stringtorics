@@ -1011,14 +1011,12 @@ doc ///
     Text
       We might want to check that these are indeed triangulations.
       I am not completely convinced that @TO topcomIsTriangulation@ always gives a
-      correct answer, so we also implement a slower routine @TO naiveIsTriangulation@.
+      correct answer, so we also need to implement an alternative function.
     Example
       starT = first select(Ts, t -> isStar(sq9,t))
-      naiveIsTriangulation(sq9, starT)
       topcomIsTriangulation(sq9, starT)
       notSq9 = matrix {{-1, -1, 1, 1, -1, 0, 0, 2, 0},
                     {-1, 1, -1, 1, 0, -1, 1, 0, 0}}
-      naiveIsTriangulation(notSq9, starT)
       topcomIsTriangulation(notSq9, starT)
       debug Triangulations
       isTriangulation(notSq9, starT)
