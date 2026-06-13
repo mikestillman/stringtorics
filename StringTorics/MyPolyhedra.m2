@@ -548,5 +548,35 @@ TEST /// -- of rawFourierMotzkin, vs FourierMotzkin package.
   assert(set entries transpose B1 === set entries transpose B1'')
 ///
 
+TEST /// -- annotatedFaces, given a list of points.
+ -- Idea: given a set of rays, we consider the first lattice point on each ray
+ --  and we take the convex hull of these points.
+ -- Then we compute P = convHull (these points).
+ -- Then we find the annotated faces of P.
+ -- Then we match the indices of vertices and lattice points of P with the given rays.
+ -- However, I'm not quite sure what the answer means when the polytope isn't reflexive...
+ -- So: each set of rays (i.e. all triangulations using these rays)
+ --   gives its own annotatedFaces.
+ needsPackage "StringTorics"
+ tope = (kreuzerSkarke 3)_75
+ Q = reflexive tope
+ rys = rays Q
+ rys = shuffle rys -- now let's say we want to use these directly...
+ Q = reflexive transpose matrix rys
+ rays Q -- different than rys
+ P = convexHull transpose matrix rys
+ vertices P
+ latticePoints P
+
+ P = polytope(Q, "N") 
+ 
+ netList annotatedFaces Q
+
+ transpose matrix rays Q
+ matrix{latticePoints P}
+ transpose matrix latticePointList P
+ transpose matrix latticePoints Q
+ transpose matrix rays Q
+ ///
 end--
 

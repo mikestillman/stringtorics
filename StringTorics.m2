@@ -38,6 +38,7 @@ export {
     "CYToolsCY3", -- we should have a superclass for CalabiYauInToric, CYToolsCY3
     "TopologicalDataOfCY3",
     "GVTable",
+    "GVRayTable",
     "CY3",
 
     ---------------------------------------------------------------------------
@@ -166,14 +167,17 @@ export {
     -- gvInvariants. Which do we really want to keep here?
     -- new code,  Rest will be removed?
     "gvInvariantsNew", -- rename to gvInvariants
+    "gvRayTable",
+    "gvCone",
     "extremalCurves",
     "displayRays",
-    "gvCone",
+    "moriCone",
+    "degreeLimit", -- helper function to get the stored degree limit
     "nilpotentCurves",
+
     "MoriConeCap",
     -- the below code for GV invariants will be removed?
     "gvInvariants",
-    --"gvCone",
     "partitionGVConeByGV",
     "classifyExtremalCurves",
     "extremalRayGVs",
@@ -188,7 +192,6 @@ export {
     "makeCY3",
     "negatedCurves",
     "performFlop",
-    "moriCone",
     
     -- remove these gvInvariant functions?
     "classifyExtremalCurve",

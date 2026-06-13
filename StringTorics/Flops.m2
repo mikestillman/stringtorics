@@ -92,9 +92,16 @@ makeCY3(ZZ, ZZ, RingElement, RingElement) := opts -> (h11val, h12val, L, F) -> (
     if opts.Label =!= null then X.cache.Label = opts.Label;
     X
     )
+
 makeCY3 CalabiYauInToric := opts -> X -> (
     makeCY3(hh^(1,1) X, hh^(1,2) X, c2Form X, cubicForm X,
-        GVTable => gvTable(X, DegreeLimit => opts.DegreeLimit),
+        GVTable => gvInvariantsNew(X, DegreeLimit => opts.DegreeLimit),
+        --gvTable(X, DegreeLimit => opts.DegreeLimit),
+        NegatedCurves => {}
+        ))
+makeCY3(CalabiYauInToric, GVTable) := opts -> (X, gvt) -> (
+    makeCY3(hh^(1,1) X, hh^(1,2) X, c2Form X, cubicForm X,
+        GVTable => gvt,
         NegatedCurves => {}
         ))
 
@@ -104,16 +111,67 @@ label CY3 := X -> X#Label
 negatedCurves = method()
 negatedCurves CY3 := X -> X.cache#NegatedCurves
 
+gvTable = method(Options => {DegreeLimit => 20, Heft => {}})
+gvTable CY3 := opts -> X -> X.cache#GVTable ?? null
+
+gvCone CY3 := Cone => opts -> X -> gvCone(gvTable X, negatedCurves X)
+
+extremalCurves CY3 := opts -> X -> (
+    -- WRITING THIS 13 Jun
+    -- method: take Mori cone (of non-zero GV's)
+    -- for each extremal ray of this cone, find the gv ray of this (OR the negated curve)
+    -- return a hashtable of (curve class) => {degree, type, gv's on (possibly negatived curve) ray}
+    if opts.Heft =!= null then error "this version cannot use a degree function";
+    C := gvCone X; -- consider negated curves
+    negs := set negatedCurves X;
+    GVT := gvTable X; 
+    curveclasses := entries transpose rays C;
+    H := new HashTable from for x in rays GVT list (
+        c := x#0;
+        if member(c, negs) then c = -c;
+        c => {x#1, x#2}
+        );
+    E := entries transpose rays C;
+    extremals := for c in E list (
+        rayC := H#c#1; -- list of GV invariants along ray of c.
+        typ := classifyExtremalCurveClass rayC;
+        c => {H#c#0, typ, take(H#c#1, opts.Limit)} -- take a max of opts.Limit values for each ray
+        );
+    hashTable extremals
+    );
+
+-- WRITING THIS 13 Jun
+flops = method()
+flops CY3 := X -> select(extremalCurves X, c -> c#2 === "FLOP") 
+
 -- TODO: store info in X?
 -- TODO: warn that these are the "generic" complex structure mori cone and nef cone.
-gvTable CY3 := opts -> X -> X.cache#GVTable
+-- Which of these do we need/use?
+gvRays = method()
+gvRay = method(Options => options gvInvariants)
+gvByRay = method()
+
+gvInvariantsAndCone = method(Options => options gvInvariants)
+partitionGVConeByGV = method(Options => options gvInvariants)
+classifyExtremalCurve = method()
+gvTopMoriConeCapDegree = method()
+classifyExtremalCurves = method(Options => {
+        Verbose => 0,
+        DegreeLimit => null,
+        MoriHilbertGens => null
+        })
+extremalRayGVs = method(Options => {Limit => 4, Heft => null})
+extremalCurveInvariant = method()
+isNilpotent = method()
+
+
+
 gvRays CY3 := X -> gvRays gvTable X
 gvRay(CY3, List) := opts -> (X, curve) -> (
     if member(-curve, negatedCurves X) then curve = -curve;
     (gvRays X)#curve ?? 0
     )
 
-  -- how to fix the above line: if the curve is a negated curve, negate it, then also check that that is in the table...
 moriCone CY3 := X -> moriCone(gvTable X, negatedCurves X)
 nefCone CY3 := X -> dualCone moriCone X
 isNilpotent(CY3, List) := (X, curve) -> isNilpotent(gvTable X, curve)
@@ -131,7 +189,13 @@ performFlop(CY3, List) := CY3 => opts -> (X, C) -> (
     F := cubicForm X;
     R := ring L;
     linform := sum for i from 0 to numgens R - 1 list C_i * R_i;
-    n := if opts#"GV" =!= null then opts#"GV" else first gvRay(X, C); -- TODO: what if multiple values on the ray?
+    H := hashTable for x in rays gvTable X list x#0 => {x#1, x#2};
+    thisray := if H#?C then H#C#1 -- #1 is the list of GV's along that ray
+         else if H#?(-C) then H#(-C)#1
+         else error "expected nonzero GV numbers along C or -C";
+    good := thisray#0 > 0 and all(drop(thisray, 1), a -> a == 0);
+    if not good then <<"WARNING: gvray has potentially a different GV value: " <<  thisray << endl;
+    n := first thisray;
     makeCY3(X#"h11", X#"h12", L + 2*n*linform, F - n * linform^3,
         Label => splice{X, {"flop via ", C}},
         GVTable => gvTable X,
@@ -253,9 +317,10 @@ end--
 -- load this in dir m2-examples.
 restart
 --load "../Flops.m2"
-load "~/utah/CYToolsM2/StringTorics/Flops.m2"
+needsPackage "StringTorics"
+--load "~/utah/CYToolsM2/StringTorics/Flops.m2"
   RZ = ZZ[a,b,c];
-  (Qs, Xs) = readCYDatabase("~/StringDatabases/cys-ntfe-h11-3.dbm", Ring => RZ);
+  (Qs, Xs) = readCYDatabase(databaseLOC | "/cy3-h11-3.dbm", Ring => RZ);
   #Qs
   #Xs
 

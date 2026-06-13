@@ -19,9 +19,14 @@ net GVTable := GVT -> (
 
 heft GVTable := List =>  GVT -> GVT.Heft
 
+GVRayTable = new Type of BasicList -- keys: curve classes, values: {degree, ray of GV values}
+net GVRayTable := gvrays -> (
+    x := for x in gvrays list {x#0, x#1#0, x#1#1};
+    netList(prepend({"Curve", "Degree", "GV"}, x), Boxes => false, HorizontalSpace => 1)
+    )
+
 degreeLimit = method()
 degreeLimit GVTable := GVT -> GVT.DegreeLimit
-
 
 -- GVRayTable = new Type of HashTable
 -- net GVRayTable := GVR -> (
@@ -190,26 +195,58 @@ displayRays GVTable := opts -> GVT -> (
     netList(prepend({"Curve", "Degree", "GV"}, v), Boxes => false, HorizontalSpace => 1)
     )
 
+gvRayTable = method()
+gvRayTable GVTable := GVRayTable => (GVT) -> (
+    GVT.cache.GVRayTable ??= new GVRayTable from for x in rays GVT list x#0 => {x#1, x#2}
+    )
+
+gvRayTable(GVTable, Set) := GVRayTable => (GVT, negatedCurveSet) -> (
+    if # negatedCurveSet === 0 then return gvRayTable GVT;
+    H := gvRayTable GVT;
+    new GVRayTable from for x in H list if member(x#0, negatedCurveSet) then {-x#0, x#1} else x
+    )
+
 -- Create the GV cone: want the extremal rays of the cone of all curve classes so far found that
 -- have non-zero GV.
 gvCone = method(Options => options gvInvariants)
-gvCone GVTable := opts -> GVT -> (
-    -- take1/2 or 1/4 of degree bound.  Compute cone.  If it lies on a hyperplane,
-    -- continue to larger size.
-    -- Let C be this cone.
-    -- for the rest of the curve classes (with higher degree), select the ones
-    -- that are not in C.
-    -- then create the new cone, returning either the cone, or a matrix whose columns are the
-    -- extremal elements of the cone.
+-- gvCone GVTable := opts -> GVT -> (
+--     -- take1/2 or 1/4 of degree bound.  Compute cone.  If it lies on a hyperplane,
+--     -- continue to larger size.
+--     -- Let C be this cone.
+--     -- for the rest of the curve classes (with higher degree), select the ones
+--     -- that are not in C.
+--     -- then create the new cone, returning either the cone, or a matrix whose columns are the
+--     -- extremal elements of the cone.
 
-    deglimit := degreeLimit GVT;
-    curves := GVT.cache.rays/first;
-    -- step 1.  Determine the degree to start with, then double the degree each time.
-    -- TODO: need to choose deg so that C is full dimensional, OR, use hyperplanes C below too
-    --  (the latter is probably best).
-    deg := ceiling((degreeLimit GVT)/4);
-    curveMatrix := transpose matrix curves;
-    currentcurves := positions(GVT.cache.rays, x -> x#1 <= deg); -- positions, not curves
+--     deglimit := degreeLimit GVT;
+--     curves := GVT.cache.rays/first;
+--     -- step 1.  Determine the degree to start with, then double the degree each time.
+--     -- TODO: need to choose deg so that C is full dimensional, OR, use hyperplanes C below too
+--     --  (the latter is probably best).
+--     deg := ceiling((degreeLimit GVT)/4);
+--     curveMatrix := transpose matrix curves;
+--     currentcurves := positions(GVT.cache.rays, x -> x#1 <= deg); -- positions, not curves
+--     C := posHull curveMatrix_currentcurves;
+--     H := halfspaces C;
+--     -- warning: still should consider hyperplanes C...
+--     remaining := positions(entries transpose matrix(H * curveMatrix), c -> any(c, a -> a < 0));
+--     while #remaining > 0 do (
+--         curveMatrix = curveMatrix_remaining;
+--         C = posHull((rays C) | curveMatrix);
+--         H = halfspaces C;
+--         remaining = positions(entries transpose matrix(H * curveMatrix), c -> any(c, a -> a < 0));
+--         deg = deg*2;
+--         );
+--     --GVT.cache.gvCone = entries transpose rays C;
+--     C
+--     )
+gvCone(GVRayTable, ZZ) := Cone => opts -> (gvr, deglimit) -> (
+    -- gvr is the result of gvRayTable(GVT, negatedCurveSet) or gvRayTable GVT.
+    -- deglimit is degreeLimit GVT.
+    curves := for x in gvr list x#0; -- these are already negated for "negated curves".
+    deg := ceiling((deglimit)/4);
+    curveMatrix := transpose matrix curves; -- CHANGE THIS LINE to include negated curves
+    currentcurves := positions(toList gvr, x -> x#1#0 <= deg); -- positions, not curves
     C := posHull curveMatrix_currentcurves;
     H := halfspaces C;
     -- warning: still should consider hyperplanes C...
@@ -221,9 +258,13 @@ gvCone GVTable := opts -> GVT -> (
         remaining = positions(entries transpose matrix(H * curveMatrix), c -> any(c, a -> a < 0));
         deg = deg*2;
         );
-    GVT.cache.gvCone = entries transpose rays C;
     C
     )
+gvCone(GVTable, Set) := opts -> (GVT, negatedCurveSet) -> ( -- TODO: ops to be used where?
+    gvr := gvRayTable(GVT, negatedCurveSet);
+    gvCone(gvr, degreeLimit GVT)
+    )
+gvCone GVTable := Cone => opts -> GVT -> gvCone(gvRayTable GVT, degreeLimit GVT, opts)
 
 -- local function, I think?
 classifyExtremalCurveClass = method()
@@ -242,12 +283,29 @@ classifyExtremalCurveClass List := rayC -> (
     )
 
 extremalCurves = method(Options => {Limit => 4, Heft => null})
-extremalCurves GVTable := opts -> GVT -> (
-    -- TODO? stash extremal curves, and their GV rays (at least first 4 values).
-    -- can recreate the degrees, and also the classification, but keep: extremal curve => gvray values.
+-- extremalCurves GVTable := opts -> GVT -> (
+--     -- TODO? stash extremal curves, and their GV rays (at least first 4 values).
+--     -- can recreate the degrees, and also the classification, but keep: extremal curve => gvray values.
+--     if opts.Heft =!= null then error "this version cannot use a degree function";
+--     H := new HashTable from for x in rays GVT list x#0 => {x#1, x#2};
+--     E := entries transpose rays gvCone GVT;
+--     extremals := for c in E list (
+--         rayC := H#c#1; -- list of GV invariants along ray of c.
+--         typ := classifyExtremalCurveClass rayC;
+--         c => {H#c#0, typ, take(H#c#1, opts.Limit)} -- take a max of opts.Limit values for each ray
+--         );
+--     hashTable extremals
+--     )
+extremalCurves(GVTable, Set) := HashTable => opts -> (GVT, negatedCurveSet) -> (
+    -- WORKING ON THIS
+    -- result is a hashtable of:
+    -- (curve class) => {degree, type, GV list along ray}
     if opts.Heft =!= null then error "this version cannot use a degree function";
-    H := new HashTable from for x in rays GVT list x#0 => {x#1, x#2};
-    E := entries transpose rays gvCone GVT;
+    gvr := gvRayTable(GVT, negatedCurveSet);
+    H := hashTable gvr;
+    --H := gvRayTable(GVT, negatedCurveSet);
+    -- H := new HashTable from for x in rays GVT list x#0 => {x#1, x#2};
+    E := entries transpose rays gvCone(gvr, degreeLimit GVT);
     extremals := for c in E list (
         rayC := H#c#1; -- list of GV invariants along ray of c.
         typ := classifyExtremalCurveClass rayC;
@@ -255,6 +313,9 @@ extremalCurves GVTable := opts -> GVT -> (
         );
     hashTable extremals
     )
+extremalCurves GVTable := HashTable => opts -> GVT -> extremalCurves(GVT, set{}, opts)
+
+-- Keep this, but we will need to change its name (Jun 13)
 -- The following requires the extremal curves, fills in the GV info for these classes.
 extremalCurves(CalabiYauInToric, List) := opts -> (X, curveClasses) -> (
     if not isFavorable X then return null; -- later, maybe we can modify this...
@@ -274,12 +335,12 @@ extremalCurves(CalabiYauInToric, List) := opts -> (X, curveClasses) -> (
     )
 
 nilpotentCurves = method()
-nilpotentCurves GVTable := GVT -> (
-  for x in rays GVT list (
-      thisray := x#2;
+nilpotentCurves GVRayTable := GVR -> (
+  for x in GVR list (
+      thisray := x#1#1;
       if (#thisray >= 4 and thisray#-1 == 0 and thisray#-2 == 0 )
       or (#thisray <= 3 and thisray#-1 == 0)
-      then {x#0, x#1, take(x#2, 4)}  else continue
+      then {x#0, x#1#0, take(x#1#1, 4)}  else continue
       )
   )
 
@@ -293,10 +354,22 @@ nilpotentCurves GVTable := GVT -> (
 
 -- also partition the extremal curve classes by first 2 values of the gv ray?
 
+moriCone = method()
+moriCone(GVTable, Set) := Cone => (gvTable, negatedCurveSet) -> (
+    -- We take the primitive curves in the table, negate the ones that need negating,
+    -- and make the cone of all these
+    gvr := gvRayTable(gvTable, negatedCurveSet);
+    curves := transpose matrix for x in gvr list x#0;
+    posHull curves
+    )
+moriCone GVTable := Cone => gvTable -> moriCone(gvTable, set{})
+
 ------------------------------
 -- end of new code May 2026 --
 ------------------------------
 
+end--
+-- BUT: keep perhaps some of the stuff below!!
 
 -- REMOVE THIS?
 -- The function to write the data needed by the computeGV program
@@ -639,7 +712,7 @@ classifyExtremalCurves CalabiYauInToric := opts -> X -> (
     partition(c -> classifyExtremalCurve(gvX, c, deglimit, degvec), mori)
     )
 
--- Good one here, I think.
+-- Good one here, I think. (OLD COMMENT!)
 extremalRayGVs = method(Options => {Limit => 4, Heft => null})
 extremalRayGVs(CalabiYauInToric, List) := opts -> (X, curveClass) -> (
     if not isFavorable X then return null; -- later, maybe we can modify this...
@@ -748,6 +821,7 @@ gvTable CalabiYauInToric := GVTable => opts -> X -> (
 gvRays = method()
 gvRays GVTable := gvTable -> gvTable.GVRays
 
+-* REMOVE ME.  Older version using older GVTable type...
 moriCone = method()
 moriCone(GVTable, List) := Cone => (gvTable, negatedCurves) -> (
     -- We take the primitive curves in the table, negate the ones that need negating,
@@ -757,7 +831,7 @@ moriCone(GVTable, List) := Cone => (gvTable, negatedCurves) -> (
     curves := matrix transpose for c in primcurves list if negatedCurves#?c then -c else c;
     posHull curves
     )
-
+*-
 
 -- TODO: use the GV code to do these rays directly?  Is that possible?
 -- gvRay(GVTable, List) := opts -> (gvTable, curve) -> (
