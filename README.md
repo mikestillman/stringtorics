@@ -1,15 +1,16 @@
 # stringtorics
 
 The package **StringTorics** is ready to use, even though it is being actively worked on.
-If you run across bugs, 
+If you run across bugs, please let me know (mes15@cornell.edu)
 
 The package **IntegerEquivalences** is pretty much usable, although one example and test fail.
+
+The package **PALPInterface** is in its infancy.  It doesn't interface to too many
+routines in the PALP package, although this month at ESI, I hope that will change!
 
 The package **DanilovKhovanskii** is still being debugged and cleaned up.  Do **not**
 trust results from this package without checking them!
 
-The package **PALPInterface** is in its infancy.  It doesn't interface to too many
-routines in the PALP package, although this month at ESI, I hope that will change!
 
 # Installing StringTorics
 
@@ -19,15 +20,17 @@ For instructions, see https://github.com/Macaulay2/M2/wiki
 Second, download, or checkout, the repository
   https://github.com/mikestillman/stringtorics
 via
-  `git clone https://github.com/mikestillman/stringtorics`
+```m2
+git clone https://github.com/mikestillman/stringtorics
+```
 
 Second, change into the stringtorics directory, and run M2.
 ```
-cd stringtorics`
-`m2`
+cd stringtorics
+M2
 ```
 
-Now install StringTorics as follows
+Now (inside running M2), install StringTorics as follows
 
 ```m2
 installPackage "StringTorics"
