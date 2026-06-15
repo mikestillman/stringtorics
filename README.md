@@ -26,31 +26,9 @@ cd stringtorics
 
 ```
 
-At this point, run M2, and run the following commands to install, check, or view the documentation.
-    You may follow these instructions replacing `StringTorics` with `IntegerEquivalences`, or `PALPInterfac`.
-    (or even `DanilovKhovanskii`, but recall that it hasn't been checked carefull for correctness yet!).
-
-```
-M2
-```
-
-Now (inside running M2), install StringTorics as follows
-
-```m2
-installPackage "StringTorics"
-```
-
-You can check that it is correct with 
-```m2
-check needsPackage "StringTorics"
-```
-
-You then can use it (and `IntegerEquivalences`, and `PALPInterface`)
-by doing (inside M2, as above):
-
-```m2
-needsPackage "StringTorics"
-```
+At this point, use `installThese.m2`: run each line of this file to install all of these packages
+(leave out `DanilovKhovanskii`, recalling that it hasn't been checked carefull for correctness yet!).
+StringTorics doesn't currently depend on it.
 
 For examples and documentation (which we are improving during this month!)
 please try (inside M2, as above):

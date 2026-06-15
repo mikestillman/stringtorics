@@ -24,10 +24,12 @@ check "PALPInterface"
 -- To get GV invariants going, compile the code in ComputeGV
 -- and place computeGV on your PATH.
 
--- to install DanilovKhovanskii
+-- to install DanilovKhovanskii (warning: although all examples and tests install and check,
+-- this package has not been well tested!  Also the interface will change, perhaps
+-- even this month at ESI)
 restart
 uninstallPackage "DanilovKhovanskii"
 restart
 installPackage "DanilovKhovanskii"
 restart
-check "DanilovKhovanskii"  -- one error (hash table has wrong class) 3/5/26.
+check "DanilovKhovanskii"
