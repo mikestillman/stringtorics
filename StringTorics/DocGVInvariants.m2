@@ -360,12 +360,11 @@ doc ///
       A @TT "GVTable"@ also stores the degree limit and heft vector used
       in the computation.
 
-      Create one using @TO gvTable@.  Access the ray data via @TO gvRays@
-      and @TO gvRay@.
+      Create one using @TO gvTable@.  Access the ray data via @TO gvRayTable@.
   SeeAlso
     gvTable
-    gvRays
-    gvRay
+    gvRayTable
+    GVRayTable
 ///
 
 "doc" -- disabled
@@ -406,14 +405,12 @@ doc ///
           ID => 7)
       R = ZZ[a,b,c];
       X = makeCY(Q, PicardRing => R, ID => 0)
-      G = gvTable(X, DegreeLimit => 10)
-      gvRays G
+      G = gvInvariantsNew(X, DegreeLimit => 10)
+      gvRayTable G
   Caveat
     Requires {\tt computeGV} when called on a CalabiYauInToric.
   SeeAlso
     GVTable
-    gvRays
-    gvRay
     gvInvariants
 ///
 
@@ -690,7 +687,7 @@ doc ///
 
       The following methods are available for @TT "CY3"@ objects:
       @TO (c2Form, CY3)@, @TO (cubicForm, CY3)@,
-      @TO (gvTable, CY3)@, @TO (gvRays, CY3)@, @TO (gvRay, CY3, List)@,
+      @TO (gvTable, CY3)@, @TO (gvRayTable, CY3)@,
       @TO (negatedCurves, CY3)@, @TO (moriCone, CY3)@,
       @TO (performFlop, CY3, List)@.
   SeeAlso
@@ -861,32 +858,37 @@ doc ///
       c2Form X3
       cubicForm X3
       -- Find a nilpotent (floppable) curve
-      nilps = select(keys gvRays X3, c -> isNilpotent(X3, c))
-      if #nilps > 0 then (
-          C := first nilps;
-          X3' := performFlop(X3, C);
-          c2Form X3'
-          )
+      E = extremalCurves X3
+      floppable = for k in keys E list if E#k#1 === "FLOP" then k else continue
+      C = first floppable;
+      X3' = performFlop(X3, C);
+      c2Form X3'
+      cubicForm X3'
   Caveat
     The curve class $C$ must be primitive (content 1).
   SeeAlso
     CY3
     makeCY3
     negatedCurves
-    isNilpotent
+    extremalCurves
 ///
 
 doc ///
   Key
     moriCone
     (moriCone, CY3)
-    (moriCone, GVTable, List)
+    (moriCone, GVTable, Set)
+    (moriCone, GVTable)
   Headline
     the Mori cone of a CY3, accounting for flopped curves
   Usage
     C = moriCone X3
+    C = moriCone(GVT, negatedCurvesSet)
   Inputs
     X3:CY3
+    GVT:GVTable
+    negatedCurvesSet:Set
+      of curve classes that have been flopped
   Outputs
     C:Cone
   Description

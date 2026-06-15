@@ -296,8 +296,27 @@ extremalCurves = method(Options => {Limit => 4, Heft => null})
 --         );
 --     hashTable extremals
 --     )
+extremalCurves(GVRayTable, ZZ) := HashTable => opts -> (GVR, deglimit) -> (
+    -- result is a hashtable of:
+    -- (curve class) => {degree, type, GV list along ray}
+    if opts.Heft =!= null then error "this version cannot use a degree function";
+    H := hashTable GVR;
+    E := entries transpose rays gvCone(GVR, deglimit);
+    extremals := for c in E list (
+        rayC := H#c#1; -- list of GV invariants along ray of c.
+        typ := classifyExtremalCurveClass rayC;
+        c => {H#c#0, typ, take(H#c#1, opts.Limit)} -- take a max of opts.Limit values for each ray
+        );
+    hashTable extremals
+    )
 extremalCurves(GVTable, Set) := HashTable => opts -> (GVT, negatedCurveSet) -> (
-    -- WORKING ON THIS
+    GVR := gvRayTable(GVT, negatedCurveSet);
+    deglimit := degreeLimit GVT;
+    extremalCurves(GVR, deglimit)
+    )
+
+-*
+-- WORKING ON THIS
     -- result is a hashtable of:
     -- (curve class) => {degree, type, GV list along ray}
     if opts.Heft =!= null then error "this version cannot use a degree function";
@@ -313,6 +332,8 @@ extremalCurves(GVTable, Set) := HashTable => opts -> (GVT, negatedCurveSet) -> (
         );
     hashTable extremals
     )
+*-
+
 extremalCurves GVTable := HashTable => opts -> GVT -> extremalCurves(GVT, set{}, opts)
 
 -- Keep this, but we will need to change its name (Jun 13)
@@ -343,6 +364,11 @@ nilpotentCurves GVRayTable := GVR -> (
       then {x#0, x#1#0, take(x#1#1, 4)}  else continue
       )
   )
+
+flopCurves = method()
+flopCurves GVRayTable := GVR -> (
+    error "not implemented yet"
+    )
 
 -- Also stash the value?  Yes!
 -- gvCone CalabiYauInToric := Cone => opts -> X -> (

@@ -114,8 +114,22 @@ negatedCurves CY3 := X -> X.cache#NegatedCurves
 gvTable = method(Options => {DegreeLimit => 20, Heft => {}})
 gvTable CY3 := opts -> X -> X.cache#GVTable ?? null
 
-gvCone CY3 := Cone => opts -> X -> gvCone(gvTable X, negatedCurves X)
+gvRayTable CY3 := GVRayTable => X -> X.cache.GVRayTable ??= gvRayTable(gvTable X, set negatedCurves X)
+gvCone CY3 := Cone => opts -> X -> gvCone(gvRayTable X, degreeLimit gvTable X)
+extremalCurves CY3 := opts -> X -> extremalCurves(gvRayTable X, degreeLimit gvTable X)
+moriCone CY3 := Cone => X -> moriCone(gvTable X, set negatedCurves X)
+nefCone CY3 := Cone => X -> dualCone moriCone X
 
+findGVEquivalence = method()
+findGVEquivalence(CY3, CY3) := Matrix => (X1, X2) -> (
+    -- returns null or an integer matrix which maps the GV data to the GV data and the
+    -- topology of X1 also to that of X2.
+    error "not yet re-implemented";
+    extreme1 := extremalCurves X1;
+    extreme2 := extremalCurves X2;
+    )
+
+-*
 extremalCurves CY3 := opts -> X -> (
     -- WRITING THIS 13 Jun
     -- method: take Mori cone (of non-zero GV's)
@@ -139,6 +153,7 @@ extremalCurves CY3 := opts -> X -> (
         );
     hashTable extremals
     );
+*-
 
 -- WRITING THIS 13 Jun
 flops = method()
@@ -162,19 +177,17 @@ classifyExtremalCurves = method(Options => {
         })
 extremalRayGVs = method(Options => {Limit => 4, Heft => null})
 extremalCurveInvariant = method()
-isNilpotent = method()
+--isNilpotent = method()
 
 
 
-gvRays CY3 := X -> gvRays gvTable X
-gvRay(CY3, List) := opts -> (X, curve) -> (
-    if member(-curve, negatedCurves X) then curve = -curve;
-    (gvRays X)#curve ?? 0
-    )
+-- gvRays CY3 := X -> gvRays gvTable X
+-- gvRay(CY3, List) := opts -> (X, curve) -> (
+--     H := hashTable gvRayTable X;
+--     H#?curve ?? {0,0,0,0}
+--     )
 
-moriCone CY3 := X -> moriCone(gvTable X, negatedCurves X)
-nefCone CY3 := X -> dualCone moriCone X
-isNilpotent(CY3, List) := (X, curve) -> isNilpotent(gvTable X, curve)
+--isNilpotent(CY3, List) := (X, curve) -> isNilpotent(gvTable X, curve)
     
 performFlop = method(Options => {"GV" => null})
 performFlop(CY3, List) := CY3 => opts -> (X, C) -> (
@@ -189,10 +202,13 @@ performFlop(CY3, List) := CY3 => opts -> (X, C) -> (
     F := cubicForm X;
     R := ring L;
     linform := sum for i from 0 to numgens R - 1 list C_i * R_i;
-    H := hashTable for x in rays gvTable X list x#0 => {x#1, x#2};
-    thisray := if H#?C then H#C#1 -- #1 is the list of GV's along that ray
-         else if H#?(-C) then H#(-C)#1
-         else error "expected nonzero GV numbers along C or -C";
+    H := hashTable gvRayTable X;
+    if not H#?C then error "expected to flop along a curve with non-zero GV";
+    thisray := last H#C;
+    -- H := hashTable for x in rays gvTable X list x#0 => {x#1, x#2};
+    -- thisray := if H#?C then H#C#1 -- #1 is the list of GV's along that ray
+    --      else if H#?(-C) then H#(-C)#1
+    --      else error "expected nonzero GV numbers along C or -C";
     good := thisray#0 > 0 and all(drop(thisray, 1), a -> a == 0);
     if not good then <<"WARNING: gvray has potentially a different GV value: " <<  thisray << endl;
     n := first thisray;

@@ -22,8 +22,8 @@ newPackage(
             "Topcom",
             "Triangulations",
             "InverseSystems",
-            "IntegerEquivalences",
-            "PALPInterface"
+            "IntegerEquivalences"
+--            "PALPInterface"
             },
         PackageImports => {
             "LLLBases"

@@ -41,8 +41,8 @@ TEST /// -- tests flop code that is in GVInvariants (i.e. doesn't refer to CY3 d
   elapsedTime GVT = gvInvariantsNew(X, DegreeLimit => 12);
 
   -- gvRayTable looks good.
-  h = gvRayTable GVT
-  assert instance(h, GVRayTable)
+  GVR = gvRayTable GVT
+  assert instance(GVR, GVRayTable)
   hashTable gvRayTable GVT
   assert(gvRayTable(GVT, set{}) === gvRayTable GVT)
   gvRayTable(GVT, set{{-1,1,0}})
@@ -51,7 +51,7 @@ TEST /// -- tests flop code that is in GVInvariants (i.e. doesn't refer to CY3 d
   C0 = gvCone GVT
   C1 = gvCone(GVT, set {})
   C2 = gvCone(GVT, set{{-1,1,0}})
-  C1' = gvCone(gvRayTable(GVT), degreeLimit GVT)
+  C1' = gvCone(GVR, degreeLimit GVT)
   assert(C0 == C1)
   assert(C1' == C1)
   rays C1
@@ -61,6 +61,7 @@ TEST /// -- tests flop code that is in GVInvariants (i.e. doesn't refer to CY3 d
   extremalCurves(GVT)
   extremalCurves(GVT, set{})
   extremalCurves(GVT, set{{-1,1,0}})
+  extremalCurves(GVR, degreeLimit GVT)
 
   C1 = moriCone GVT -- doesn't exist
   rays (C1' = moriCone(GVT, set{})) -- OK
@@ -89,21 +90,42 @@ TEST ///
 
   X1 = makeCY3(X, DegreeLimit => 16)
   assert instance(gvTable X1, GVTable)
-  extremalCurves X1 -- not working yet.
-
+  extremalCurves X1
+  rays gvCone X1
+  rays moriCone X1
   -- Now let's do a flop.  There are 2 that can be done from X: {-1,1,0}, and {1,2,-1}.
 
   X2 = performFlop(X1, {-1,1,0})
   moriCone X2
   rays oo
-  extremalCurves X2  -- fails
+  extremalCurves X2
 
+  X3 = performFlop(X1, {1,2,-1})
+  extremalCurves X3
 
+  extremalCurves X2
+  X4 = performFlop(X2, {-1,-1,1})
+  extremalCurves X4
+  
+  extremalCurves X2
+  X5 = performFlop(X2, {0,3,-1})
+  extremalCurves X5
+
+  extremalCurves X3
+  X6 = performFlop(X3, {-1,-2,1})
+  extremalCurves X6
+
+  extremalCurves X4
+
+  X6 = performFlop(X3, {-1,-2,1})
+  extremalCurves X6
+
+  
   makeCY3(X1, DegreeLimit => 20) -- can't change the degree yet...
   extremalCurves X1
   flops X1
 
-
+  
   
   X1 = makeCY3(X, GVT)
   X1 = makeCY3(X, GVTable => GVT) -- X a CalabiYauInToric
@@ -112,7 +134,7 @@ TEST ///
   
   flops X1 -- list of (extremal) curve classes that are flops curves.
   extremalCurves gvTable X1 -- {curve class, deg, gvs, classificaiton}
-  nilpotentCurves gvTable X1
+--  nilpotentCurves gvTable X1
     
   performFlop X1
 
