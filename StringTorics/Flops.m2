@@ -94,7 +94,7 @@ makeCY3(ZZ, ZZ, RingElement, RingElement) := opts -> (h11val, h12val, L, F) -> (
 
 makeCY3 CalabiYauInToric := opts -> X -> (
     makeCY3(hh^(1,1) X, hh^(1,2) X, c2Form X, cubicForm X,
-        GVTable => gvInvariantsNew(X, DegreeLimit => opts.DegreeLimit),
+        GVTable => gvInvariants(X, DegreeLimit => opts.DegreeLimit),
         --gvTable(X, DegreeLimit => opts.DegreeLimit),
         NegatedCurves => {}
         ))

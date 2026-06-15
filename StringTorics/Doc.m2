@@ -790,7 +790,7 @@ for k in sort keys Qs list elapsedTime findAllFRVTs Qs#k -- these work for h11=2
     Example
       M1 = matrix"-1,0,0,0;2,1,0,0;2,0,1,0;2,0,0,1"
       for a in {0,0,0}..{3,3,3} list a => hh^*(OO_X(-1,a#0,a#1,a#2))
-      GV = gvInvariantsNew(X, DegreeLimit => 10);
+      GV = gvInvariants(X, DegreeLimit => 10);
       hh^*(OO_X(-1,2,2,2))
       hh^*(OO_X(-1,2,2,3))
       hh^*(OO_X(-2,2,2,2))

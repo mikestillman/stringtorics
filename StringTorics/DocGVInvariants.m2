@@ -24,7 +24,7 @@ doc ///
       @SUBSECTION "Computing GV invariants"@
     Text
       @UL {
-          TO (gvInvariantsNew, CalabiYauInToric),
+          TO (gvInvariants, CalabiYauInToric),
           TO (rays, GVTable),
           TO (displayRays, GVTable),
           TO (gvCone, GVTable),
@@ -80,18 +80,18 @@ doc ///
 
 doc ///
   Key
-    gvInvariantsNew
-    (gvInvariantsNew, CalabiYauInToric)
-    (gvInvariantsNew, NormalToricVariety, List)
-    [gvInvariantsNew, Mori]
-    [gvInvariantsNew, DegreeLimit]
-    [gvInvariantsNew, Heft]
-    [gvInvariantsNew, Precision]
+    gvInvariants
+    (gvInvariants, CalabiYauInToric)
+    (gvInvariants, NormalToricVariety, List)
+    [gvInvariants, Mori]
+    [gvInvariants, DegreeLimit]
+    [gvInvariants, Heft]
+    [gvInvariants, Precision]
   Headline
     compute Gopakumar-Vafa invariants of a Calabi-Yau 3-fold hypersurface
   Usage
-    GV = gvInvariantsNew X
-    GV = gvInvariantsNew(V, basisIndices)
+    GV = gvInvariants X
+    GV = gvInvariants(V, basisIndices)
   Inputs
     X:CalabiYauInToric
     V:NormalToricVariety
@@ -123,7 +123,7 @@ doc ///
           {{-1,-1,-1,-1},{-1,-1,-1,0},{-1,-1,0,2},
            {-1,0,-1,-1},{0,-1,-1,-1},{1,-1,0,-1},{1,2,2,2}})
       X = makeCY Q
-      GV = gvInvariantsNew(X, DegreeLimit => 10)
+      GV = gvInvariants(X, DegreeLimit => 10)
     Text
       The output consists of curve classes (list of integers), the heft degree of the curve,
       and its Gopakumar-Vafa invariant (a repackaging of Gromov-Witten numbers).
@@ -405,7 +405,7 @@ doc ///
           ID => 7)
       R = ZZ[a,b,c];
       X = makeCY(Q, PicardRing => R, ID => 0)
-      G = gvInvariantsNew(X, DegreeLimit => 10)
+      G = gvInvariants(X, DegreeLimit => 10)
       gvRayTable G
   Caveat
     Requires {\tt computeGV} when called on a CalabiYauInToric.

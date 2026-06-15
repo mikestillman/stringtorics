@@ -10,7 +10,7 @@ TEST /// -- WORKING ON THIS ONE, AND OTHER GV invariants code
       ID => 7)
   R = ZZ[a,b,c];
   X = makeCY(Q, PicardRing => R, ID => 0);
-  elapsedTime GVT = gvInvariantsNew(X, DegreeLimit => 12);
+  elapsedTime GVT = gvInvariants(X, DegreeLimit => 12);
   GVT
   rays GVT
   displayRays GVT
@@ -38,7 +38,7 @@ TEST /// -- tests flop code that is in GVInvariants (i.e. doesn't refer to CY3 d
       ID => 7)
   R = ZZ[a,b,c];
   X = makeCY(Q, PicardRing => R, ID => 0);
-  elapsedTime GVT = gvInvariantsNew(X, DegreeLimit => 12);
+  elapsedTime GVT = gvInvariants(X, DegreeLimit => 12);
 
   -- gvRayTable looks good.
   GVR = gvRayTable GVT
@@ -86,7 +86,7 @@ TEST ///
       ID => 7)
   R = ZZ[a,b,c];
   X = makeCY(Q, PicardRing => R, ID => 0);
-  elapsedTime GVT = gvInvariantsNew(X, DegreeLimit => 12);
+  elapsedTime GVT = gvInvariants(X, DegreeLimit => 12);
 
   X1 = makeCY3(X, DegreeLimit => 16)
   assert instance(gvTable X1, GVTable)
@@ -164,7 +164,7 @@ TEST ///
   lab = allXs#19 -- allXs#18: likely infinite flop chains: 17, 18, (not 15, 16).
   X = Xs#lab 
   heft X
-  GVT = gvInvariantsNew(X, DegreeLimit => 40);
+  GVT = gvInvariants(X, DegreeLimit => 40);
   displayRays(GVT, "OneOnly" => true)
   -- rays gvCone GVT
   extremalCurves GVT

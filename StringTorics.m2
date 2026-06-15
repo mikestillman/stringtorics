@@ -166,7 +166,7 @@ export {
         
     -- gvInvariants. Which do we really want to keep here?
     -- new code,  Rest will be removed?
-    "gvInvariantsNew", -- rename to gvInvariants
+    "gvInvariants",
     "gvRayTable",
     "gvCone",
     "extremalCurves",
@@ -174,30 +174,37 @@ export {
     "moriCone",
     "degreeLimit", -- helper function to get the stored degree limit
     "nilpotentCurves",
+    "GVs", -- field in GVTable hash table
 
     "MoriConeCap",
+
     -- the below code for GV invariants will be removed?
-    "gvInvariants",
+    -- this code is only now used in CYTools.m2
     "partitionGVConeByGV",
+    "gvInvariantsAndCone",
+
+-*    
     "classifyExtremalCurves",
     "extremalRayGVs",
-    "GVs", -- field in GVTable hash table
     "gvByRay", -- should this be private?
-    "gvTable",
     "gvRays",
     "gvRay",
+*-    
+    "gvTable",
     "isNilpotent",
 
     -- CY3: flopping via curves
     "makeCY3",
     "negatedCurves",
     "performFlop",
-    
+
+-*    
     -- remove these gvInvariant functions?
     "classifyExtremalCurve",
-    "gvInvariantsAndCone",
+
     "findLinearMaps",
-    
+*-
+
     -- Invariants
     "hubschInvariants",
     "PointCounter",
@@ -240,7 +247,6 @@ export {
     "LinearForm",
     "Basis",
     
-
     -- Creating databases of polytopes (with precomputed data).
     "hodgeNumbers", -- of KSEntry: gives (h11, h12) from KSEntry.  Should be in ReflexivePolytopesDB?
     "createCYDatabaseFiles",
@@ -357,6 +363,7 @@ CYPolytope = new Type of HashTable
 CalabiYauInToric = new Type of HashTable
 CY3 = new Type of HashTable 
 CompleteIntersectionInToric = new Type of HashTable
+CYToolsCY3 = new Type of HashTable
 
 LineBundle = new Type of HashTable
 
@@ -845,15 +852,14 @@ restart
   uninstallAllPackages()
 
 restart
-  installPackage "IntegerEquivalences" -- works, lots of warnings, 1 failure 4/30/2026
-  installPackage "DanilovKhovanskii" -- 1 failure 4/30/2026
+  -- all 4 packages install cleanly and check cleanly 15 June 2026.
+  installPackage "IntegerEquivalences" 
+  installPackage "DanilovKhovanskii" 
   installPackage "PALPInterface"
   elapsedTime installPackage "StringTorics"  -- 72 sec, 6/7/2026 
   
   check IntegerEquivalences -- 8 checks, finishes to completion, 1 takes 6.6 sec (now it takes 9.7 sec 4/30/2026)
-  check "DanilovKhovanskii" -- 10 checks, finishes, 3 take some time (3.9sec, 4.9sec, 16.5 sec).  One test error (#8) (hmmm, I see 9 checks, not 10...)
-    -- the error is because we use ReflexivePolytope...
-  time check "StringTorics" -- used 53.257s (cpu); 23.9121s (thread); 0s (gc) (one uses 5 sec, 6.6 sec, 4.5 sec, 4.1 sec)) Now 68 sec... 
+  check "DanilovKhovanskii" -- 10 checks, finishes, 3 take some time (3.9sec, 4.9sec, 16.5 sec).
   elapsedTime check "StringTorics" -- 78 sec, 6/7/2026
     -- currently: 48 tests, finishes to completion.  Longest tests: 9.2, 7.1, 5.9 sec
     -- works offline (so not accessing KS database).

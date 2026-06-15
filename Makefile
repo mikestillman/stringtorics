@@ -1,4 +1,5 @@
-M2=~/src/M2-worktree/computegv/M2/BUILD/mike/builds.tmp/arm64-appleclang/M2
+#You may change M2 to point to the executable M2 on your machine, e.g. M2=/opt/homebrew/bin/M2
+M2=M2
 
 install:
 	$(M2) -e 'uninstallAllPackages()' -e 'exit 0'

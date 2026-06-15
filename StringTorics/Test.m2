@@ -1744,10 +1744,10 @@ TEST ///
   hh^(1,2) T
 
   
-  extremalCurves(gvInvariantsNew(X, DegreeLimit => 10))
-  extremalCurves(gvInvariantsNew(X, DegreeLimit => 20))
-  extremalCurves(gvInvariantsNew(X, DegreeLimit => 30))
-  hilbertBasis gvCone(gvInvariantsNew(X, DegreeLimit => 10))
+  extremalCurves(gvInvariants(X, DegreeLimit => 10))
+  extremalCurves(gvInvariants(X, DegreeLimit => 20))
+  extremalCurves(gvInvariants(X, DegreeLimit => 30))
+  hilbertBasis gvCone(gvInvariants(X, DegreeLimit => 10))
 
   -- test of gvInvariants
   debug StringTorics  
@@ -1758,12 +1758,12 @@ TEST ///
   assert all(curvedegs, w -> w > 0)
 
   -- remove this test?
-  H = gvInvariantsNew(V, basisIndices Q, DegreeLimit => 10)
+  H = gvInvariants(V, basisIndices Q, DegreeLimit => 10)
   for k in H.GVs list dotProduct(k#0, heft H)
   assert all(oo, d -> d > 0)
 
   -- Put more asserts into here.
-  H2 = gvInvariantsNew(X, DegreeLimit => 10)
+  H2 = gvInvariants(X, DegreeLimit => 10)
   assert(H === H2)
   degreeLimit H2
   heft H2
@@ -1788,7 +1788,7 @@ TEST ///
   X = Xs#0
 
   debug StringTorics
-  elapsedTime H2 = gvInvariantsNew(X, DegreeLimit => 12);
+  elapsedTime H2 = gvInvariants(X, DegreeLimit => 12);
   degreeLimit H2
   heft H2
 
@@ -1821,7 +1821,7 @@ TEST ///
       -- here we test all of the cases.
       X := Xs#lab;
       if not isFavorable X then continue;
-      gvt := gvInvariantsNew(X, DegreeLimit => 20);
+      gvt := gvInvariants(X, DegreeLimit => 20);
 
       C := gvCone gvt;
       << lab << "  " << rays C << endl;
@@ -1847,7 +1847,7 @@ TEST ///
 
   X = Xs#(165,0)
   assert isFavorable X
-  gvt = gvInvariantsNew(X, DegreeLimit => 80);
+  gvt = gvInvariants(X, DegreeLimit => 80);
   gvt
   displayRays gvt
   
@@ -1869,7 +1869,7 @@ TEST ///
       -- here we test all of the cases.
       X := Xs#lab;
       if not isFavorable X then continue;
-      (gvs, degvec, moric) := gvInvariantsNew(X, DegreeLimit => 8);
+      (gvs, degvec, moric) := gvInvariants(X, DegreeLimit => 8);
       assert all(moric, c -> dotProduct(c, degvec) > 0);
       curveclasses = gvs/first;
       degs = apply(curveclasses, c -> dotProduct(c, degvec));
@@ -1927,7 +1927,7 @@ TEST ///
   hilbertBasis toricMoriCone X
 
   -- TODO: add tests about this
-  gvInvariantsNew(X, DegreeLimit => 10)
+  gvInvariants(X, DegreeLimit => 10)
   gvRayTable oo
   -- TODO: add tests for line bundles on X, and their cohomology.
 ///
