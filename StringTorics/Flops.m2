@@ -71,7 +71,6 @@
 
 -- TODO: move this def to StringTorics? Is this similar to another class?
 -- This one contains GV information and flopped curves info.
-CY3 = new Type of HashTable 
 
 makeCY3 = method(Options => {
         GVTable => null, -- of the original, toric, hypersurface

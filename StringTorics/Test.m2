@@ -1812,12 +1812,6 @@ TEST ///
   RZ = ZZ[a,b,c]
   (Qs, Xs) = readCYDatabase(DB3, Ring => RZ);
 
-  -- for lab in sort keys Xs list (
-  --   << lab << endl;
-  --   try gvInvariants(Xs#lab, DegreeLimit => 10) then lab else continue
-  --   )
-  -- set keys Xs - set oo
-
   debug StringTorics
   elapsedTime for lab in sort keys Xs list lab => (
       -- if lab === (115, 0) then (
@@ -1829,8 +1823,8 @@ TEST ///
       if not isFavorable X then continue;
       gvt := gvInvariantsNew(X, DegreeLimit => 20);
 
-      (C, degs) := gvCone gvt;
-      << lab << "  " << rays C << " and degs " << degs << endl;
+      C := gvCone gvt;
+      << lab << "  " << rays C << endl;
       -- what to test here about gvt?
       --curveclasses = gvt/first;
       --assert all(moric, c -> dotProduct(c, degvec) > 0);
@@ -1869,12 +1863,6 @@ TEST ///
   DB4 = databaseLOC | "/cy3-h11-4.dbm"
   RZ = ZZ[a,b,c,d]
   (Qs, Xs) = readCYDatabase(DB4, Ring => RZ);
-
-  elapsedTime for lab in sort keys Xs list (
-    --<< lab << endl;
-    try gvInvariants(Xs#lab, DegreeLimit => 10) then lab else continue
-    )
-  -- set keys Xs - set oo
 
   debug StringTorics
   elapsedTime for lab in sort keys Xs list lab => (
@@ -1938,9 +1926,9 @@ TEST ///
   rays toricMoriCone X
   hilbertBasis toricMoriCone X
 
-  --TODO: reinstate this test
-  --gvInvariants(X, DegreeLimit => 10)
-
+  -- TODO: add tests about this
+  gvInvariantsNew(X, DegreeLimit => 10)
+  gvRayTable oo
   -- TODO: add tests for line bundles on X, and their cohomology.
 ///
 

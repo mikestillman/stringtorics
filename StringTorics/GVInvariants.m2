@@ -5,11 +5,6 @@
 -- This requires computing some information first (intersection numbers, mori cone cap, etc).
 ---------------------------------------
 
--- What ways do we have to present GV invariants?
--- 1. via each ray
--- 2. as a list curve => GV, together with DegreeLimit, Heft (degree vector).
-
--- A GVTable has 3 keys: GVRays, DegreeLimit, Heft (degree vector).
 GVTable = new Type of HashTable
 expression GVTable := GVT -> expression GVT.GVs
 net GVTable := GVT -> (
@@ -19,24 +14,14 @@ net GVTable := GVT -> (
 
 heft GVTable := List =>  GVT -> GVT.Heft
 
+degreeLimit = method()
+degreeLimit GVTable := GVT -> GVT.DegreeLimit
+
 GVRayTable = new Type of BasicList -- keys: curve classes, values: {degree, ray of GV values}
 net GVRayTable := gvrays -> (
     x := for x in gvrays list {x#0, x#1#0, x#1#1};
     netList(prepend({"Curve", "Degree", "GV"}, x), Boxes => false, HorizontalSpace => 1)
     )
-
-degreeLimit = method()
-degreeLimit GVTable := GVT -> GVT.DegreeLimit
-
--- GVRayTable = new Type of HashTable
--- net GVRayTable := GVR -> (
---     v := for c in GVT.GVs list {c#0, dotProduct(c#0, GVT.Heft), c#1};
---     netList(prepend({"Curve", "Degree", "GV"}, v), Boxes => false, HorizontalSpace => 1)
---     )
-
-
--- GVRays = new Type of HashTable
--- expression GVRays := GVT -> expression GVT.GVRays
 
 toricMoriCone(NormalToricVariety, List) := Cone => (V, basisIndices) -> (
     IV := intersectionRing (abstractVariety V);
