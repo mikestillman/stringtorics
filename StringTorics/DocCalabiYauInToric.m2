@@ -360,11 +360,6 @@ doc ///
       at h11=3 from the data base included with StringTorics.  The two hash tables
       returned have keys which are the labels of the resulting polytopes and
       CalabiYauInToric's.
-    Example
-      DB3 = databaseLOC | "/cy3-h11-3.dbm"
-      (Qs, Xs) = readCYDatabase(DB3, Ring => R);
-      keys Qs
-      keys Xs
   SeeAlso
     reflexivePolytope
     (findAllFRSTs, ReflexivePolytope)
