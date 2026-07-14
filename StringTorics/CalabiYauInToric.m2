@@ -183,7 +183,7 @@ max CalabiYauInToric := X -> X#"triangulation"
 -- We need to be consistent about these!
 -- TODO: do we really need this?
 triangulation CalabiYauInToric := Triangulation => opts -> X -> (
-    if not opts.Homogenize then error "Homogenize flag is not used in this method";
+    if opts.Homogenize =!= null then error "Homogenize flag is not used in this method";
     if not X.cache#?"triangulation" then (
         rys := X#"polytopeData"#"rays";
         d := #rys#0;

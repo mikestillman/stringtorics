@@ -263,7 +263,7 @@ combineAndSeparateByFindEquivalence TopologySet := opts -> T -> (
     Xs := T#"CYHash";
     defer := set opts.Defer; -- list of labels, which should be the first element of some elem in buckets
     result := for x in T#"Sets" list (
-        if member(x#0#0, defer) then x else combineAndSeparateBucketviaFE(x, Xs);
+        if member(x#0#0, defer) then x else combineAndSeparateBucketviaFE(x, Xs)
         );
     bads := result/last;
     result = result/first;
@@ -988,6 +988,37 @@ invariantsHessianSings(RingElement, RingElement, ZZ, ZZ) := (L, F, h11, h12) -> 
 invariantsHessianSings(CalabiYauInToric) := (X) -> (
     F := cubicForm X;
     invariantsHessianSings(c2Form X, F, hh^(1,1) X, hh^(1,2) X)
+    )
+
+invariantsOfCubic = method()
+invariantsOfCubic RingElement := (F) -> (
+    RZ := ring F;
+    if coefficientRing RZ =!= ZZ then 
+        error "expected c2 and cubic form ring to be a polynomial ring over ZZ";
+    RQ := QQ[gens RZ];
+    toQQ := F -> sub(F, vars RQ);
+    sing := (cod, I) -> trim(I + minors(cod, jacobian I));
+    linearcontent := (I) -> (
+        if I == 0 then return 0;
+        lins := select(I_*, f -> f != 0 and first degree f <= 1);
+        if #lins == 0 then return 0;
+        gcd for ell in lins list (trim content ell)_0
+        );
+    FQ := toQQ F;
+    inv1 := polynomialContent F;
+    -- dimension and degree of each component of the singular loci over QQ.
+    inv2 := sort for c in decompose sing_1 ideal FQ list {codim c, degree c};
+    inv4 := betti res saturate sing_1 ideal FQ;
+    conductF := integerPart saturate sing_1 ideal F;
+    inv6 := conductF;
+    inv8 := factorShape det hessian F;
+    inv9 := linearcontent saturate sing_1 F;
+    hashTable {"c(F)" => inv1, 
+     "comps sing FQ" => inv2, 
+     "conduct(F)" => inv6,
+     "hessian shape" => inv8,
+     "lincontent sing F" => inv9
+     }
     )
 
 invariantsAll CalabiYauInToric := X -> invariantsAll(c2Form X, cubicForm X, hh^(1,1) X, hh^(1,2) X)
