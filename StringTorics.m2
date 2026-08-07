@@ -175,12 +175,12 @@ export {
     "degreeLimit", -- helper function to get the stored degree limit
     "nilpotentCurves",
     "GVs", -- field in GVTable hash table
+    "partitionGVConeByGV",
 
     "MoriConeCap",
 
     -- the below code for GV invariants will be removed?
     -- this code is only now used in CYTools.m2
-    "partitionGVConeByGV",
     "gvInvariantsAndCone",
 
 -*    
@@ -393,6 +393,7 @@ cyPolytope = reflexivePolytope
 load (currentFileDirectory | "StringTorics/ReflexivePolytopes.m2")
 load (currentFileDirectory | "StringTorics/CalabiYauInToric.m2")
 load (currentFileDirectory | "StringTorics/IntersectionNumbers.m2")
+load (currentFileDirectory | "StringTorics/GVInvariants.m2")
 load (currentFileDirectory | "StringTorics/Invariants.m2")
 load (currentFileDirectory | "StringTorics/Topology.m2")
 load (currentFileDirectory | "StringTorics/ToricCompleteIntersections.m2") -- has some util code, but not much.  TODO: clean that up.
@@ -811,7 +812,6 @@ reflexiveToSimplicialToricVariety Polyhedron := opts -> (P1) -> (
     )
 
 
-load (currentFileDirectory | "StringTorics/GVInvariants.m2")
 load (currentFileDirectory | "StringTorics/Flops.m2")
 
 -- This file refers to many of the method names defined earlier, applied to CYToolsCY3

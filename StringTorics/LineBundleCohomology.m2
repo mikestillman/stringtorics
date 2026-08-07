@@ -572,6 +572,16 @@ hodgeDiamond CompleteIntersectionInToric := (X) -> (
         )
     )
 
+hodgeDiamond CalabiYauInToric := (X) -> (
+    -- Assumptions: X is smooth?
+    --  Certainly want: X is smooth.
+    -- if dimX <= 3, then we only need Omega1_X
+    -- if dimX == 4, then we can either use Omega2_X, or the topological Euler characteristic
+    dimX := dim X;
+    if dimX >= 4 then <<  "warning: not yet implemented for dimension >= 4, -1's mean not computed" << endl;
+    matrix for p from 0 to dim X list for q from 0 to dim X list hh^(p,q) X
+    )
+
 -- Ds are toric divisors in a toric variety
 -- Computes the cohomology vector of the intersection
 -- of these divisors.

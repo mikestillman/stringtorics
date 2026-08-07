@@ -131,7 +131,7 @@ rays GVTable := {} >> opts -> GVT -> (
         )
     )
 
-gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices) -> (
+gvInvariants(NormalToricVariety, List) := GVTable => opts -> (V, basisIndices) -> (
     -- TODO: check favorability??
     intersectionnums := for t in intersectionNumbersOfCY(V, basisIndices) list append(t#0, t#1);
     mori := if opts.Mori =!= null then 
@@ -146,7 +146,7 @@ gvInvariants(NormalToricVariety, List) := HashTable => opts -> (V, basisIndices)
     gvInvariants0(mori, heft, glsm, intersectionnums, opts)
     )
 
-gvInvariants CalabiYauInToric := Sequence => opts -> X -> (
+gvInvariants CalabiYauInToric := GVTable => opts -> X -> (
     if not isFavorable X then return null;
     intersectionnums := for t in intersectionNumbers X list append(t#0, t#1);
     mori := if opts.Mori =!= null then 
@@ -238,6 +238,25 @@ gvCone(GVTable, Set) := opts -> (GVT, negatedCurveSet) -> ( -- TODO: ops to be u
     gvCone(gvr, degreeLimit GVT)
     )
 gvCone GVTable := Cone => opts -> GVT -> gvCone(gvRayTable GVT, degreeLimit GVT, opts)
+
+partitionGVConeByGV = method(Options => options gvInvariants)
+-- partitionGVConeByGV CalabiYauInToric := HashTable => opts -> X -> (
+--     -- return null if we cannot computr GV invariants (i.e. if non-favorable).
+--     GVT := gvInvariants(X, opts);
+--     if GVT === null then return null;
+--     H := extremalCurves GVT;
+--     minngv := min for c in keys H list #H#c#2;
+--     partition(c -> take(H#c#2, minngv), keys H)
+--     )
+partitionGVConeByGV CalabiYauInToric := HashTable => opts -> X -> (
+    -- return null if we cannot computr GV invariants (i.e. if non-favorable).
+    GVT := gvInvariants(X, opts);
+    if GVT === null then return null;
+    gv := hashTable GVT.GVs; -- hash table: curve => value
+    C := posHull transpose matrix (keys gv);
+    gvX := entries transpose rays C;
+    partition(f -> gv#f ?? 0, gvX)
+    )
 
 -- local function, I think?
 classifyExtremalCurveClass = method()

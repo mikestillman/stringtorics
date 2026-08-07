@@ -23,8 +23,10 @@ TEST /// -- WORKING ON THIS ONE, AND OTHER GV invariants code
   curveGVs2 = extremalCurves(X, entries transpose rays C)
   assert(curveGVs === curveGVs2)
 
-  netList nilpotentCurves GVT
+  netList nilpotentCurves gvRayTable GVT
 
+  partitionGVConeByGV(X, DegreeLimit => 12)
+  partitionGVConeByGV(X, DegreeLimit => 7)
 ///
 
 -*

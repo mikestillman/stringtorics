@@ -166,7 +166,7 @@ gvRay = method(Options => options gvInvariants)
 gvByRay = method()
 
 gvInvariantsAndCone = method(Options => options gvInvariants)
-partitionGVConeByGV = method(Options => options gvInvariants)
+--partitionGVConeByGV = method(Options => options gvInvariants)
 classifyExtremalCurve = method()
 gvTopMoriConeCapDegree = method()
 classifyExtremalCurves = method(Options => {
