@@ -14,31 +14,82 @@ newPackage(
     )
 
 export {
-    "palpVertices","getVerticesFromWS", "getWSFromDim",
-    "stringToList", "linesToMatrix", "matrixToLines", 
-    "getPartitionInfo", "readPartitions", "formDivisor",
-    "getPolyhedralInfo",
-    "palpMatrix", "fromPalpMatrix", -- perhaps do not export these?
+    -- weight systems
+    "getWSFromDim",
+    "getVerticesFromWS",
+    "weightSystemPolytope",
+    
+    -- nef partition code
+    "palpNefPartitions",
+    "parsePALPNefPartitions",
+      --"getNefPartitionInfo",
+
+    -- normal form
     "normalForm",
+
+    -- some basic palp functions
+    "palpMVertices",
+    "palpMPoints",
+    "palpNVertices",
+    "palpNPoints",
+    --"palpVertices",
+
+    "stringToList",
+    --"getPartitionInfo", -- nef partition info from nef.x output
+    --"readPartitions",
+    "formDivisor",
+    "getPolyhedralInfo",
+    "toPalp",
+    "fromPalpMatrix",
     "runPoly", -- TODO: change name, or remove this function, once we understand output of PALP better.
     "runNEF",
-    "Normal",
-    "weightSystemPolytope"
+    "Normal"
     }
 
-POLYX = findProgram("poly.x", "poly.x -h")
+exportMutable {
+    "palpVerbosity"
+    }
 
--- translate Matrix into a String suitable for input to PALP
+palpVerbosity = 0
+
+POLYX = findProgram("poly.x", "poly.x -h")
+NEFX = findProgram("nef.x", "nef.x -h")
+CWSX = findProgram("cws.x", "cws.x -h")
+polyexe =  "!"|POLYX#"path"| POLYX#"name" -- Don't use this
+
+NEF11D = findProgram("nef-11d.x", "nef-11d.x -h")
+--programPaths#"poly.x" = executableDir; -- Don't use this.
+
+nextInt = 0 -- used as a hack for now to create file input names...
+
+runPALP = method()
+runPALP(Program, String, String) := (P, args, hereis) -> (
+    thisInt := nextInt;
+    nextInt = nextInt + 1;
+    filename := "run-palp"|thisInt;
+    filename << hereis << close;
+    result := runProgram(P, args | " " | filename);
+    if palpVerbosity > 1 then print result#"output";
+    result#"output"
+    )
+
+-- translate Matrix or a (combined) weight system list into a String suitable for input to PALP
 -- warning: often, the convex hull of the columns must be reflexive.
 -- we need to document when this is necessary
-palpMatrix = method()
-palpMatrix Matrix := String => M -> (
+-- Additionally, the matrix must satisfy that the polytope is full dimensional
+toPalp = method()
+toPalp Matrix := String => M -> (
     if ring M =!= ZZ then error "expected integer matrix";
     header := toString(numRows M | " " | numcols M);
     e := entries M;
     es := for e1 in e list for a in e1 list (toString a | " ");
     s := concatenate between("\n", es);
     header | "\n" | s | "\n"
+    )
+toPalp List := String => wlist -> (
+    w1 := for i in wlist list(toString(i)|" ");
+    w := concatenate(drop(w1,-1),toString(wlist_(-1)));
+    w = w | "\n"
     )
 
 -- From output of palp functions, we might need to grab only some of the lines
@@ -49,18 +100,50 @@ fromPalpMatrix String := Matrix => str -> (
     )
 
 normalForm = method()
-normalForm Matrix := Matrix => (M) -> (
-    "foo-normalForm-foo" << palpMatrix M << close;
-    cmd := " -N foo-normalForm-foo";
-    --cmd := " -N -t foo-normalForm-foo"; -- -t gives data it computes along the way.
-    result := runProgram(POLYX, cmd);
-    print result#"output";
-    matrix KSEntry result#"output"
+normalForm Matrix :=
+normalForm List := Matrix => M ->
+    fromPalpMatrix runPALP(POLYX, "-N", toPalp M)  -- -N: normal form
+
+getVerticesFromWS = method()
+getVerticesFromWS List := Matrix => wlist -> (
+    -- wlist is of the form {sum, a1, a2, a3, ..., an}
+    -- e.g. getVerticesFromWS {10,1,2,3,4}
+    w1 := for i in wlist list(toString(i)|" ");
+    w := concatenate(drop(w1,-1),toString(wlist_(-1)));
+    w = w | "\n";
+    fromPalpMatrix runPALP(POLYX, "-v", w)
     )
+
+palpMVertices = method()
+palpNVertices = method()
+palpMPoints = method()
+palpNPoints = method()
+
+palpMVertices Matrix := 
+palpMVertices List := Matrix => A -> 
+  fromPalpMatrix runPALP(POLYX, "-v", toPalp A)  -- -v: M-lattice vertices
+
+palpMPoints Matrix := 
+palpMPoints List := Matrix => A -> 
+  fromPalpMatrix runPALP(POLYX, "-p", toPalp A)  -- -p: M-lattice points
+  
+palpNVertices Matrix := 
+palpNVertices List := Matrix => A -> 
+  fromPalpMatrix runPALP(POLYX, "-e", toPalp A)  -- -v: N-lattice vertices
+
+palpNPoints Matrix := 
+palpNPoints List := Matrix => A -> (
+  output := runPALP(POLYX, "-d", toPalp A);  -- -d: N-lattice points
+  if output === "" then error "the convex hull of the given matrix is likely not reflexive (or there was some other error";
+  fromPalpMatrix output
+  )
+  
 
 ---------------------------
 -- Weight systems code ----
 ---------------------------
+
+-- this function doesn't seem to be correct at all?
 weightSystemPolytope = method()
 weightSystemPolytope List := (wts) -> (
     -- Note: wts#0 is the sum of the rest.
@@ -80,47 +163,17 @@ weightSystemPolytope List := (wts) -> (
     convexHull matrix{latticePoints P0}
     )
 
-getVerticesFromWS = method()
-getVerticesFromWS List := Matrix => wlist ->(
-    w1 := for i in wlist list(toString(i)|" ");
-    w := concatenate(drop(w1,-1),toString(wlist_(-1)));
-    
-    str1 := "!poly.x -v -r << FOO\n";
-    str2 := "\nFOO\n";
-    str3 := str1|w|str2;
-    PALPOutput := get str3;
-    L := lines PALPOutput;
-    L = drop(drop(L, 3), -2);
-    M := for ell in L list (
-        L0 := separate(" +", ell);
-        for x in L0 list if x!="" then value x else continue
-        );
-    if #M == 0 then return null;
-    matrix M)
-
-getVerticesFromWS(List, Nothing) := Matrix => wlist ->(
-    w1 := for i in wlist list(toString(i)|" ");
-    w := concatenate(drop(w1,-1),toString(wlist_(-1)));
-    
-    str1 := "!poly.x -v << FOO\n";
-    str2 := "\nFOO\n";
-    str3 := str1|w|str2;
-    PALPOutput := get str3;
-    L := lines PALPOutput;
-    << netList L << endl;
-    L = drop(drop(L, 3), -2);
-    M := for ell in L list (
-        L0 := separate(" +", ell);
-        for x in L0 list if x!="" then value x else continue
-        );
-    if #M == 0 then return null;
-    matrix M)
-
 getWSFromDim = method(Options => {Degrees => null})
 getWSFromDim ZZ := List => opts -> d -> (
     drange := opts.Degrees;
+    if drange =!= null then (
+        -- check consistency of opts.Degrees
+        if instance(drange, ZZ) then drange = {drange, drange};
+        if not instance(drange, BasicList) or #drange =!= 2 then error "expected Degrees => {lo, hi} or Degrees => deg";
+        if not all(drange, a -> instance(a, ZZ)) then error "expected list of integers";
+        );
     str0 := toString(d);
-    str1 := if opts.Degrees === null then "!cws.x -w"|str0
+    str1 := if drange === null then "!cws.x -w"|str0
     else "!cws.x -w"|str0|" "|toString(drange_0)|" "|toString(drange_1);
 
     PALPOutput := get str1;
@@ -133,7 +186,196 @@ getWSFromDim ZZ := List => opts -> d -> (
 	)
     )
 
+------------------------------
+-- NEF partition code --------
+------------------------------
+
+-- read the output of the nef partition code
+palpNefPartitions = method()
+palpNefPartitions(Matrix, ZZ) :=
+palpNefPartitions(List, ZZ) := (M, cod) -> (
+    runPALP(NEF11D, "-Lp -c"|cod, toPalp M)
+    )
+
+-- deprecate this.
+getNefPartitionInfo = method()
+getNefPartitionInfo(Matrix, ZZ) :=
+getNefPartitionInfo(List, ZZ) := String => (M, cod) -> (
+    runPALP(NEF11D, "-Lp -c"|cod, toPalp M)
+    )
+
+-- This needs some work, as it is not grabbing the entire parts in cod=3 (or higher).
+parsePALPNefPartitions = method()
+parsePALPNefPartitions String := output1 -> (
+    --reg1 := "V[0-9]*:([0-9 ]+ {1})";
+    reg1 := "V[0-9]*:([0-9 ]+ {1})";
+    for thisline in (lines output1) list (
+        regres := regex(reg1, thisline);
+        if not (regres === null) then (
+            << thisline << " " << thisline_(regres_1) <<"\n";
+            -- for eachparti in thisline_(regres_1) list (regex("^[0-9]$", eachparti))
+            stringToList(thisline_(regres_1))
+        )
+        else continue
+        )
+    )
+
+-- Remove this after parsePALPNefPartitions is working correctly.
+readPartitions = (output1) -> (
+    reg1 := "P:[0-9 ]+V:([0-9 ]+ {1})";
+    for thisline in (lines output1) list(
+        -- reg1 = "M:(.*)N(.*)codim(.*)part*";
+        
+        -- (for x in L0 list if x!="" then value x else continue)
+        regres := regex(reg1, thisline);
+        -- << "start: " << thisline;
+        -- << "reg: ";
+        -- << thisline;
+        -- << "\n";
+        -- -- if not (regres === null) then << regres;
+        -- << regex(reg1, thisline);
+        -- << "\n";
+        -- << "\n";
+        -- << output1_(219, 4);
+        if not (regres === null) then (
+            << thisline << " " << thisline_(regres_1) <<"\n";
+            -- for eachparti in thisline_(regres_1) list (regex("^[0-9]$", eachparti))
+            stringToList(thisline_(regres_1))
+        )
+        else continue
+    )
+)
+
+
+-- probably remove?
+runPoly = method()
+runPoly(Matrix, String) := String => (M, opts) -> (
+    "foo" << toPalp M << close;
+    cmd := " -" | opts | " foo";
+    result := runProgram(POLYX, cmd);
+    result#"output"
+    )
+
+-- probably remove?
+runNEF = method()
+runNEF(Matrix, String) := String => (M, opts) -> (
+    "foo" << toPalp M << close;
+    cmd := " -" | opts | " foo";
+    result := runProgram(NEFX, cmd);
+    result#"output"
+    )
+
+-- two versions here?
+-- keep these?
+getPolyhedralInfo = method(Options => {Normal => false})
+getPolyhedralInfo Matrix := opts -> M -> (
+    -- idea: create the matrix of M.
+    -- create the call to PALP
+    -- call PALP (poly.x here)
+    -- parse the output and return the answer as a hash table of desired info.
+    w := toPalp M;
+    -- this needs to be changed depending on desired info
+    str1 := "!poly.x -v  << FOO\n";
+    --str1 := " -v << FOO\n";
+    str2 := "\nFOO\n";
+    str3 := str1|w|str2;
+    PALPOutput := get str3;
+    -- the following obtains the matrix remaining after removing the given lines.
+    keeplines := select(lines PALPOutput, s -> (
+            not match("^Degrees", s) and not match("^Type", s) and not match("or", s)));
+    str := concatenate between("\n", keeplines);
+    matrix KSEntry str
+    )
+getPolyhedralInfo Matrix := opts -> M -> (
+    -- idea: create the matrix of M.
+    -- create the call to PALP
+    -- call PALP (poly.x here)
+    -- parse the output and return the answer as a hash table of desired info.
+    w := toPalp M;
+    -- this needs to be changed depending on desired info
+    str1 := "!poly.x -g  << FOO\n";
+    --str1 := " -v << FOO\n";
+    str2 := "\nFOO\n";
+    str3 := str1|w|str2;
+    PALPOutput := get str3;
+    return PALPOutput;
+    -- the following obtains the matrix remaining after removing the given lines.
+    keeplines := select(lines PALPOutput, s -> (
+            not match("^Degrees", s) and not match("^Type", s) and not match("or", s)));
+    str := concatenate between("\n", keeplines);
+    matrix KSEntry str
+    )
+
+stringToList = method()
+stringToList String := List => stemp -> (
+    L0 := separate(" +", stemp);
+    (for x in L0 list if x!="" then value x else continue)
+)
+
+
+-- TODO: What is this function doing?
+formDivisor = (V, partlist) -> (
+    raylist := rays V;
+    -- << # raylist;
+    -- -- << raylist_0;
+    -- << raylist;
+    -- << "\n";
+    -- << partlist;
+    -- << "\n";
+    fulllist := toList (0..(# raylist - 1));
+    partlist = reverse partlist;
+    complist := fulllist;
+
+    for thispart in partlist do complist = drop(complist, {thispart, thispart});
+    -- << complist;
+    D1list := for thispart in partlist list (V_thispart);
+    -- << "D1list: " << for thispart in partlist list ("V_"|toString(thispart));
+    D1 := sum(D1list);
+    -- << D1;
+    
+    D2list := for thispart in complist list (V_thispart);
+    -- << "D2list: " << for thispart in complist list ("V_"|toString(thispart));
+    D2 := sum(D2list);
+    -- << D2;
+
+    -- << isNef(D1);
+    -- << isNef(D2);
+    if not isNef(D1) then (<< "D1 false");
+    if not isNef(D2) then (<< "D2 false");
+    (D1, D2)
+    -- completeIntersection(V, {D1, D2})
+
+    -- test5 = (for thispart in partlist list drop(fulllist, {thispart, thispart}));
+    -- test5
+    -- complist = 
+    -- for thispart in partlist do << thispart;
+
+
+)
+
+-- Not using palp. Maybe: naiveNefPartitions...?
+-- anyway: this is codim=2 only...
+findNefPartitions = method()
+findNefPartitions(ZZ, NormalToricVariety) := (cod, V) -> (
+    subsetRays := subsets(splice{0..#rays V-1});
+    subsetRays = drop(subsetRays, 1); -- remove the empty set
+    subsetRays = drop(subsetRays, -1); -- remove the full set
+    partition(v -> isNef sum(v, i -> V_i), subsetRays, {true, false})
+    )
+
 beginDocumentation()
+
+doc ///
+Key
+  PALPInterface
+Headline
+  interface to the polyhedral program PALP
+Description
+  Text
+    The program PALP was designed by ... to help compute all reflexive polytopes in dimensions 3 and 4.
+    However, it has some generally useful functionality beyond that.  This package interfaces to that
+    functionality.
+///
 
 doc ///
   Key
@@ -174,70 +416,115 @@ doc ///
         assert isReflexive C
         nflll = normalForm lift(vertices B, ZZ)
         assert(nfverts == nflll)
+    Text
+        Let's compare two weight systems to see if they are the same.
+    Example
+        ws1 = {3402, 40, 41, 486, 1134, 1701}
+        ws2 = {3486, 41, 42, 498, 1162, 1743}
+        M1 = normalForm getVerticesFromWS ws1
+        M2 = normalForm getVerticesFromWS ws2
+        M1 == normalForm ws1
+        M2 == normalForm ws2
+        M1 == M2
   SeeAlso
     getWSFromDim
+    normalForm
 ///
-
-
-
-
-
-
-
-
-
-
-
 
 -*
   restart
   needsPackage "PALPInterface"
 *-
 TEST ///
-  -- test of palpMatrix, fromPalpMatrix
+  -- test of toPalp, fromPalpMatrix
   M = matrix{{1,1,1,1},{0,1,2,3}}
-  str1 = palpMatrix M
+  str1 = toPalp M
   assert(M == fromPalpMatrix str1)
 
-  str2 = palpMatrix transpose M
+  str2 = toPalp transpose M
   assert(transpose M == fromPalpMatrix str2)
 
   -- from smoothFanoToricVariety(3, 5)
   M = transpose matrix {{1, 0, 0}, {-1, 0, 1}, {0, 1, 0}, {0, -1, 1}, {0, 0, 1}, {0, 0, -1}}
-  assert(M == fromPalpMatrix palpMatrix M)
+  assert(M == fromPalpMatrix toPalp M)
 ///
 
+-*
+  restart
+  needsPackage "PALPInterface"
+*-
 TEST ///
-  needsPackage "ReflexivePolytopesDB"
+  -- test of palpNPoints, palpNVertices, palpMPoints, palpNpoints
+  ws = {10,1,2,3,4}
+  M = getVerticesFromWS ws
+
+  -- Do these work for non-reflexive polytopes?
+  mv = palpMVertices M -- default input is M lattice.
+  mp = palpMPoints M
+  nv = palpNVertices M
+  np = palpNPoints M
+
+  assert(M == mv)
+  assert(mv == palpMVertices ws)
+  mp == palpMPoints ws -- not the same order as mp! (At least generally).
+  assert(set entries mp === set entries palpMPoints ws)
+  assert(nv == palpNVertices ws)
+  np == palpNPoints ws -- true here, doesn't need to be.
+  assert(set entries np === set entries palpNPoints ws)
+///
+
+-*
+  restart
+  needsPackage "PALPInterface"
+*-
+TEST ///
   --needsPackage "QuillenSuslin"
-  --A = ZZ[x]
-  --completeMatrix matrix(A, {{6,10,3*26, 3*39}})
-  A = matrix {{6, 10, 78, 117}, {0, 3, 0, 35}, {0, 0, 1, 0}, {1, 0, 0, 0}}
+  -- A = ZZ[x]
+  -- A1 = completeMatrix matrix(A, {{6,10,3*26, 3*39}})
+  -- assert(A1 == matrix(A, {{6, 10, 78, 117}, {0, 3, 0, 35}, {0, 0, 1, 0}, {1, 0, 0, 0}}))
 
   -- another way to generate invertible integer matrices
   -- needsPackage "IntegerEquivalences"
   -- A = extendToMatrix {6,10,3*26, 3*39}
-  A = matrix {{0, 0, -3, 2}, {-5, 3, 0, 0}, {-3, -6, 1, 0}, {-3, -2, -1, 1}}  
 
-  M = matrix KSEntry "4 12  M:24 12 N:15 12 H:11,19 [-16] id:13
+  A = matrix {{0, 0, -3, 2}, {-5, 3, 0, 0}, {-3, -6, 1, 0}, {-3, -2, -1, 1}}  
+  M = fromPalpMatrix "4 12  M:24 12 N:15 12 H:11,19 [-16] id:13
    1   0   0   1   1  -1   0  -2   4  -2   0   2
    0   1   0   0  -1   0   0   3  -4   1  -1  -3
    0   0   1  -1   0   0   0   1  -4   3  -1  -3
    0   0   0   0   0   0   1  -1   1  -1   1   1
    "
+   assert(numrows M == 4 and numcols M == 12)
    assert(normalForm M == M)
    assert(normalForm (A*M) == M)
 ///
 
 TEST ///
+-- This test is not quote correct yet.  weightSystemPolytope returns a polytope with full dim?
   -- this polytope is in a hyperplane in one higher dimension...
+  vertices convexHull matrix{latticePoints polar weightSystemPolytope{10, 1,2,3,4}}
+  normalForm lift(oo, ZZ)
+
+    normalForm getVerticesFromWS{10, 1,2,3,4}
+  assert(oo == ooo)
+
+
+  ws = {30, 4, 4, 6, 7, 9}
+  vertices convexHull matrix{latticePoints polar weightSystemPolytope ws}
+  normalForm lift(oo, ZZ)
+  normalForm getVerticesFromWS ws
+  assert(oo == ooo)
+
   P = polar weightSystemPolytope {3,1,1,1}
+
   vertices P
   isReflexive P
   assert(#latticePoints P == 10)
   --assert(vertices P == matrix(QQ, {{2, -1, -1}, {-1, 2, -1}, {-1, -1, 2}})) -- TODO: need better test here.
   vertices polar P
 
+  normalForm getVerticesFromWS({3,1,1,1})
+  
   -- TODO: what are these really supposed to be?
   getVerticesFromWS({10,1,2,3,4})
   Q = polar weightSystemPolytope {10,1,2,3,4}
@@ -245,36 +532,91 @@ TEST ///
   latticePoints Q
 ///
 
+-*
+  restart
+  needsPackage "PALPInterface"
+*-
+TEST ///
+  -- which operations are fine with non-reflexive polytopes?
+  M = transpose matrix{{1,-1,-1}, {1,-1,1}, {1,1,-1}, {1,1,2}, {-1,0,0}}
+  P = convexHull M
+  isReflexive P
+  vertices polar P
+  interiorLatticePoints P -- this is an IP polytope...
+  -- Now, let's see what palp does with this
+
+  nM = normalForm M
+  Mpermuted = M_{4,1,3,0,2} 
+  basechange = nM_{0,1,2} * (Mpermuted_{0,1,2} ** QQ)^-1
+  basechange = lift(basechange, ZZ)
+  assert(nM == basechange * M_{4,1,3,0,2})
+
+  -- anyway, normalForm seems to be fine here.
+  assert(palpMVertices M == M)
+  assert(numcols palpMPoints M == # latticePoints convexHull M)
+  assert(set entries transpose palpMPoints M === set entries transpose matrix {latticePoints convexHull M})
+
+  -- how about N? Yes, the equtions are different though!  They are equations over ZZ, but have an extra column
+  -- POSSIBLE TODO: handle the output in a different way?
+  vertices polar convexHull M
+  palpNVertices M
+
+  -- lattice points inside the dual doesn't work though...
+  ans = trap palpNPoints M
+  assert(ans#0 === null and instance(ans#1, Error))
+///
+
+
+-*
+-- XXX
+  restart
+  needsPackage "PALPInterface"
+*-
+TEST /// -- nef partition code
+  -- first, let's do codim=2
+  ws = {10, 1, 1, 2, 2, 2, 2}
+  M = getVerticesFromWS ws
+  -- want nef partitions from this
+  debug PALPInterface -- getNefPartitionInfo not there yet.
+  palpNefPartitions(ws, 2)
+  parsePALPNefPartitions oo
+
+
+  palpNefPartitions(ws, 2)
+  parsePALPNefPartitions oo  
+  palpNefPartitions(ws, 3)
+  parsePALPNefPartitions oo
+  
+  getNefPartitionInfo(M, 2)
+  elapsedTime getNefPartitionInfo(ws, 2) -- not so cheap (0.5 sec)
+
+  elapsedTime getNefPartitionInfo(ws, 3) -- not so cheap (0.5 sec)
+  readPartitions oo
+
+  ws = {5, 1, 1, 1, 1, 1, 0, 0,  10, 2, 2, 2, 2, 0, 1, 1}
+  elapsedTime getNefPartitionInfo(ws, 2)
+  readPartitions oo
+
+  -- codim=3 example
+  options getWSFromDim
+  wss = getWSFromDim(6, Degrees => {14,14})
+  getNefPartitionInfo({14, 1, 2, 2, 2, 2, 2, 3}, 3) -- can't do that with NEFX
+
+  runPALP(NEFX, "-Lp -c2", toPalp ws)
+    elapsedTime runPALP(NEFX, "-c2", toPalp ws)
+    elapsedTime runPALP(NEFX, "-p -c2", toPalp ws)
+    elapsedTime runPALP(NEFX, "-h", toPalp ws)
+    elapsedTime runPALP(NEFX, "-D -P -c2", toPalp ws)
+    elapsedTime runPALP(NEFX, "-y -c2", toPalp ws) -- has nontrivial nef partition.
+    elapsedTime runPALP(NEFX, "-H -c2", toPalp ws) -- display out the full Hodge diamond
+///
 ----------------------------------------------------------------------
 ----------------------------------------------------------------------
 --- Below this line has not been re-vetted ---------------------------
 --- Todo: get everything below this line back into the package
 ----------------------------------------------------------------------
 ----------------------------------------------------------------------
---programPaths#"PALP" = executableDir;
-PALP = findProgram("PALP", "poly.x -h")
 
---programPaths#"poly.x" = executableDir;
-NEFX = findProgram("nef.x", "nef.x -h")
-
-
-
-
-runPoly = method()
-runPoly(Matrix, String) := String => (M, opts) -> (
-    "foo" << palpMatrix M << close;
-    cmd := " -" | opts | " foo";
-    result := runProgram(POLYX, cmd);
-    result#"output"
-    )
-
-runNEF = method()
-runNEF(Matrix, String) := String => (M, opts) -> (
-    "foo" << palpMatrix M << close;
-    cmd := " -" | opts | " foo";
-    result := runProgram(NEFX, cmd);
-    result#"output"
-    )
 
 -*
   restart
@@ -284,16 +626,17 @@ TEST ///
   -- 3d reflexive example
   -- from smoothFanoToricVariety(3, 5)
   M = transpose matrix {{1, 0, 0}, {-1, 0, 1}, {0, 1, 0}, {0, -1, 1}, {0, 0, 1}, {0, 0, -1}}
-  assert(M == fromPalpMatrix palpMatrix M)
+  assert(M == fromPalpMatrix toPalp M)
   normalForm M
-  runPoly(M, "t")
+  runPoly(M, "t") -- t means give info about the normal form process.
+
   needsPackage "Polyhedra"
   P = convexHull M
   P' = polar P
   M1 = lift(vertices P', ZZ)
 
   M = transpose matrix {{1, 0, 0}, {-1, 0, 1}, {0, 1, 0}, {0, -1, 1}, {0, 0, 1}, {0, -1, -2}}
-  assert(M == fromPalpMatrix palpMatrix M)
+  assert(M == fromPalpMatrix toPalp M)
   normalForm M
   runPoly(M, "t")
 
@@ -354,63 +697,16 @@ TEST ///
   runPoly(2*M1, "G")
   ///
 
-nefPartitions = method()
-nefPartitions Matrix := M -> (
-    -- M should be the matrix whose columns are vertices of the reflexive polytope in N lattice.
-    
-    )
-getPolyhedralInfo = method(Options => {Normal => false})
-getPolyhedralInfo Matrix := opts -> M -> (
-    -- idea: create the matrix of M.
-    -- create the call to PALP
-    -- call PALP (poly.x here)
-    -- parse the output and return the answer as a hash table of desired info.
-    w := palpMatrix M;
-    -- this needs to be changed depending on desired info
-    str1 := "!poly.x -v  << FOO\n";
-    --str1 := " -v << FOO\n";
-    str2 := "\nFOO\n";
-    str3 := str1|w|str2;
-    PALPOutput := get str3;
-    -- the following obtains the matrix remaining after removing the given lines.
-    keeplines := select(lines PALPOutput, s -> (
-            not match("^Degrees", s) and not match("^Type", s) and not match("or", s)));
-    str := concatenate between("\n", keeplines);
-    matrix KSEntry str
-    )
-getPolyhedralInfo Matrix := opts -> M -> (
-    -- idea: create the matrix of M.
-    -- create the call to PALP
-    -- call PALP (poly.x here)
-    -- parse the output and return the answer as a hash table of desired info.
-    w := palpMatrix M;
-    -- this needs to be changed depending on desired info
-    str1 := "!poly.x -g  << FOO\n";
-    --str1 := " -v << FOO\n";
-    str2 := "\nFOO\n";
-    str3 := str1|w|str2;
-    PALPOutput := get str3;
-    return PALPOutput;
-    -- the following obtains the matrix remaining after removing the given lines.
-    keeplines := select(lines PALPOutput, s -> (
-            not match("^Degrees", s) and not match("^Type", s) and not match("or", s)));
-    str := concatenate between("\n", keeplines);
-    matrix KSEntry str
-    )
-
-
 -*
   restart
   needsPackage "PALPInterface"
   -- TEST of generating polytope from a weight system
-  -- XXX
 *-
 TEST ///
   needsPackage "Polyhedra"
 -- this polytope is in a hyperplane in one higher dimension...
   P2 = weightSystemPolytope {2,1,1}
   -- getVerticesFromWS {2,1,1}   -- hmm, this fails... too small?
-
 
   -- what is P??
   Q = convexHull getVerticesFromWS {3,1,1,1}
@@ -438,7 +734,7 @@ TEST ///
   vertices P
 
 ///
--- str = get "!poly.x -v -r << FOO
+-- str = get "!poly.x -v -r <<FOO
 -- 10 1 2 3 4
 -- FOO
 -- "
@@ -486,243 +782,15 @@ TEST ///
   normalForm M2
   normalForm M
   
-  getWSFromDim(4)
-
-wss = getWSFromDim(5, Degrees => (20,20))
-assert(#wss == 61)
-V = getVerticesFromWS wss_58
-needsPackage "Polyhedra"
-P = convexHull V
-isReflexive P
-latticePoints P
-isSimplicial polar P
+  wss = getWSFromDim(5, Degrees => (20,20))
+  assert(#wss == 61)
+  V = getVerticesFromWS wss_58
+  needsPackage "Polyhedra"
+  P = convexHull V
+  isReflexive P
+  latticePoints P
+  isSimplicial polar P
 ///
-
---matrix oo
---getVerticesFromWS "10 1 2 3 4"
---oo_0    
---oo/class
-
-
-stringToList = method()
-stringToList String := List => stemp -> (
-    L0 := separate(" +", stemp);
-    (for x in L0 list if x!="" then value x else continue)
-)
--- testwm8x5dw = stringToList("8 5")
-
-
-linesToMatrix = method()
-linesToMatrix String := Matrix => stemp -> (
---    << stemp;
-    L := lines stemp;
-    M := for ell in L list (
---	<< "line " << ell << "\n";
-	if ell == "" then continue;
-        stringToList(ell)
-        );
-    matrix M
-)
-
-
-
-
-matrixToLines = method()
-matrixToLines List := String => ll -> (
--- matrixToLines := ll -> (
-    res := "";
-    for ell in ll do (
-        respart := "\n";
-        for x in ell do respart = respart|toString(x)|" ";
-        -- << "eachline: " << respart << " \n";
-        res = res|respart;
-    );
-    res
-);
-
-
-
-getPartitionInfo = method()
-getPartitionInfo (ZZ, ZZ, ZZ) := String => (dimen, indexing, cod) -> (
-    V := smoothFanoToricVariety(dimen, indexing);
-    -- << rays V;
-    -- << # (rays V);
-    -- << dim V;
-    nrowcol := toString(# (rays V))|" "|toString(dim V);
-    -- << cod << " \n";
-    entrylines := matrixToLines(rays V);
-
-
-    -- cod, nrowcol, entrylines
---    commp1 := "!nef.x -N -c"|cod|" -p << FOO\n";
-    commp1 := "!nef.x -N -c"|cod|" << FOO\n";
-    commp3 := "\nFOO\n";
-    -- << commp1|nrowcol|entrylines|commp3;
-    test := get (commp1|nrowcol|entrylines|commp3);
-    -- << "result: ";
-    -- << test;
-
-    test
-)
-
-readPartitions = (output1) -> (
-    reg1 := "P:[0-9 ]+V:([0-9 ]+ {1})";
-    for thisline in (lines output1) list(
-        -- reg1 = "M:(.*)N(.*)codim(.*)part*";
-        
-        -- (for x in L0 list if x!="" then value x else continue)
-        regres := regex(reg1, thisline);
-        -- << "start: " << thisline;
-        -- << "reg: ";
-        -- << thisline;
-        -- << "\n";
-        -- -- if not (regres === null) then << regres;
-        -- << regex(reg1, thisline);
-        -- << "\n";
-        -- << "\n";
-        -- << output1_(219, 4);
-        if not (regres === null) then (
-            << thisline << " " << thisline_(regres_1) <<"\n";
-            -- for eachparti in thisline_(regres_1) list (regex("^[0-9]$", eachparti))
-            stringToList(thisline_(regres_1))
-        )
-        else continue
-    )
-)
-
--- TODO: What is this function doing?
-formDivisor = (V, partlist) -> (
-    raylist := rays V;
-    -- << # raylist;
-    -- -- << raylist_0;
-    -- << raylist;
-    -- << "\n";
-    -- << partlist;
-    -- << "\n";
-    fulllist := toList (0..(# raylist - 1));
-    partlist = reverse partlist;
-    complist := fulllist;
-
-    for thispart in partlist do complist = drop(complist, {thispart, thispart});
-    -- << complist;
-    D1list := for thispart in partlist list (V_thispart);
-    -- << "D1list: " << for thispart in partlist list ("V_"|toString(thispart));
-    D1 := sum(D1list);
-    -- << D1;
-    
-    D2list := for thispart in complist list (V_thispart);
-    -- << "D2list: " << for thispart in complist list ("V_"|toString(thispart));
-    D2 := sum(D2list);
-    -- << D2;
-
-    -- << isNef(D1);
-    -- << isNef(D2);
-    if not isNef(D1) then (<< "D1 false");
-    if not isNef(D2) then (<< "D2 false");
-    (D1, D2)
-    -- completeIntersection(V, {D1, D2})
-
-    -- test5 = (for thispart in partlist list drop(fulllist, {thispart, thispart}));
-    -- test5
-    -- complist = 
-    -- for thispart in partlist do << thispart;
-
-
-)
-
-findNefPartitions = method()
-findNefPartitions(ZZ, NormalToricVariety) := (cod, V) -> (
-    subsetRays := subsets(splice{0..#rays V-1});
-    subsetRays = drop(subsetRays, 1); -- remove the empty set
-    subsetRays = drop(subsetRays, -1); -- remove the full set
-    partition(v -> isNef sum(v, i -> V_i), subsetRays, {true, false})
-    )
-
-///
-  wss = getWSFromDim(5, Degrees => (10,10));
-  ws = wss_4
-  assert(ws == {10, 1, 1, 2, 2, 2, 2})
-  
-  A1 = getVerticesFromWS ws
-  A2 = lift(vertices polar convexHull A1, ZZ)
-  normalForm A1
-  normalForm A2
-  
-  myrays = entries transpose A1
-  annotatedFaces convexHull A2
-  convexHull A2
-  isReflexive oo
-
-  needsPackage "StringTorics"
-  Q = cyPolytope(A2, ID => 3)
-  findAllCYs Q;
-
-  P = convexHull A2
-  (verts, tri) = regularStarTriangulation(dim P - 2, P)
-  rays Q == verts
-  V = normalToricVariety(verts, tri, CoefficientRing => ZZ/101)
-  dim V
-  assert isSimplicial V
-  assert isSmooth V
-  assert isProjective V
-
-  dual monomialIdeal V
-
-  H = findNefPartitions(2, V)
-  oo#true
-  netList oo
-  for x in H#true list (
-      if #x >= 4 then continue;
-      other := sort toList ((set splice{0..#rays V - 1}) - set x);
-      if isNef(sum(other, i -> V_i)) then {x, other} else continue
-      )
-  
-  -- I want to take Delta(q), take a triuangulation of it.
-  -- Use that.  But I want the one with reasonably small h11...
-
-  matrix for x from -10 to 10 list for y from -4 to 4 list rank HH^0(V, OO_V (x,y))
-  matrix for x from -10 to 10 list for y from -4 to 4 list rank HH^1(V, OO_V (x,y))
-  matrix for x from -10 to 10 list for y from -4 to 4 list rank HH^2(V, OO_V (x,y))
-  matrix for x from -15 to 5 list for y from -10 to 4 list rank HH^3(V, OO_V (x,y))
-  matrix for x from -15 to 5 list for y from -10 to 4 list rank HH^4(V, OO_V (x,y))
-  matrix for x from -15 to 10 list for y from -10 to 0 list rank HH^5(V, OO_V (x,y))
-  ///
-
-
-
-
-
-
-
--- runPoly(Matrix, String) := (M, opts) -> (
---     "foo" << palpMatrix M << close;
---     cmd := "poly.x -" | opts | " foo";
---     runProgram(PALP, cmd)
---     )
-
--- runPoly(Matrix, String) := (M, opts) -> (
---     "foo" << palpMatrix M << close;
---     cmd := " -" | opts | " foo";
---     result := runProgram(POLYX, cmd);
---     matrix KSEntry result#"output"
---     )
-
-
-
--* Documentation section *-
-beginDocumentation()
-
-doc ///
-Key
-  PALPInterface
-Headline
-  interface to the polyhedral program PALP
-Description
-  Text
-    The program PALP was designed by ... to help compute all reflexive polytopes in dimensions 3 and 4.
-    However, it has some generally useful functionality beyond that.
-///
-
 
 -- template for doc nodes for methods/functions
 ///
@@ -900,11 +968,63 @@ TEST ///
   posHull transpose matrix degrees ring V
   rays oo
 ///
+
+
+///
+  wss = getWSFromDim(5, Degrees => (10,10));
+  ws = wss_4
+  assert(ws == {10, 1, 1, 2, 2, 2, 2})
+  
+  A1 = getVerticesFromWS ws
+  A2 = lift(vertices polar convexHull A1, ZZ)
+  normalForm A1
+  normalForm A2
+  
+  myrays = entries transpose A1
+  annotatedFaces convexHull A2
+  convexHull A2
+  isReflexive oo
+
+  needsPackage "StringTorics"
+  Q = cyPolytope(A2, ID => 3)
+  findAllCYs Q; -- FAILS: dim is too high
+
+  P = convexHull A2
+  (verts, tri) = regularStarTriangulation(dim P - 2, P)
+  rays Q == verts
+  V = normalToricVariety(verts, tri, CoefficientRing => ZZ/101)
+  dim V
+  assert isSimplicial V
+  assert isSmooth V
+  assert isProjective V
+
+  dual monomialIdeal V
+
+  H = findNefPartitions(2, V)
+  oo#true
+  netList oo
+  for x in H#true list (
+      if #x >= 4 then continue;
+      other := sort toList ((set splice{0..#rays V - 1}) - set x);
+      if isNef(sum(other, i -> V_i)) then {x, other} else continue
+      )
+  
+  -- I want to take Delta(q), take a triuangulation of it.
+  -- Use that.  But I want the one with reasonably small h11...
+
+  matrix for x from -10 to 10 list for y from -4 to 4 list rank HH^0(V, OO_V (x,y))
+  matrix for x from -10 to 10 list for y from -4 to 4 list rank HH^1(V, OO_V (x,y))
+  matrix for x from -10 to 10 list for y from -4 to 4 list rank HH^2(V, OO_V (x,y))
+  matrix for x from -15 to 5 list for y from -10 to 4 list rank HH^3(V, OO_V (x,y))
+  matrix for x from -15 to 5 list for y from -10 to 4 list rank HH^4(V, OO_V (x,y))
+  matrix for x from -15 to 10 list for y from -10 to 0 list rank HH^5(V, OO_V (x,y))
+  ///
+
 end--
 
 -* Development section *-
 restart
-debug needsPackage "PALPInterface"
+needsPackage "PALPInterface"
 check "PALPInterface"
 
 uninstallPackage "PALPInterface"
@@ -915,13 +1035,13 @@ viewHelp "PALPInterface"
 restart
 debug needsPackage "PALPInterface"
 M = matrix{{1,1,1,1},{0,1,2,3}}
-palpMatrix transpose M
+toPalp transpose M
 getPolyhedralInfo M
 getPolyhedralInfo transpose M
 
 
 
-"foo" << palpMatrix M << close
+"foo" << toPalp M << close
 runPoly(M, "v")
 normalForm M
 viewHelp runProgram
@@ -1033,17 +1153,6 @@ o31_100000
 
 
 
-restart
-needsPackage"PALPInterface"
-M = getVerticesFromWS("10 1 2 3 4")
-
-M2 = getVerticesFromWS("3 1 1 1 0 0 0  3 0 0 0 1 1 1")
-
-needsPackage "StringTorics"
-P = convexHull(M2)
-isReflexive P
-#latticePoints P
-
 
 ---------- nef-partitions ---------
 restart
@@ -1120,7 +1229,7 @@ needsPackage "PALPInterface"
 needsPackage "StringTorics"
 needsPackage "NormalToricVarieties"
 
-testinfo = getPartitionInfo(5, 6, 2)
+testinfo = getPartitionInfo(5, 6, 2) -- remove this line: this grabs from DB in toric varieties or polyhedra...
 Y = smoothFanoToricVariety(5, 6)
 testPartitionList = readPartitions(testinfo)
 -- (testD1, testD2) = formDivisor(smoothFanoToricVariety(5, 6), {4, 6, 7})
@@ -1131,3 +1240,18 @@ oo/(x -> (x/isNef))
 -- X = completeIntersection(testV, {D1, D2});
 X = completeIntersection(Y, toList divisorsList_0);
 hodgeDiamond X
+
+--- testing PALP calls with hereis docs in them.
+restart
+needsPackage "PALPInterface"
+
+M = getVerticesFromWS {10,1,2,3,4}
+normalForm M
+M2 = getVerticesFromWS {3,1,1,1,0,0,0, 3,0,0,0,1,1,1}
+normalForm M2
+
+P = convexHull(M2)
+assert isReflexive P
+assert(#latticePoints P == 100)
+
+
