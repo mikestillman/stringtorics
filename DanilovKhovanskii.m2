@@ -167,44 +167,44 @@ ehrhartNumeratorNaive Polyhedron := P -> (
     )
 
 ehrhartNumerator = method();
-ehrhartNumerator Polyhedron := P -> (
-    d := dim P;
-    Ps := for i from 1 to ceiling(d / 2) list i * P;
-    l := prepend(1, for i from 1 to ceiling(d / 2) list (
-	#latticePoints(Ps#(i - 1))
-	));
-    --The coefficients of the Ehrhart numerator of reflexive polytopes
-    --is symmetric: c_i = c_{d-i}.
-    if isReflexive P then (
-	hs1 := prepend(1, for i from 1 to ceiling(d / 2) list (
-	    sum for j from max(0, i - d - 1) to i list (-- print(i, j);
-	    	(-1)^(i - j) * binomial(d + 1, i - j) * l#(j)
-		)
-	    )
-	    );
-	hs2 := for i from ceiling(d / 2) + 1 to d list (
-	    hs1#(d - i)
-	    );
-	return join(hs1, hs2);
-	);
-    --Instead of using #latticePoints(i * P) for ceiling(d / 2) < i <= d,
-    --one can use #interiorLatticePoints(i * P) for 0 < i <= floor (d / 2).
-    lint := for i from 1 to floor(d / 2) list (
-	#interiorLatticePoints(Ps#(i - 1))
-	);
-    prepend(1, for i from 1 to d list (
-	if i <= ceiling(d / 2) then (
-	    sum for j from max(0, i - d - 1) to i list (-- print(i, j);
-		(-1)^(i - j) * binomial(d + 1, i - j) * l#(j)
-		)
-	    )
-	else (
-	    sum for j from max(1, i - d - 1) to d + 1 - i list (-- print(i, j);
-		(-1)^(d + 1 - i - j) * binomial(d + 1, d + 1 - i - j) * lint#(j - 1)
-		)		
-	    )
-	))
-    )
+-- ehrhartNumerator Polyhedron := P -> (
+--     d := dim P;
+--     Ps := for i from 1 to ceiling(d / 2) list i * P;
+--     l := prepend(1, for i from 1 to ceiling(d / 2) list (
+-- 	#latticePoints(Ps#(i - 1))
+-- 	));
+--     --The coefficients of the Ehrhart numerator of reflexive polytopes
+--     --is symmetric: c_i = c_{d-i}.
+--     if isReflexive P then (
+-- 	hs1 := prepend(1, for i from 1 to ceiling(d / 2) list (
+-- 	    sum for j from max(0, i - d - 1) to i list (-- print(i, j);
+-- 	    	(-1)^(i - j) * binomial(d + 1, i - j) * l#(j)
+-- 		)
+-- 	    )
+-- 	    );
+-- 	hs2 := for i from ceiling(d / 2) + 1 to d list (
+-- 	    hs1#(d - i)
+-- 	    );
+-- 	return join(hs1, hs2);
+-- 	);
+--     --Instead of using #latticePoints(i * P) for ceiling(d / 2) < i <= d,
+--     --one can use #interiorLatticePoints(i * P) for 0 < i <= floor (d / 2).
+--     lint := for i from 1 to floor(d / 2) list (
+-- 	#interiorLatticePoints(Ps#(i - 1))
+-- 	);
+--     prepend(1, for i from 1 to d list (
+-- 	if i <= ceiling(d / 2) then (
+-- 	    sum for j from max(0, i - d - 1) to i list (-- print(i, j);
+-- 		(-1)^(i - j) * binomial(d + 1, i - j) * l#(j)
+-- 		)
+-- 	    )
+-- 	else (
+-- 	    sum for j from max(1, i - d - 1) to d + 1 - i list (-- print(i, j);
+-- 		(-1)^(d + 1 - i - j) * binomial(d + 1, d + 1 - i - j) * lint#(j - 1)
+-- 		)		
+-- 	    )
+-- 	))
+--     )
 
 computeSumqeZ = method();--from 4.6 of Danilov and Khovanskii [though that may need a factor of (-1)^d in front of \psi_{d+1}(\Delta)]
 computeSumqeZ (Polyhedron, List, ZZ) := (P, psi, p) -> (
@@ -729,6 +729,95 @@ computeHodgeDeligneTorusCI List := Ps -> (
     (new HashTable from eZCI, eZtoric)
     )
 
+------- new code 7 Aug 2026 --------------------
+
+debug Core
+ourLatticePoints = method()
+ourLatticePoints(Matrix, Matrix) := (A, b) -> (
+    map(ZZ, rawLatticePointsNormaliz(raw A, raw b))
+    )
+
+QQt = null
+--ehrhartNumerator = method()
+ehrhartNumerator Polyhedron := List => P -> (
+    if QQt === null then QQt = QQ[getSymbol "t"];
+    d := dim P;
+    (M, b) := halfspaces P;
+    (M1, b1) := hyperplanes P;
+    M = M || M1 || (-M1);
+    b = b || b1 || (-b1);
+    M = lift(M, ZZ);
+    b = lift(b, ZZ);
+    t := QQt_0;
+    eseries := sum for i from 0 to d list (numcols ourLatticePoints(M, i*b)) * t^i;
+    g := (eseries * (1-t)^(d+1)) % t^(d+1);
+    for i from 0 to d list (
+        lift(coefficient(t^i, g), ZZ)
+        )
+    )
+
+///
+    P = convexHull transpose matrix {{1,1},{1,-1},{-1,1},{-1,-1}}
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(P)
+    eZ
+    eZbar
+    toeZMatrix eZ
+    eZ2hZ eZbar
+    topes = kreuzerSkarke 3;
+    Q = cyPolytope topes_50
+    (eZ, eZbar, eZcones) = computeHodgeDeligne(Q);
+    toeZMatrix eZbar
+
+
+
+
+map(ZZ, rawLatticePoints(raw A, raw b, 100000, 1000000))
+map(ZZ, rawLatticePointsNormaliz(raw A, raw b))
+
+restart
+needsPackage "DanilovKhovanskii"
+    A = transpose matrix {
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {0, 0, 1, 3},
+        {1, 1, 1, 1},
+        {1, 1, 1, 3},
+        {-1, -1, -3, -5},
+        {1, -1, 1, 1},
+        {-1, 1, 1, 1}}
+    A = transpose matrix {
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {0, 0, 1, 7},
+        {1, 1, 1, 1},
+        {1, 1, 1, 3},
+        {-1, -1, -3, -5},
+        {1, -1, 1, 1},
+        {-1, 1, 1, 1}}
+    P = convexHull A
+    ehrhartNumerator P
+
+    
+    # latticePoints P == 23
+    (M, b) = halfspaces P
+    M = lift(M, ZZ)
+    b = lift(b, ZZ)
+
+    numcols ourLatticePoints(M, 2*b)
+    numcols ourLatticePoints(M, 3*b)
+    numcols ourLatticePoints(M, 4*b)
+
+
+    Qt = QQ[t]
+    d = dim P
+    eseries = sum for i from 0 to d list (numcols ourLatticePoints(M, i*b)) * t^i
+    (eseries * (1-t)^(d+1)) % t^(d+1)
+    
+///
+
+------------------------------------------------
 
 -* Documentation section *-
 beginDocumentation()
@@ -1862,3 +1951,4 @@ uninstallPackage "DanilovKhovanskii"
 restart
 installPackage "DanilovKhovanskii"
 viewHelp "DanilovKhovanskii"
+
