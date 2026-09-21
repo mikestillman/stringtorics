@@ -1165,9 +1165,9 @@ Description
 Caveat
   PALP's time depends very much on the range.  With no upper bound, in dimension
   at most 4, it lists all weight systems using the algorithm of Kreuzer and
-  Skarke, and discards the degrees below @TT "lo"@ afterwards: for dimension 4,
+  Skarke, and discards the degrees below {\tt lo} afterwards: for dimension 4,
   that is all 184026 of them, of degrees 5 to 3486, in about three minutes,
-  whatever @TT "lo"@ is.  With a finite range it searches degree by degree, which
+  whatever {\tt lo} is.  With a finite range it searches degree by degree, which
   is fast for small degrees and slow for large ones: in dimension 4, degrees 5
   to 100 take a second or two, degrees 5 to 200 half a minute, and degree 3402
   alone more than half an hour.  In dimension 5 and higher, PALP requires a
