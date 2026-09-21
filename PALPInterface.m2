@@ -301,8 +301,25 @@ checkPalpInput List := q -> (
                 | toString(j-1) | " is 0 in all of them");
     )
 
--- everything that hands a polytope to PALP goes through this
-palpInput = A -> (checkPalpInput A; toPalp A)
+-- The first copy of each column.  PALP mishandles repeated points: a repeated
+-- vertex makes poly.x print "Identical points in Vec_Greater_Than !!" and stop,
+-- and a repeated point that is not a vertex is kept, so that poly.x -p lists it
+-- twice and poly.x -g counts it twice.  Neither changes the polytope, so drop them.
+palpDistinctColumns = M -> (
+    seen := new MutableHashTable;
+    cols := entries transpose M;
+    M_(select(#cols, j -> if seen#?(cols#j) then false else seen#(cols#j) = true))
+    )
+
+-- everything that hands a polytope to PALP goes through this.  A matrix over QQ
+-- with integer entries, such as vertices of a Polyhedra polytope, is lifted to
+-- ZZ; any other matrix not over ZZ is rejected by toPalp.
+palpInput = A -> (
+    if instance(A, Matrix) and ring A === QQ then A = try lift(A, ZZ) else A;
+    if instance(A, Matrix) then A = palpDistinctColumns A;
+    checkPalpInput A;
+    toPalp A
+    )
 
 palpPoly = (args, A) -> palpPointMatrix runPALP(palpProgram "poly", args, palpInput A)
 
@@ -364,7 +381,16 @@ palpInfo = method()
 palpInfo Matrix :=
 palpInfo List := HashTable => A -> (
     out := runPALP(palpProgram "poly", "-g", palpInput A);
-    if isBlankString out then new HashTable from {} else palpParseInfo first lines out
+    -- Every summary line poly.x -g prints has an "M:" field, even for input
+    -- that is not reflexive or not IP ({9,1,1,2,5} gives "M:39 7 F:6").  So a
+    -- line without one is something else, such as a PALP error message on
+    -- stdout: before repeated columns were dropped, a repeated vertex produced
+    -- "Identical points in Vec_Greater_Than !!" here.  No input is known to
+    -- reach this now; it is a guard against returning an empty table.
+    H := if isBlankString out then null else palpParseInfo first lines out;
+    if H === null or not H#?"M" then error(
+        "unexpected output from poly.x -g:" | newline | out);
+    H
     )
 
 -- Two PALP options answer this.  The summary line of poly.x -g carries an "N:"
@@ -891,6 +917,16 @@ Description
     det A
     assert(palpNormalForm (A * M) == palpNormalForm M)
   Text
+    A translation is not a change of basis, and a polytope and its translates
+    usually have different normal forms.  Here are a reflexive triangle and the
+    same triangle moved by $(1,0)$.  PALP also has an affine normal form,
+    {\tt poly.x -A}, which is not wrapped here.
+  Example
+    P = matrix{{1,0,-1}, {0,1,-1}}
+    Q = matrix{{2,1,0}, {0,1,-1}}
+    palpNormalForm P
+    palpNormalForm Q
+  Text
     Two weight systems that give the same polytope:
   Example
     palpNormalForm {3402, 40, 41, 486, 1134, 1701}
@@ -937,6 +973,21 @@ Description
     For a polytope $P$ in the lattice $M$, with dual $P^*$ in $N$, these give
     the vertices of $P$, the lattice points of $P$, the vertices of $P^*$, and
     the lattice points of $P^*$ respectively.
+
+    Given a matrix $A$ over the integers, $P$ is the convex hull of its columns;
+    a matrix over @TO QQ@ with integer entries, such as the vertices of a
+    polyhedron from @TO "Polyhedra::Polyhedra"@, is accepted as well.
+    It must be full dimensional, so $A$ has more columns than rows.  Otherwise
+    the columns are arbitrary: they need not be vertices, and they may include
+    interior points and repeat.  @TO palpMVertices@ and @TO palpMPoints@ need
+    no interior lattice point.  The dual
+    $P^* = \{y : \langle x, y \rangle \ge -1 \text{ for all } x \in P\}$
+    is taken with respect to the origin, and is a lattice polytope exactly when
+    $P$ is reflexive; @TO palpNVertices@ and @TO palpNPoints@ give an answer
+    only then.  A reflexive polytope has the origin as its only interior lattice
+    point, so a polytope with other interior lattice points, or a translate of a
+    reflexive polytope, gets @TO null@.  For the dual as a rational polytope, use
+    @TO "Polyhedra::polar"@.
   Example
     ws = {10, 1, 2, 3, 4}
     palpMVertices ws
@@ -1888,6 +1939,40 @@ TEST ///
   -- weights that overshoot, or fall short of, the degree do not split
   assert(palpWeightBlocks {10,2,3,6,0,1} === null)
   assert(palpWeightBlocks {10,1,2,3,3} === null)
+///
+
+TEST ///
+  -- the columns need only span the polytope: points that are not vertices, and
+  -- repeated columns, give the same answers.  PALP itself stops on a repeated
+  -- vertex and counts a repeated interior point twice, so repeats are dropped.
+  R = matrix{{1,0,0,-1},{0,1,0,-1},{0,0,1,-1}}
+  O = matrix{{0},{0},{0}}
+  for A in {R | O, R | R_{0}, R | O | O, R | R | O} do (
+      assert(palpMVertices A == palpMVertices R);
+      assert(palpMPoints A == palpMPoints R);
+      assert(palpNVertices A == palpNVertices R);
+      assert(palpNormalForm A == palpNormalForm R);
+      assert(palpInfo A === palpInfo R));
+  assert((palpInfo(R | O | O))#"M" == {5, 4})
+  -- no interior lattice point is needed for the functions about P itself; those
+  -- about the dual are taken with respect to the origin
+  S = matrix{{0,1,0,0},{0,0,1,0},{0,0,0,1}}                -- the unit simplex
+  assert(palpMVertices S == S)
+  assert(numColumns palpMPoints S == 4)
+  assert(palpNVertices S === null and not palpIsReflexive S)
+  T = R + matrix{{5},{5},{5}} * matrix{{1,1,1,1}}         -- R translated
+  assert(numColumns palpMPoints T == 5)
+  assert(not palpIsReflexive T)
+  assert(palpNormalForm T != palpNormalForm R)           -- not invariant under translation
+  -- a matrix over QQ with integer entries is lifted to ZZ; others are refused
+  assert(palpMVertices sub(R, QQ) == palpMVertices R)
+  -- vertices from Polyhedra are over QQ, and in another order
+  V = vertices convexHull R
+  assert(ring V === QQ)
+  assert(set entries transpose palpMVertices V === set entries transpose R)
+  assert palpIsReflexive V
+  assert match("over ZZ", toString last trap palpMVertices(1/2 * sub(R, QQ)))
+  assert match("over ZZ", toString last trap palpMVertices sub(R, RR))
 ///
 
 TEST ///
