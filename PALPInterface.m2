@@ -1828,3 +1828,16 @@ elapsedTime weightSystems 3;
 # elapsedTime weightSystems(4, Degrees => 30) == 137
 # elapsedTime weightSystems(4, Degrees => 100) == 781
 
+-- TODO: some doc in M2 for palp.
+--   mention the executables used.
+--   I believe ubuntu and debian include palp too?  (Not everyone is using a mac or homebrew).
+--   mention how sometimes one needs to compile it yourself with larger bounds.
+--     Johanna, Emmanuel had heuristics about when that is needed (I will find those notes).
+--     in any case, if you need to recompile it, how to add it to programPaths? (OK, this should probably be in doc for "programPaths").
+--     How to check what executable it found and is using?
+
+-- TODO: add in interfaces to palp routines for finding fibrations.  Doc should say exactly what is it finding too.
+--   First, tell me the interface functions, and we can brainstorm (plan) for what the names of the interface functions should be.
+
+-- TODO: I'm not sure I understand the symmetry support in palp.  But we should,
+--         and perhaps we want to wrap that functionality too.

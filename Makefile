@@ -14,6 +14,8 @@ check:
 	$(M2) -e 'elapsedTime check "DanilovKhovanskii"' -e '-exit 0'
 	$(M2) -e 'elapsedTime check "StringTorics"' -e '-exit 0'
 
+# PALPInterface no longer writes scratch files into the current directory;
+# these are leftovers from before that was fixed.  IE this should not be needed!
 clean:
 	rm -rf foo-normalForm-foo foo run-palp*
 

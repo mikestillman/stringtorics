@@ -134,6 +134,7 @@ validMatchingItem = (LM,i) -> (
           then (
               if debugLevel > 0 then 
                 << "excepted each item of Option to be the same type: an Ideal, RingElement or row or column matrix" << endl;
+                --error "debug me";
                 return false;
               );
           -- todo: make sure matrices are row or column matrices.

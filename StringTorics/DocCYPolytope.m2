@@ -680,7 +680,7 @@ doc ///
       B2 = matrix vertices P2
       B2*A2
       tally flatten entries (B2*A2)
-      normalForm M
+      palpNormalForm M
   SeeAlso
 ///
 

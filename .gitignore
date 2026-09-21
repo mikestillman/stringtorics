@@ -4,5 +4,5 @@ scrap
 .DS_Store
 
 # PALP scratch files written into cwd by PALPInterface.m2 (poly.x/normalForm)
-foo
-foo-normalForm-foo
+# foo
+# foo-normalForm-foo
