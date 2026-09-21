@@ -532,8 +532,9 @@ Description
     Macaulay2.
   Text
     The program, its source and its documentation are at
-    @HREF "https://hep.itp.tuwien.ac.at/~kreuzer/CY/CYpalp.html"@, and it is
-    described in
+    @HREF "https://hep.itp.tuwien.ac.at/~kreuzer/CY/CYpalp.html"@; the reference
+    documentation is reached from there, under "Former PALP wiki" and "Last
+    version of the PALP online documentation".  PALP is described in
   Pre
     M. Kreuzer and H. Skarke, PALP: A Package for Analyzing Lattice Polytopes
     with Applications to Toric Geometry, Comput. Phys. Commun. 157 (2004)
@@ -1683,6 +1684,7 @@ TEST ///
   assert(ans#0 === null and instance(ans#1, Error))
   assert match("dimension one", toString ans#1)
 ///
+
 TEST ///
   -- palpIsReflexive asks poly.x -e for the vertices of the dual: a reflexive
   -- polytope has them, one that is not gets inequalities instead, which come
@@ -1796,3 +1798,33 @@ uninstallPackage "PALPInterface"
 restart
 installPackage "PALPInterface"
 check "PALPInterface"
+
+-- Questions to check:
+--  weight systems: do the integers need to be in monotone increasing order?
+--    {q, n_0, ..., n_r}, sum(n_i) = q, and n_0 <= n_1 <= ... <= n_r.
+--    ANSWER: the n_i do NOT need to be numbered.
+--    TODO: check that the integers are >= 1, sum to 0th element?  Otherwise we get a strange error...
+--    We could also insist that they are in order, but not sure we care?
+ws1 = weightSystemVertices {10,1,2,3,4}
+ws2 = weightSystemVertices {10,1,2,4,3}
+assert(palpNormalForm ws1 == palpNormalForm ws2)
+ws3 = weightSystemVertices {10,4,3,2,1}
+assert(palpNormalForm ws1 == palpNormalForm ws3)
+ws4 = weightSystemVertices {10,2,3,6,0,1}
+weightSystemVertices {5,2,2,1}
+weightSystemVertices {3,1,1,1}
+
+-- TODO:
+-- doc for weightSystems
+--   The description is weak.  Define a weight system.  What is the degree vs weight of a weight system?
+--     which partitions are removed?
+--   The user doesn't know what cws.x -w is.  It is nice to keep it here, but should not be the lead sentence, and should
+--     mention that this is a palp command.
+--   For dim >= 4, I think we need to limit the degree range automatically.  I don't think it finishes otherwise (I cancelled it
+--     after 100 seconds elapsed.
+--     and it is annoyingly large in any case.
+help weightSystems
+elapsedTime weightSystems 3;
+# elapsedTime weightSystems(4, Degrees => 30) == 137
+# elapsedTime weightSystems(4, Degrees => 100) == 781
+
