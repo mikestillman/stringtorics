@@ -368,13 +368,13 @@ palpInfo List := HashTable => A -> (
     )
 
 -- Two PALP options answer this.  The summary line of poly.x -g carries an "N:"
--- field for a reflexive polytope and an "F:" field for one that is not, but -g
--- counts the lattice points of the dual and so becomes expensive as the
--- dimension grows: on the simplex in dimension eight it takes three seconds
--- against twenty milliseconds for -e.  So we use -e, which returns the vertices
--- of the dual when there are any and inequalities, which palpPointMatrix
--- reports as null, when there are not.  The two agree wherever both are
--- affordable.
+-- field for a reflexive polytope and an "F:" field for one that is not, but -g,
+-- like the other options that find lattice points (-p, -d), becomes expensive
+-- as the dimension grows: on the simplex in dimension eight it takes three
+-- seconds, where -e takes a few milliseconds.  So we use -e, which returns the
+-- vertices of the dual when there are any and inequalities, which
+-- palpPointMatrix reports as null, when there are not.  The two agree wherever
+-- both are affordable.
 palpIsReflexive = method()
 palpIsReflexive Matrix :=
 palpIsReflexive List := Boolean => A -> palpNVertices A =!= null
@@ -958,32 +958,44 @@ Description
   Example
     numRows palpMPoints {3, 1, 1, 1}
     numColumns palpMPoints {3, 1, 1, 1}
+  Text
+    When the polytope is not reflexive, its dual is not a lattice polytope, and
+    the two functions about the dual return @TO null@.  The smallest example in
+    dimension 3 is this simplex: its only interior lattice point is the origin,
+    but it is not reflexive.
+  Example
+    M = matrix{{1,0,0,-1}, {0,1,0,-1}, {0,0,1,-2}}
+    interiorLatticePoints convexHull M
+    palpIsReflexive M
+    palpNVertices M === null
+    palpNPoints M === null
 Caveat
+  These functions run the PALP program {\tt poly.x}, one option each:
+  {\tt -v} (the vertices of $P$) for @TO palpMVertices@, {\tt -p} (the lattice
+  points of $P$) for @TO palpMPoints@, {\tt -e} (the equations of the facets of
+  $P$, which for reflexive $P$ are the vertices of $P^*$) for
+  @TO palpNVertices@, and {\tt -d} (the lattice points of $P^*$, only when $P$
+  is reflexive) for @TO palpNPoints@.  The option {\tt -g} (general
+  information) is the one @TO palpInfo@ uses.  The notes below refer to these.
+
   The result is @TO null@ when PALP has no answer to give.  This is the usual
   outcome of asking about the dual of a polytope that is not reflexive: there
-  @TT "poly.x -d"@ prints nothing at all, and @TT "poly.x -e"@ prints
+  {\tt poly.x -d} prints nothing at all, and {\tt poly.x -e} prints
   inequalities rather than vertices.
 
   PALP requires the polytope to be full dimensional, and so requires more points
   than the dimension.  It assumes both and checks neither: given a polytope of
-  lower dimension, @TT "poly.x -v"@ quietly returns too few vertices while
-  @TT "poly.x -g"@ exits on a bus error, and given too few points it prints
+  lower dimension, {\tt poly.x -v} quietly returns too few vertices while
+  {\tt poly.x -g} exits on a bus error, and given too few points it prints
   @TT "Identical points in Vec_Greater_Than !!"@.  These functions test the
   input first and raise an error rather than pass any of that on.
 
-  @TT "poly.x -p"@, and so @TO palpInfo@ with it, counts the lattice points of
-  the dual, which grows quickly: on the simplex it takes about twenty
-  milliseconds in dimension six, three seconds in dimension eight, and more than
-  a minute in dimension nine, while @TT "-v"@ and @TT "-e"@ stay fast.  PALP is
-  chiefly used in low dimensions and is not much exercised above seven.
-Description
-  Text
-    For example:
-  Example
-    M = transpose matrix{{1,-1,-1}, {1,-1,1}, {1,1,-1}, {1,1,2}, {-1,0,0}};
-    isReflexive convexHull M
-    palpMVertices M
-    palpNPoints M
+  The options that find lattice points, {\tt -p}, {\tt -d} and {\tt -g}, slow
+  down quickly with the dimension, even when there are few points: on the
+  simplex they take about twenty milliseconds in dimension six, three seconds in
+  dimension eight, and more than a minute in dimension nine, while {\tt -v} and
+  {\tt -e} stay fast.  PALP is chiefly used in low dimensions and is not much
+  exercised above seven.
 SeeAlso
   palpNormalForm
   palpInfo
@@ -2034,3 +2046,14 @@ elapsedTime weightSystems 3;
 
 -- TODO: I'm not sure I understand the symmetry support in palp.  But we should,
 --         and perhaps we want to wrap that functionality too.
+
+
+needsPackage "PALPInterface"
+palpProgram "cws"                        -- which executable was found: /opt/homebrew/bin/cws-11d.x
+r = runProgram(palpProgram "cws", "-w3");
+r#"command"                              -- "/opt/homebrew/bin/cws-11d.x -w3"
+L = lines r#"output"                     -- {"4  1 1 1 1  rt", "5  1 1 1 2  rt", ...}
+palpRun("poly", "-v", {10,1,2,3,4})      -- raw poly.x output for any polytope or weight system
+palpVerbosity = 2                        -- then every call prints its command, input and output
+
+elapsedTime r = runProgram(palpProgram "cws", "-w4");
