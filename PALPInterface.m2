@@ -1131,37 +1131,94 @@ Key
 Headline
   the weight systems of a given dimension
 Usage
-  L = weightSystems d
+  L = weightSystems n
 Inputs
-  d:ZZ
+  n:ZZ
     the dimension of the resulting polytopes
   Degrees => {List, ZZ}
     a range {lo, hi} of degrees, where hi may be @TO infinity@, or a single
     degree
 Outputs
   L:List
-    of lists of integers, each of the form {degree, weights}
+    of the IP weight systems $\{d, q_0, \ldots, q_n\}$ of dimension $n$, in the
+    order PALP produces them
 Description
   Text
-    This is @TT "cws.x -w"@, which enumerates the weight systems whose degree is
-    the sum of their weights.  Those are exactly the ones whose hypersurface in
-    the weighted projective space has trivial canonical class.
+    A weight system is a list $\{d, q_0, \ldots, q_n\}$ of positive integers with
+    $d = q_0 + \cdots + q_n$.  The weights $q_i$ are the degrees of the variables
+    $x_0, \ldots, x_n$ of the weighted projective space
+    $\mathbb{P}(q_0, \ldots, q_n)$, and $d$ is the degree of a hypersurface in
+    it.  Since the anticanonical class of $\mathbb{P}(q)$ has degree
+    $q_0 + \cdots + q_n$, the condition $d = \sum q_i$ says exactly that such a
+    hypersurface has trivial canonical class.
+
+    The polytope of the weight system is the convex hull of the lattice points of
+    $$\Delta(q) = \{x \in \mathbb{R}^{n+1} : q_0 x_0 + \cdots + q_n x_n = 0,\ x_i \ge -1\},$$
+    which has dimension $n$.  Its lattice points correspond one to one to the
+    monomials $x^m$ of degree $d$, by $m = x + (1, \ldots, 1)$.  So
+    $\Delta(q) + (1, \ldots, 1)$ is the Newton polytope of a general polynomial
+    of degree $d$, and the origin corresponds to the monomial
+    $x_0 x_1 \cdots x_n$.  The weight system is IP if the origin is an interior
+    point of $\Delta(q)$, and those are the ones returned here.
+
+    For example, there are 95 IP weight systems of dimension 3, that is, with
+    four weights.
   Example
     L = weightSystems 3;
     #L
     L#0
     L#90
-    assert all(L, ws -> ws#0 == sum drop(ws, 1))
+  Text
+    For the weight system $\{10, 1, 2, 3, 4\}$, the monomials of degree 10 and
+    the lattice points of the polytope match up.
+  Example
+    R = QQ[x_0..x_3, Degrees => {1, 2, 3, 4}];
+    numColumns basis(10, R)
+    numColumns palpMPoints {10, 1, 2, 3, 4}
+  Text
+    In dimension at most 4 every IP weight system gives a reflexive polytope, but
+    in dimension 5 that fails.
+  Example
+    all(L, palpIsReflexive)
+    member({7, 1, 1, 1, 1, 1, 2}, weightSystems(5, Degrees => 7))
+    palpIsReflexive {7, 1, 1, 1, 1, 1, 2}
   Text
     Restricting the degree:
   Example
     weightSystems(5, Degrees => 10)
-  Example
     #weightSystems(5, Degrees => {20, 20})
   Text
     An unbounded range is allowed in dimension at most 4.
   Example
     weightSystems(3, Degrees => {40, infinity})
+  Text
+    {\bf Combined weight systems.}  A combined weight system is several weight
+    systems on the same variables, one per row, written one after another in a
+    single list:
+    $\{d_1, q_{10}, \ldots, q_{1n}, \ d_2, q_{20}, \ldots, q_{2n}, \ \ldots\}$.
+    The weights are nonnegative integers, each degree is the sum of the weights
+    in its row, and every variable has a positive weight in some row.  The weight
+    of $x_i$ is then the vector $(q_{1i}, \ldots, q_{ki})$, the degree is
+    $(d_1, \ldots, d_k)$, and the polytope, cut out by all $k$ equations, has
+    dimension $n + 1 - k$.  For example, the hypersurfaces of bidegree $(3,3)$
+    in $\mathbb{P}^2 \times \mathbb{P}^2$:
+  Example
+    w = {3,1,1,1,0,0,0, 3,0,0,0,1,1,1};
+    S = QQ[x_0..x_5, Degrees => {{1,0},{1,0},{1,0},{0,1},{0,1},{0,1}}];
+    numColumns basis({3,3}, S)
+    numColumns palpMPoints w
+  Text
+    The rows need not involve disjoint sets of variables.  Only the span of the
+    rows matters, so the same polytope can be written with overlapping rows:
+  Example
+    palpNormalForm w == palpNormalForm {6,1,1,1,1,1,1, 3,0,0,0,1,1,1}
+    palpMVertices {4,1,1,1,1,0, 2,0,0,1,0,1}
+  Text
+    The functions of this package that take a weight system, such as
+    @TO palpMVertices@ and @TO palpNormalForm@, accept combined weight systems
+    too; this function only produces single ones.
+
+    This function calls the PALP program {\tt cws.x} with the option {\tt -w}.
 Caveat
   PALP's time depends very much on the range.  With no upper bound, in dimension
   at most 4, it lists all weight systems using the algorithm of Kreuzer and
