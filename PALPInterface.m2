@@ -387,34 +387,51 @@ palpIsReflexive List := Boolean => A -> palpNVertices A =!= null
 -- interest here are those with d = sum of the q_i, which are exactly the ones
 -- whose degree d hypersurface in the weighted projective space P(q) has trivial
 -- canonical class.  cws.x enumerates them.
-weightSystems = method(Options => {Degrees => null})
-weightSystems ZZ := List => opts -> d -> (
-    if d < 1 then error "expected a positive dimension";
-    args := "-w" | toString d;
+-- cws.x -w has two modes.  Given a range of degrees "L H" it runs a general
+-- search whose cost grows steeply with the degree (in dimension 4, degrees 5..200
+-- take 31 seconds, and degree 3402 alone more than half an hour).  Given no range,
+-- in dimension at most 4 it runs the enumeration of Kreuzer and Skarke instead,
+-- which lists all 184026 weight systems of dimension 4 in about three minutes;
+-- in dimension 5 and higher it fails an assertion.  So an unbounded range of
+-- degrees is answered by the second mode, keeping the degrees >= lo afterwards.
+weightSystems = method(Options => {Degrees => {0, infinity}})
+weightSystems ZZ := List => opts -> n -> (
+    if n < 1 then error "expected a positive dimension";
     drange := opts.Degrees;
-    if drange =!= null then (
-        if instance(drange, ZZ) then drange = {drange, drange};
-        if not instance(drange, BasicList) or #drange =!= 2
-        then error "expected Degrees => {lo, hi} or Degrees => deg";
-        if not all(drange, a -> instance(a, ZZ)) then error "expected Degrees to be integers";
-        args = args | " " | toString drange#0 | " " | toString drange#1;
-        );
+    if instance(drange, ZZ) then drange = {drange, drange};
+    if not instance(drange, BasicList) or #drange =!= 2
+    or not instance(drange#0, ZZ)
+    or not (instance(drange#1, ZZ) or drange#1 === infinity)
+    then error "expected Degrees => {lo, hi}, Degrees => {lo, infinity}, or Degrees => deg";
+    (lo, hi) := toSequence drange;
+    if hi =!= infinity and lo > hi then error(
+        "expected Degrees => {lo, hi} with lo <= hi, got " | toString drange);
+    if hi === infinity and n > 4 then error(
+        "PALP lists the weight systems of dimension " | toString n | " only for a "
+        | "finite range of degrees.  Give a range, for instance" | newline
+        | "    weightSystems(" | toString n | ", Degrees => {0, 20})");
+    args := "-w" | toString n;
+    if hi =!= infinity then args = args | " " | toString lo | " " | toString hi;
     -- cws.x -w takes no input file, so we call it directly rather than via runPALP
     result := runProgram(palpProgram "cws", args, RaiseError => false);
     if result#"return value" =!= 0 then error(
         "cws.x failed: " | result#"command" | newline | result#"error");
     if match("POLY_Dmax", result#"output") then error(
-        "cws.x was built with too small a POLY_Dmax for dimension " | toString d |
+        "cws.x was built with too small a POLY_Dmax for dimension " | toString n |
         ":" | newline | result#"output");
-    -- Each line is "<d> <q_0> ... <q_n>" followed by flags such as "rt".  When a
-    -- degree range is given, cws.x adds a trailing summary line beginning with #.
-    for ell in lines result#"output" list (
-        if isBlankString ell or match("^#", ell) then continue;
-        toks := take(select(separate(" +", ell), x -> x =!= ""), d + 2);
-        if #toks =!= d + 2 or not all(toks, x -> match("^[0-9]+$", x))
-        then error("unexpected cws.x output line: " | ell);
-        for x in toks list value x
-        )
+    -- Each line is "<degree> <q_0> ... <q_n>", n+2 integers in dimension n,
+    -- followed by flags such as "rt"; in the second mode the last line also
+    -- carries a summary "#=184026 #cand=...".
+    -- With a range, cws.x adds a summary line of its own, beginning with #.
+    -- Keep the leading run of integers of each line, and read it with one value.
+    L := for ell in lines result#"output" list (
+        if match("^ *(#|$)", ell) then continue;
+        m := regex("^ *([0-9]+( +[0-9]+)*)", ell);
+        if m === null then error("unexpected cws.x output line: " | ell);
+        ws := value("{" | replace(" +", ",", substring(m#1, ell)) | "}");
+        if #ws =!= n + 2 then error("unexpected cws.x output line: " | ell);
+        ws);
+    if hi === infinity and lo > 0 then select(L, ws -> ws#0 >= lo) else L
     )
 
 -- The vertices of Delta(q).  This is palpMVertices on a weight system; it is
@@ -1118,9 +1135,9 @@ Usage
 Inputs
   d:ZZ
     the dimension of the resulting polytopes
-  Degrees => ZZ
-    one degree, or a pair giving a range of degrees; the default @TO null@ asks
-    for all of them
+  Degrees => {List, ZZ}
+    a range {lo, hi} of degrees, where hi may be @TO infinity@, or a single
+    degree
 Outputs
   L:List
     of lists of integers, each of the form {degree, weights}
@@ -1141,6 +1158,20 @@ Description
     weightSystems(5, Degrees => 10)
   Example
     #weightSystems(5, Degrees => {20, 20})
+  Text
+    An unbounded range is allowed in dimension at most 4.
+  Example
+    weightSystems(3, Degrees => {40, infinity})
+Caveat
+  PALP's time depends very much on the range.  With no upper bound, in dimension
+  at most 4, it lists all weight systems using the algorithm of Kreuzer and
+  Skarke, and discards the degrees below @TT "lo"@ afterwards: for dimension 4,
+  that is all 184026 of them, of degrees 5 to 3486, in about three minutes,
+  whatever @TT "lo"@ is.  With a finite range it searches degree by degree, which
+  is fast for small degrees and slow for large ones: in dimension 4, degrees 5
+  to 100 take a second or two, degrees 5 to 200 half a minute, and degree 3402
+  alone more than half an hour.  In dimension 5 and higher, PALP requires a
+  finite range.
 SeeAlso
   weightSystemVertices
   weightSystemPolytope
@@ -1550,6 +1581,20 @@ TEST ///
   assert(member({10, 1, 1, 2, 2, 2, 2}, weightSystems(5, Degrees => 10)))
 
   assert(try (weightSystems(3, Degrees => {1,2,3}); false) else true)
+
+  -- the default is Degrees => {0, infinity}; a lower bound alone filters the
+  -- full list, and agrees with a finite range reaching the largest degree, 66
+  assert(weightSystems(3, Degrees => {0, infinity}) == wss)
+  assert(weightSystems(3, Degrees => {40, infinity}) == select(wss, ws -> ws#0 >= 40))
+  assert(set weightSystems(3, Degrees => {40, infinity}) === set weightSystems(3, Degrees => {40, 66}))
+  assert(weightSystems 1 == {{2, 1, 1}})
+  assert(#weightSystems 2 == 3)
+  -- PALP aborts on lo > hi, and needs a finite range in dimension 5 and up
+  ans = trap weightSystems(3, Degrees => {8, 6})
+  assert(ans#0 === null and match("lo <= hi", toString ans#1))
+  ans = trap weightSystems 5
+  assert(ans#0 === null and match("weightSystems\\(5, Degrees => \\{0, 20\\}\\)", toString ans#1))
+  assert(try (weightSystems(3, Degrees => {1, 2.5}); false) else true)
 ///
 
 TEST ///
