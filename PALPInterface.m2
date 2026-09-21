@@ -243,13 +243,62 @@ checkPalpInput Matrix := M -> (
         | newline
         | "Change coordinates so that the polytope is full dimensional.");
     )
+-- Split a (combined) weight system into its blocks {d, q_0, ..., q_n} the way
+-- ReadCwsPp in PALP's Coord.c does: after a degree, numbers are weights while
+-- their running sum stays within the degree; once it reaches the degree exactly,
+-- zeros are still weights, and the next positive number is a new degree.
+-- Returns null when that fails.
+palpWeightBlocks = q -> (
+    blocks := {};
+    cur := {q#0};
+    rem := q#0;
+    for a in drop(q, 1) do (
+        if a > rem then (
+            if rem > 0 then return null;
+            blocks = append(blocks, cur);
+            cur = {a};
+            rem = a;
+            )
+        else (
+            cur = append(cur, a);
+            rem = rem - a;
+            ));
+    if rem > 0 then null else append(blocks, cur)
+    )
+
+-- PALP reads only nonnegative integers (a minus sign ends its input), and given
+-- a weight that is zero in every block it quietly returns a wrong answer, the
+-- polytope then being unbounded: poly.x -v on 3 1 1 1 0 prints a 3 by 3 matrix.
+-- A list whose last entry is the largest and which has no zeros is read as
+-- "q_0 ... q_n d", degree last; requiring the degree first to be the sum of the
+-- weights rules that reading out.
 checkPalpInput List := q -> (
+    if not all(q, a -> instance(a, ZZ) and a >= 0) then error(
+        "expected a weight system of nonnegative integers, got " | toString q);
     -- a single weight system {d, q_0, q_1} describes a polytope of dimension one,
     -- on which poly.x fails an assertion in ReadCwsPp and aborts
     if #q === 3 then error(
         "PALP aborts on a weight system of dimension one; give the polytope as a "
         | "matrix instead, for instance matrix{{1,-1}}");
     if #q < 3 then error "expected a weight system {d, q_0, ..., q_n}";
+    if q#0 === 0 then error "expected the degree of a weight system to be positive";
+    blocks := palpWeightBlocks q;
+    -- a single weight system always splits, so when splitting fails the degree
+    -- is not the sum of the rest
+    if blocks === null then error(
+        "expected the degree " | toString q#0 | " to be the sum of the weights, but "
+        | demark(" + ", toString \ drop(q, 1)) | " = " | toString sum drop(q, 1)
+        | newline | "(a combined weight system is several such lists, each with the "
+        | "same number of weights)");
+    if #unique apply(blocks, b -> #b) > 1 then error(
+        "expected the weight systems in a combined weight system to have the same "
+        | "number of weights, but they are " | toString blocks);
+    for j from 1 to #(blocks#0) - 1 do
+        if all(blocks, b -> b#j === 0) then error(
+            if #blocks === 1
+            then "expected every weight to be positive, but weight q_" | toString(j-1) | " is 0"
+            else "expected every weight to be positive in some weight system, but weight q_"
+                | toString(j-1) | " is 0 in all of them");
     )
 
 -- everything that hands a polytope to PALP goes through this
@@ -1683,6 +1732,48 @@ TEST ///
   ans = trap weightSystemVertices {2,1,1}
   assert(ans#0 === null and instance(ans#1, Error))
   assert match("dimension one", toString ans#1)
+///
+
+TEST ///
+  -- weight systems are checked before PALP sees them; PALP's own messages come
+  -- out as a failure to parse its output, or not at all
+  err = q -> (ans := trap palpMVertices q; assert(ans#0 === null); toString ans#1)
+  assert match("= 12", err {10,2,3,6,0,1})
+  assert match("= 9", err {10,1,2,3,3})
+  assert match("q_3 is 0", err {3,1,1,1,0})               -- PALP answers this, wrongly
+  assert match("nonnegative", err {10,-1,2,3,6})
+  assert match("nonnegative", err {10,1,2,3,4/1})
+  assert match("positive", err {0,0,0,1,1})
+  assert match("same number", err {3,1,1,1,0,0, 3,0,0,0,1,1,1})
+  assert match("in all of them", err {3,1,1,1,0,0,0,0, 3,0,0,0,1,1,1,0})
+  assert match("= 5", err {1,1,1,3})    -- PALP would read this as degree 3, degree last
+  -- the order of the weights does not matter, and combined systems still work -- TODO: what does this mean? (where does the order not matter)
+  assert(palpNormalForm {10,1,2,3,4} == palpNormalForm {10,4,3,2,1})
+  assert(numRows palpMVertices {3,1,1,1,0,0,0, 3,0,0,0,1,1,1} == 4)
+///
+
+TEST ///
+  -- palpWeightBlocks splits a combined weight system the way PALP's ReadCwsPp
+  -- does: once the weights reach the degree, zeros are still weights, and the
+  -- next positive number starts a new block
+  debug PALPInterface
+  -- a product, P(1,1,2)[4] x P(1,2,2)[5]
+  w = {4,1,1,2,0,0,0, 5,0,0,0,1,2,2}
+  assert(palpWeightBlocks w == {{4,1,1,2,0,0,0}, {5,0,0,0,1,2,2}})
+  assert(numRows palpMVertices w == 4)
+  -- not a product: x_2 has weight (1,1)
+  w = {4,1,1,1,1,0, 2,0,0,1,0,1}
+  assert(palpWeightBlocks w == {{4,1,1,1,1,0}, {2,0,0,1,0,1}})
+  assert(numRows palpMVertices w == 3)
+  -- a single weight system is one block
+  assert(palpWeightBlocks {10,1,2,3,4} == {{10,1,2,3,4}})
+  -- a later degree may be smaller than the first
+  assert(palpWeightBlocks {2,1,1,0, 1,0,0,1} == {{2,1,1,0}, {1,0,0,1}})
+  -- blocks of different lengths still split; checkPalpInput rejects them
+  assert(palpWeightBlocks {3,1,1,1,0,0, 3,0,0,0,1,1,1} == {{3,1,1,1,0,0}, {3,0,0,0,1,1,1}})
+  -- weights that overshoot, or fall short of, the degree do not split
+  assert(palpWeightBlocks {10,2,3,6,0,1} === null)
+  assert(palpWeightBlocks {10,1,2,3,3} === null)
 ///
 
 TEST ///
