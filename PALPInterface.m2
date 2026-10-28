@@ -22,6 +22,10 @@ export {
     "toPalp",
     "fromPalpMatrix",
 
+    -- combined weight systems
+    "WeightSystem",
+    "weightSystem",
+
     -- poly.x
     "palpNormalForm",
     "palpMVertices",
@@ -49,6 +53,8 @@ exportMutable {
     }
 
 palpVerbosity = 0
+
+WeightSystem = new Type of BasicList
 
 -------------------------------------------------
 -- Locating the PALP executables -----------------
@@ -145,7 +151,8 @@ palpRun(String, String, List) := String => opts -> (name, args, input) ->
 -- Translating to and from PALP's format ---------
 -------------------------------------------------
 
--- A matrix becomes "#rows #cols" followed by the rows.  A list of integers is
+-- A matrix becomes "#rows #cols" followed by the rows (each row on one line,
+-- integer entries separated by spaces).  A list of integers is
 -- passed through as a (combined) weight system, which PALP distinguishes from a
 -- matrix by the shape of its first line.
 toPalp = method()
@@ -158,10 +165,12 @@ toPalp Matrix := String => M -> (
         newline)
     )
 toPalp List := String => wlist -> (
+    if isNestedWeightSystem wlist then wlist = flatten wlist;
     if #wlist === 0 then error "expected a non-empty weight system";
     if not all(wlist, a -> instance(a, ZZ)) then error "expected a list of integers";
     demark(" ", toString \ wlist) | newline
     )
+toPalp WeightSystem := String => cws -> toPalp flatten toList cws
 
 -- PALP writes a block of numbers preceded by a header line
 --     <#lines> <#columns>  <comment>
@@ -243,11 +252,60 @@ checkPalpInput Matrix := M -> (
         | newline
         | "Change coordinates so that the polytope is full dimensional.");
     )
--- Split a (combined) weight system into its blocks {d, q_0, ..., q_n} the way
--- ReadCwsPp in PALP's Coord.c does: after a degree, numbers are weights while
--- their running sum stays within the degree; once it reaches the degree exactly,
--- zeros are still weights, and the next positive number is a new degree.
--- Returns null when that fails.
+
+weightSystem = method(Options => {Verify => true})
+weightSystem List := WeightSystem => opts -> q -> (
+    -- q: a list of integers, a (possibly combined) weight system, given as a list of integers.
+    -- returns a WeightSystem (i.e. a combined weight system)
+    blocks := {};
+    cur := {q#0};
+    rem := q#0;
+    for a in drop(q, 1) do (
+        if a > rem then (
+            if rem > 0 then (
+                if opts.Verify then error "weights sum to more than expected sum";
+                if debugLevel > 0 then << "weights sum to more than expected sum" << endl;
+                return null;
+                );
+            blocks = append(blocks, cur);
+            cur = {a};
+            rem = a;
+            )
+        else (
+            cur = append(cur, a);
+            rem = rem - a;
+            ));
+    if rem > 0 then (
+        if opts.Verify then error "weights sum to less than expected sum";
+        if debugLevel > 0 then << "weights sum to less than expected sum" << endl;
+        return null;
+        );
+    new WeightSystem from append(blocks, cur)
+    )
+
+isWellDefined WeightSystem := Boolean => cws -> (
+    
+    )
+
+-- XXX
+-- The following are used in checkPalpInput...
+-- palpWeightBlocks: called in palpFlatBlocks only, 
+-- isNestedWeightSystem: called in checkPalpInput only.  Not tested.
+-- palpFlatBlocks: called in palpNestedBlocks, checkPalpInput.  Not tested.
+-- palpNestedBlocks: called in checkPalpInput.  Not tested.
+
+-- palpWeightBlocks q
+--   q: a List of nonnegative integers with q#0 > 0, a weight system written
+--      flat, possibly combined: {d_1, q_10, ..., q_1n, d_2, q_20, ..., q_2n, ...}
+--   returns the list of its rows {{d_1, q_10, ..., q_1n}, {d_2, ...}, ...}, or
+--      null if q does not split into rows.
+-- Reading from the left, a row is a degree d followed by the weights after it,
+-- taken until they add up to exactly d; zeros that come next still belong to the
+-- row, and the next positive number is the degree of a new row.  A number that
+-- would take the sum past d, or a last row whose weights fall short of its
+-- degree, means q does not split.  For example {3,1,1,1,0,0,0, 3,0,0,0,1,1,1}
+-- splits after the third 0, into {3,1,1,1,0,0,0} and {3,0,0,0,1,1,1}.  PALP
+-- splits its input the same way (ReadCwsPp in Coord.c).
 palpWeightBlocks = q -> (
     blocks := {};
     cur := {q#0};
@@ -266,13 +324,22 @@ palpWeightBlocks = q -> (
     if rem > 0 then null else append(blocks, cur)
     )
 
--- PALP reads only nonnegative integers (a minus sign ends its input), and given
--- a weight that is zero in every block it quietly returns a wrong answer, the
--- polytope then being unbounded: poly.x -v on 3 1 1 1 0 prints a 3 by 3 matrix.
--- A list whose last entry is the largest and which has no zeros is read as
--- "q_0 ... q_n d", degree last; requiring the degree first to be the sum of the
--- weights rules that reading out.
-checkPalpInput List := q -> (
+-- isNestedWeightSystem q
+--   q: a List, a weight system as the user gave it
+--   returns true if q is a list of rows {{d_1, q_10, ..., q_1n}, {d_2, ...}, ...},
+--      false if it is written flat, as PALP writes it.
+isNestedWeightSystem = q -> #q > 0 and all(q, r -> instance(r, List))
+
+-- palpFlatBlocks q
+--   q: a List, a weight system {d, q_0, ..., q_n}, or a combined one written
+--      flat, {d_1, q_10, ..., q_1n, d_2, q_20, ..., q_2n, ...}
+--   returns the list of its rows, found by palpWeightBlocks, or raises an error
+--      saying what is wrong with q.
+-- PALP reads only nonnegative integers: a minus sign ends its input.  It also
+-- reads a list whose last entry is the largest, with no zeros, as
+-- "q_0 ... q_n d", with the degree last; requiring the first entry to be the sum
+-- of the rest rules that reading out.
+palpFlatBlocks = q -> (
     if not all(q, a -> instance(a, ZZ) and a >= 0) then error(
         "expected a weight system of nonnegative integers, got " | toString q);
     -- a single weight system {d, q_0, q_1} describes a polytope of dimension one,
@@ -289,7 +356,42 @@ checkPalpInput List := q -> (
         "expected the degree " | toString q#0 | " to be the sum of the weights, but "
         | demark(" + ", toString \ drop(q, 1)) | " = " | toString sum drop(q, 1)
         | newline | "(a combined weight system is several such lists, each with the "
-        | "same number of weights)");
+        | "same number of weights, one after another or as a list of lists)");
+    blocks
+    )
+
+-- palpNestedBlocks q
+--   q: a List of Lists, the rows {{d_1, q_10, ..., q_1n}, {d_2, ...}, ...} of a
+--      combined weight system
+--   returns q, after checking each row on its own, or raises an error naming
+--      the row at fault.  A single row is just a weight system, and is checked
+--      as one.
+-- Flattened, valid rows split back into the same rows under palpWeightBlocks,
+-- so PALP reads what was given.
+palpNestedBlocks = q -> (
+    if #q === 1 then return palpFlatBlocks first q;
+    for r in q do (
+        if not all(r, a -> instance(a, ZZ) and a >= 0) then error(
+            "expected each row of a combined weight system to consist of "
+            | "nonnegative integers, got " | toString r);
+        if #r < 2 then error(
+            "expected each row of a combined weight system to be {d, q_0, ..., q_n}, got "
+            | toString r);
+        if r#0 === 0 then error(
+            "expected the degree of each row to be positive, got " | toString r);
+        if r#0 =!= sum drop(r, 1) then error(
+            "expected the degree of each row to be the sum of its weights, but in "
+            | toString r | " they sum to " | toString sum drop(r, 1));
+        );
+    q
+    )
+
+-- Split the weight system into rows, which checks each row, then check that
+-- the rows fit together: they have the same length, and no variable has weight
+-- zero in every row.  Such a variable makes the polytope unbounded, and PALP
+-- does not notice: poly.x -v on 3 1 1 1 0 prints a 3 by 3 matrix.
+checkPalpInput List := q -> (
+    blocks := if isNestedWeightSystem q then palpNestedBlocks q else palpFlatBlocks q;
     if #unique apply(blocks, b -> #b) > 1 then error(
         "expected the weight systems in a combined weight system to have the same "
         | "number of weights, but they are " | toString blocks);
@@ -1256,9 +1358,11 @@ Description
     weightSystems(3, Degrees => {40, infinity})
   Text
     {\bf Combined weight systems.}  A combined weight system is several weight
-    systems on the same variables, one per row, written one after another in a
-    single list:
-    $\{d_1, q_{10}, \ldots, q_{1n}, \ d_2, q_{20}, \ldots, q_{2n}, \ \ldots\}$.
+    systems on the same variables, one per row.  PALP writes them one after
+    another in a single list,
+    $\{d_1, q_{10}, \ldots, q_{1n}, \ d_2, q_{20}, \ldots, q_{2n}, \ \ldots\}$,
+    and they may also be given as a list of rows,
+    $\{\{d_1, q_{10}, \ldots, q_{1n}\}, \{d_2, q_{20}, \ldots, q_{2n}\}, \ldots\}$.
     The weights are nonnegative integers, each degree is the sum of the weights
     in its row, and every variable has a positive weight in some row.  The weight
     of $x_i$ is then the vector $(q_{1i}, \ldots, q_{ki})$, the degree is
@@ -1270,6 +1374,7 @@ Description
     S = QQ[x_0..x_5, Degrees => {{1,0},{1,0},{1,0},{0,1},{0,1},{0,1}}];
     numColumns basis({3,3}, S)
     numColumns palpMPoints w
+    palpMPoints {{3,1,1,1,0,0,0}, {3,0,0,0,1,1,1}} == palpMPoints w
   Text
     The rows need not involve disjoint sets of variables.  Only the span of the
     rows matters, so the same polytope can be written with overlapping rows:
@@ -1307,8 +1412,9 @@ Usage
   V = weightSystemVertices q
 Inputs
   q:List
-    of integers {d, q_0, ..., q_n}, the degree followed by the weights, or
-    several such blocks in a row making a combined weight system
+    of integers {d, q_0, ..., q_n}, the degree followed by the weights, or a
+    combined weight system: several such blocks one after another, or a list
+    of them
 Outputs
   V:Matrix
     over the integers, the vertices of the polytope as its columns
@@ -1918,6 +2024,82 @@ TEST ///
 ///
 
 TEST ///
+  -- a combined weight system may also be given as a list of rows
+  w = {3,1,1,1,0,0,0, 3,0,0,0,1,1,1}
+  wn = {{3,1,1,1,0,0,0}, {3,0,0,0,1,1,1}}
+  assert(toPalp wn == toPalp w)
+  assert(palpMVertices wn == palpMVertices w)
+  assert(palpMPoints wn == palpMPoints w)
+  assert(palpNVertices wn == palpNVertices w)
+  assert(palpNormalForm wn == palpNormalForm w)
+  assert(palpInfo wn === palpInfo w)
+  assert palpIsReflexive wn
+  assert(weightSystemVertices wn == weightSystemVertices w)
+  assert((palpNefPartitions(wn, 2))#"Partitions" == (palpNefPartitions(w, 2))#"Partitions")
+  -- rows sharing variables: x_2 has weight (1,1).  The lattice points are the
+  -- monomials of bidegree (4,2), shifted, so there are as many of each
+  v = {4,1,1,1,1,0, 2,0,0,1,0,1}
+  vn = {{4,1,1,1,1,0}, {2,0,0,1,0,1}}
+  assert(palpMPoints vn == palpMPoints v)
+  assert(palpNormalForm vn == palpNormalForm v)
+  S = QQ[x_0..x_4, Degrees => {{1,0},{1,0},{1,1},{1,0},{0,1}}]
+  assert(numColumns palpMPoints vn == numColumns basis({4,2}, S))
+  -- only the span of the rows matters: split rows and overlapping ones agree
+  assert(palpNormalForm {{6,1,1,1,1,1,1}, {3,0,0,0,1,1,1}} == palpNormalForm wn)
+  -- a single row
+  assert(palpNormalForm {{10,1,2,3,4}} == palpNormalForm {10,1,2,3,4})
+  -- rows are checked one at a time
+  err = q -> (ans := trap palpMVertices q; assert(ans#0 === null); toString ans#1)
+  assert match("same number", err {{3,1,1,1,0,0,0}, {3,0,0,1,1,1}})
+  assert match("sum of its weights", err {{3,1,1,1,0,0,0}, {4,0,0,0,1,1,1}})
+  assert match("nonnegative", err {{3,1,1,1,0,0,0}, {3,0,0,0,1,-1,3}})
+  assert match("positive", err {{3,1,1,1,0,0}, {0,0,0,0,0,0}})
+  assert match("in all of them", err {{3,1,1,1,0,0,0,0}, {3,0,0,0,1,1,1,0}})
+  assert match("q_3 is 0", err {{3,1,1,1,0}})
+///
+
+TEST ///
+  -- XXX
+  -- test: weightSystem, `toPalp WeightSystem`, `isWellDefined WeightSystem`
+  
+  -- test the private routines: palpWeightBlocks, palpFlatBlocks, palpNestedBlocks.
+  -- palpWeightBlocks splits a combined weight system the way PALP's ReadCwsPp
+  -- does: once the weights reach the degree, zeros are still weights, and the
+  -- next positive number starts a new block
+  -- a product, P(1,1,2)[4] x P(1,2,2)[5]
+  w = {4,1,1,2,0,0,0, 5,0,0,0,1,2,2}
+  cws = weightSystem w
+  toPalp cws
+  assert(numRows palpMVertices w == 4)
+  -- not a product: x_2 has weight (1,1)
+  w = {4,1,1,1,1,0, 2,0,0,1,0,1}
+  cws = weightSystem w
+  toPalp cws === toPalp w
+  assert(numRows palpMVertices w == 3)
+  -- a single weight system is one block
+  assert(toList weightSystem {10,1,2,3,4} === {{10, 1, 2, 3, 4}})
+  -- a later degree may be smaller than the first
+  assert(toList weightSystem {2,1,1,0, 1,0,0,1} === {{2,1,1,0}, {1,0,0,1}})
+
+  -- blocks of different lengths are rejected
+  w = {3,1,1,1,0,0, 3,0,0,0,1,1,1}
+  weightSystem w -- WRONG: weightSystem needs to verify its answer.
+
+  -- weights that add to greater than the sum (first entry of each block) are not allowed.
+  (ans, err) = trap weightSystem {10,2,3,6,0,1}
+  assert(ans === null)
+  assert(toString err === "weights sum to more than expected sum");
+
+  -- weights that do not add up to the sum
+  (ans, err) = trap weightSystem {10,1,2,3,3}
+  assert(ans === null)
+  assert(toString err === "weights sum to less than expected sum");
+///
+
+"TEST"
+///
+-- REMOVE ME
+  -- test the private routines: palpWeightBlocks, palpFlatBlocks, palpNestedBlocks.
   -- palpWeightBlocks splits a combined weight system the way PALP's ReadCwsPp
   -- does: once the weights reach the degree, zeros are still weights, and the
   -- next positive number starts a new block
@@ -1939,6 +2121,18 @@ TEST ///
   -- weights that overshoot, or fall short of, the degree do not split
   assert(palpWeightBlocks {10,2,3,6,0,1} === null)
   assert(palpWeightBlocks {10,1,2,3,3} === null)
+
+  -- XXX
+code  palpFlatBlocks
+
+  -- palpWeightBlocks is essentionally the following function:
+  WeightSystem = new Type of BasicList
+  weightSystem = method(Options => {Verify => true})
+  weightSystem List := WeightSystem => opts -> L -> (
+      -- from palp form to a list of weight systems (all same length, 0's allowed).
+      )
+  toPalpString WeightSystem := cws -> toPalp flatten cws
+  isWellDefined WeightSystem := Boolean => cws -> (); -- uses debugLevel to decide to display issues?
 ///
 
 TEST ///
@@ -2014,7 +2208,7 @@ TEST ///
   V8 = id_(ZZ^8) | transpose matrix {toList(8 : -1)}
   assert(numRows palpMVertices V8 == 8)            -- the cheap calls are fine
   assert(numRows palpNVertices V8 == 8)
-  ans = trap palpNormalForm V8
+  ans = trap palpNormalForm V8 -- TODO: the error is missing the input!
   assert(ans#0 === null and instance(ans#1, Error))
   assert match("SYM_Nmax", toString ans#1)
 
@@ -2076,6 +2270,71 @@ TEST ///
   assert(numColumns palpMVertices {10,1,2,3,4} == 7)
 ///
 
+"TEST"
+/// -- checking nef partitions, codim = 3 or higher...
+  -- Start with a weight system in dim 6.
+  needsPackage "NormalToricVarieties"
+  wsorig = (weightSystems(6, Degrees => {20,20}))_5; -- the _5 was chosen at random
+  ws = {20, 1, 1, 2, 2, 2, 2, 10}
+  ws = {20, 1, 1, 1, 1, 1, 6, 9}
+  assert(ws === wsorig)
+  verts = weightSystemVertices ws
+  P = convexHull verts
+  isReflexive P
+  P' = polar P
+  isReflexive P'
+  V = normalToricVariety P
+  V' = normalToricVariety P'
+  assert isSimplicial V
+  assert not isSimplicial V'
+  rays V'
+  Ds = for i from 0 to # rays V' - 1 list V'_i
+  ds = select(drop(drop(subsets(#rays V), 1), -1), s -> s#0 == 0)
+  Dlist = for d in ds list sum(d, i -> V_i)
+  select(Dlist, d -> not isNef d)
+  Ds/isNef
+
+
+  Ds = for i from 0 to # rays V' - 1 list V'_i
+  ds = select(drop(drop(subsets(#rays V'), 1), -1), s -> s#0 == 0);
+  Dlist = for d in ds list sum(d, i -> V'_i);
+  elapsedTime select(Dlist, d -> isNef d) -- slow?
+  -- IN PROGRESS?? select(drop(subsets Ds, -1), d ->
+
+  elapsedTime palpNefPartitions(ws, 2) -- very slow...!
+  weightSystemVertices ws
+  P'' = weightSystemPolytope ws -- very slow...!
+  vertices P'' -- ouch!
+
+  wsorig = weightSystems(6, Degrees => {20,20}); -- the _5 was chosen at random
+  for i from 0 to 33 list wsorig#i => palpNefPartitions(wsorig#i, 3)
+  for ws in wsorig list ws => palpNefPartitions(ws, 3)
+  ws = last wsorig  
+  verts = weightSystemVertices ws
+  P = convexHull verts
+  isReflexive P
+  P' = polar P
+  isReflexive P'
+  vertices P'
+  weightSystemPolytope ws
+  V = normalToricVariety P
+  V' = normalToricVariety P'
+  assert isSimplicial V
+  assert not isSimplicial V'
+
+  Ds = for i from 0 to # rays V - 1 list V_i
+  ds = select(drop(drop(subsets(#rays V), 1), -1), s -> s#0 == 0)
+  ds = drop(drop(subsets(#rays V), 1), -1)
+  Dlist = for d in ds list sum(d, i -> V_i)
+  select(Dlist, d -> isNef d)
+  select(oo, d -> isNef(-toricDivisor V - d))
+  Ds/isNef
+  palpNefPartitions(ws, 3)
+  palpNefPartitions(ws, 2)
+
+  palpNefPartitions(verts, 2)
+  
+///
 end--
 
 -* Development section *-
