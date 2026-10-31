@@ -150,7 +150,8 @@ runPALP(Program, String, String) := String => opts -> (P, args, input) -> (
 
 palpRun = method(Options => {KeepFiles => false})
 palpRun(String, String, Matrix) :=
-palpRun(String, String, List) := String => opts -> (name, args, input) ->
+palpRun(String, String, List) :=
+palpRun(String, String, WeightSystem) := String => opts -> (name, args, input) ->
     runPALP(palpProgram name, args, palpInput input, KeepFiles => opts.KeepFiles)
 
 -------------------------------------------------
@@ -335,14 +336,16 @@ isWellDefined WeightSystem := Boolean => cws -> (
     msg === null
     )
 
--- weightSystem checks q, raising an error if it is not a weight system.
-checkPalpInput List := q -> (
-    cws := weightSystem q;
+checkPalpInput WeightSystem := cws -> (
+    msg := weightSystemProblem cws;
+    if msg =!= null then error msg;
     -- poly.x fails an assertion in ReadCwsPp and aborts on a single weight system of dimension one
     if #cws === 1 and #(cws#0) === 3 then error(
         "PALP aborts on a weight system of dimension one; give the polytope as a "
         | "matrix instead, for instance matrix{{1,-1}}");
     )
+-- weightSystem raises an error if q is not a weight system
+checkPalpInput List := q -> checkPalpInput weightSystem q
 
 -- The first copy of each column.  PALP mishandles repeated points: a repeated
 -- vertex makes poly.x print "Identical points in Vec_Greater_Than !!" and stop,
@@ -376,23 +379,28 @@ palpPoly = (args, A) -> palpPointMatrix runPALP(palpProgram "poly", args, palpIn
 
 palpNormalForm = method()
 palpNormalForm Matrix :=
-palpNormalForm List := Matrix => A -> palpPoly("-N", A)
+palpNormalForm List :=
+palpNormalForm WeightSystem := Matrix => A -> palpPoly("-N", A)
 
 palpMVertices = method()
 palpMVertices Matrix :=
-palpMVertices List := Matrix => A -> palpPoly("-v", A)
+palpMVertices List :=
+palpMVertices WeightSystem := Matrix => A -> palpPoly("-v", A)
 
 palpMPoints = method()
 palpMPoints Matrix :=
-palpMPoints List := Matrix => A -> palpPoly("-p", A)
+palpMPoints List :=
+palpMPoints WeightSystem := Matrix => A -> palpPoly("-p", A)
 
 palpNVertices = method()
 palpNVertices Matrix :=
-palpNVertices List := Matrix => A -> palpPoly("-e", A)
+palpNVertices List :=
+palpNVertices WeightSystem := Matrix => A -> palpPoly("-e", A)
 
 palpNPoints = method()
 palpNPoints Matrix :=
-palpNPoints List := Matrix => A -> palpPoly("-d", A)
+palpNPoints List :=
+palpNPoints WeightSystem := Matrix => A -> palpPoly("-d", A)
 
 -- poly.x -g prints one line of "Key:value ..." fields, for example
 --     M:7 6 N:27 8 Pic:17 Cor:0
@@ -422,7 +430,8 @@ palpParseInfo = ell -> (
 
 palpInfo = method()
 palpInfo Matrix :=
-palpInfo List := HashTable => A -> (
+palpInfo List :=
+palpInfo WeightSystem := HashTable => A -> (
     out := runPALP(palpProgram "poly", "-g", palpInput A);
     -- Every summary line poly.x -g prints has an "M:" field, even for input
     -- that is not reflexive or not IP ({9,1,1,2,5} gives "M:39 7 F:6").  So a
@@ -446,7 +455,8 @@ palpInfo List := HashTable => A -> (
 -- both are affordable.
 palpIsReflexive = method()
 palpIsReflexive Matrix :=
-palpIsReflexive List := Boolean => A -> palpNVertices A =!= null
+palpIsReflexive List :=
+palpIsReflexive WeightSystem := Boolean => A -> palpNVertices A =!= null
 
 -------------------------------------------------
 -- Weight systems --------------------------------
@@ -507,7 +517,8 @@ weightSystems ZZ := List => opts -> n -> (
 -- named separately because that is how one looks for it, and because a combined
 -- weight system is also accepted here.
 weightSystemVertices = method()
-weightSystemVertices List := Matrix => q -> palpMVertices q
+weightSystemVertices List :=
+weightSystemVertices WeightSystem := Matrix => q -> palpMVertices q
 
 -- Delta(q) = {x : q.x = 0, x_i >= -1}, computed from the definition rather than
 -- by calling PALP, and returned in a basis of the lattice ker(q) \cap ZZ^n so
@@ -531,6 +542,11 @@ weightSystemPolytope List := Polyhedron => wts -> (
     B := transpose LLL syz matrix {q};    -- rows: a ZZ-basis of ker(q) \cap ZZ^n
     Delta := polyhedronFromHData(- transpose B, matrix toList(n : {1}));
     convexHull matrix {latticePoints Delta}
+    )
+weightSystemPolytope WeightSystem := Polyhedron => cws -> (
+    if #cws =!= 1 then error(
+        "expected a single weight system; for a combined weight system use weightSystemVertices");
+    weightSystemPolytope cws#0
     )
 
 -------------------------------------------------
@@ -582,7 +598,8 @@ palpNefPoints = out -> (
 -- An empty list of partitions means: no nef partitions of the given codimension
 palpNefPartitions = method()
 palpNefPartitions(Matrix, ZZ) :=
-palpNefPartitions(List, ZZ) := HashTable => (A, c) -> (
+palpNefPartitions(List, ZZ) :=
+palpNefPartitions(WeightSystem, ZZ) := HashTable => (A, c) -> (
     if c < 1 then error "expected a positive codimension";
     out := runPALP(palpProgram "nef", "-Lp -c" | toString c, palpInput A);
     new HashTable from {
@@ -815,6 +832,7 @@ Key
   palpRun
   (palpRun, String, String, Matrix)
   (palpRun, String, String, List)
+  (palpRun, String, String, WeightSystem)
   [palpRun, KeepFiles]
 Headline
   run a PALP program and return its output
@@ -826,8 +844,8 @@ Inputs
   args:String
     the command line options, for instance "-v" or "-Lp -c2"
   A:Matrix
-    over the integers, whose columns span the polytope, or a @TO List@ holding a
-    (combined) weight system
+    over the integers, whose columns span the polytope, or a (combined) weight
+    system, as a @TO List@ or a @TO WeightSystem@
   KeepFiles => Boolean
     whether to keep the temporary file holding PALP's input, and print its name
 Outputs
@@ -861,6 +879,7 @@ Key
   toPalp
   (toPalp, Matrix)
   (toPalp, List)
+  (toPalp, WeightSystem)
 Headline
   the PALP input format for a matrix or a weight system
 Usage
@@ -936,14 +955,15 @@ Key
   palpNormalForm
   (palpNormalForm, Matrix)
   (palpNormalForm, List)
+  (palpNormalForm, WeightSystem)
 Headline
   the PALP normal form of a lattice polytope
 Usage
   N = palpNormalForm A
 Inputs
   A:Matrix
-    over the integers, whose columns span the polytope, or a @TO List@ holding a
-    (combined) weight system
+    over the integers, whose columns span the polytope, or a (combined) weight
+    system, as a @TO List@ or a @TO WeightSystem@
 Outputs
   N:Matrix
     whose columns are the vertices in normal form
@@ -987,15 +1007,19 @@ Key
   palpMVertices
   (palpMVertices, Matrix)
   (palpMVertices, List)
+  (palpMVertices, WeightSystem)
   palpMPoints
   (palpMPoints, Matrix)
   (palpMPoints, List)
+  (palpMPoints, WeightSystem)
   palpNVertices
   (palpNVertices, Matrix)
   (palpNVertices, List)
+  (palpNVertices, WeightSystem)
   palpNPoints
   (palpNPoints, Matrix)
   (palpNPoints, List)
+  (palpNPoints, WeightSystem)
 Headline
   vertices and lattice points of a polytope and of its dual
 Usage
@@ -1005,8 +1029,8 @@ Usage
   palpNPoints A
 Inputs
   A:Matrix
-    over the integers, whose columns span the polytope, or a @TO List@ holding a
-    (combined) weight system
+    over the integers, whose columns span the polytope, or a (combined) weight
+    system, as a @TO List@ or a @TO WeightSystem@
 Outputs
   :Matrix
     over the integers, one point per column
@@ -1100,14 +1124,15 @@ Key
   palpInfo
   (palpInfo, Matrix)
   (palpInfo, List)
+  (palpInfo, WeightSystem)
 Headline
   the summary line PALP prints for a polytope
 Usage
   H = palpInfo A
 Inputs
   A:Matrix
-    over the integers, whose columns span the polytope, or a @TO List@ holding a
-    (combined) weight system
+    over the integers, whose columns span the polytope, or a (combined) weight
+    system, as a @TO List@ or a @TO WeightSystem@
 Outputs
   H:HashTable
 Description
@@ -1185,14 +1210,15 @@ Key
   palpIsReflexive
   (palpIsReflexive, Matrix)
   (palpIsReflexive, List)
+  (palpIsReflexive, WeightSystem)
 Headline
   whether PALP considers a polytope reflexive
 Usage
   palpIsReflexive A
 Inputs
   A:Matrix
-    over the integers, whose columns span the polytope, or a @TO List@ holding a
-    (combined) weight system
+    over the integers, whose columns span the polytope, or a (combined) weight
+    system, as a @TO List@ or a @TO WeightSystem@
 Outputs
   :Boolean
 Description
@@ -1391,10 +1417,11 @@ Description
     weightSystem({10,1,2,3,3}, Verify => false) === null
     weightSystem({3,1,1,1,0,0, 3,0,0,0,1,1,1}, Verify => false) === null
     weightSystem({3,1,1,1,0}, Verify => false) === null
-Caveat
-  The functions of this package that take a weight system, such as
-  @TO palpMVertices@, take it as a @TO List@, flat or as a list of rows, and do
-  not yet accept a {\tt WeightSystem}.
+  Text
+    The functions of this package that take a weight system, such as
+    @TO palpMVertices@, accept a {\tt WeightSystem} as well as a @TO List@.
+  Example
+    palpMVertices cws == palpMVertices {3,1,1,1,0,0,0, 3,0,0,0,1,1,1}
 SeeAlso
   (isWellDefined, WeightSystem)
   weightSystems
@@ -1442,6 +1469,7 @@ doc ///
 Key
   weightSystemVertices
   (weightSystemVertices, List)
+  (weightSystemVertices, WeightSystem)
 Headline
   the vertices of the polytope of a weight system
 Usage
@@ -1450,7 +1478,7 @@ Inputs
   q:List
     of integers {d, q_0, ..., q_n}, the degree followed by the weights, or a
     combined weight system: several such blocks one after another, or a list
-    of them
+    of them; or a @TO WeightSystem@
 Outputs
   V:Matrix
     over the integers, the vertices of the polytope as its columns
@@ -1487,13 +1515,15 @@ doc ///
 Key
   weightSystemPolytope
   (weightSystemPolytope, List)
+  (weightSystemPolytope, WeightSystem)
 Headline
   the polytope of a weight system, computed from the definition
 Usage
   P = weightSystemPolytope q
 Inputs
   q:List
-    of integers {d, q_0, ..., q_n}, where d is the sum of the weights
+    of integers {d, q_0, ..., q_n}, where d is the sum of the weights, or a
+    @TO WeightSystem@ with a single row
 Outputs
   P:Polyhedron
 Description
@@ -1534,14 +1564,15 @@ Key
   palpNefPartitions
   (palpNefPartitions, Matrix, ZZ)
   (palpNefPartitions, List, ZZ)
+  (palpNefPartitions, WeightSystem, ZZ)
 Headline
   the nef partitions of a reflexive polytope
 Usage
   H = palpNefPartitions(A, c)
 Inputs
   A:Matrix
-    over the integers, whose columns span the polytope, or a @TO List@ holding a
-    (combined) weight system
+    over the integers, whose columns span the polytope, or a (combined) weight
+    system, as a @TO List@ or a @TO WeightSystem@
   c:ZZ
     the codimension, that is, the number of parts
 Outputs
@@ -1871,6 +1902,28 @@ TEST ///
   assert not isWellDefined new WeightSystem from {{2,1,1},{3,1,1,1}}  -- rows of different lengths
   assert not isWellDefined new WeightSystem from {{2,1/1,1}}          -- entry not in ZZ
   assert not isWellDefined new WeightSystem from {5}                  -- not a list of rows
+///
+
+TEST ///
+  -- the functions that take a weight system accept a WeightSystem as well as a List
+  for w in {{10,1,2,3,4}, {3,1,1,1,0,0,0, 3,0,0,0,1,1,1}} do (
+      cws := weightSystem w;
+      assert(palpNormalForm cws == palpNormalForm w);
+      assert(palpMVertices cws == palpMVertices w);
+      assert(palpMPoints cws == palpMPoints w);
+      assert(palpNVertices cws == palpNVertices w);
+      assert(palpNPoints cws == palpNPoints w);
+      assert(palpInfo cws === palpInfo w);
+      assert(palpIsReflexive cws === palpIsReflexive w);
+      assert(weightSystemVertices cws == weightSystemVertices w);
+      assert(palpRun("poly", "-v", cws) == palpRun("poly", "-v", w));
+      assert((palpNefPartitions(cws, 2))#"Partitions" == (palpNefPartitions(w, 2))#"Partitions");
+      );
+  assert(vertices weightSystemPolytope weightSystem {10,1,2,3,4} == vertices weightSystemPolytope {10,1,2,3,4})
+  assert(try (weightSystemPolytope weightSystem {3,1,1,1,0,0,0, 3,0,0,0,1,1,1}; false) else true)
+  -- a malformed WeightSystem is refused before PALP sees it
+  assert(try (palpMVertices new WeightSystem from {{3,1,1,1,0}}; false) else true)
+  assert(try (palpMVertices weightSystem {2,1,1}; false) else true)      -- dimension one
 ///
 
 TEST ///
