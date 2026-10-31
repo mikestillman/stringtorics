@@ -1338,8 +1338,104 @@ Caveat
   alone more than half an hour.  In dimension 5 and higher, PALP requires a
   finite range.
 SeeAlso
+  weightSystem
   weightSystemVertices
   weightSystemPolytope
+///
+
+doc ///
+Key
+  weightSystem
+  (weightSystem, List)
+  [weightSystem, Verify]
+  WeightSystem
+Headline
+  make a (combined) weight system
+Usage
+  cws = weightSystem q
+Inputs
+  q:List
+    a weight system $\{d, q_0, \ldots, q_n\}$, or a combined weight system,
+    written either flat, as PALP writes it,
+    $\{d_1, q_{10}, \ldots, q_{1n}, \ d_2, q_{20}, \ldots, q_{2n}, \ \ldots\}$,
+    or as a list of rows
+  Verify => Boolean
+    if true, an input that is not a weight system is an error; if false, the
+    result is then @TO null@
+Outputs
+  cws:WeightSystem
+    the list of rows $\{\{d_1, q_{10}, \ldots, q_{1n}\}, \{d_2, q_{20}, \ldots, q_{2n}\}, \ldots\}$
+Description
+  Text
+    An object of type {\tt WeightSystem} is a combined weight system, stored as
+    its list of rows; a single weight system is one with just one row.  See
+    @TO weightSystems@ for the definitions.
+  Example
+    weightSystem {10, 1, 2, 3, 4}
+  Text
+    A flat list is split into rows the way PALP splits it: a row is a degree
+    followed by weights adding up to it, zeros that come next still belong to the
+    row, and the next positive number starts a new row.  So a later degree may
+    be smaller than the first.
+  Example
+    cws = weightSystem {3,1,1,1,0,0,0, 3,0,0,0,1,1,1}
+    cws === weightSystem {{3,1,1,1,0,0,0}, {3,0,0,0,1,1,1}}
+    weightSystem {2,1,1,0, 1,0,0,1}
+    toPalp cws
+  Text
+    The result is checked: each degree is the sum of the weights in its row, the
+    rows have the same length, and every variable has a positive weight in some
+    row (see @TO (isWellDefined, WeightSystem)@).  If not, this is an error, or,
+    with {\tt Verify => false}, the result is @TO null@.
+  Example
+    weightSystem({10,1,2,3,3}, Verify => false) === null
+    weightSystem({3,1,1,1,0,0, 3,0,0,0,1,1,1}, Verify => false) === null
+    weightSystem({3,1,1,1,0}, Verify => false) === null
+Caveat
+  The functions of this package that take a weight system, such as
+  @TO palpMVertices@, take it as a @TO List@, flat or as a list of rows, and do
+  not yet accept a {\tt WeightSystem}.
+SeeAlso
+  (isWellDefined, WeightSystem)
+  weightSystems
+  toPalp
+///
+
+doc ///
+Key
+  (isWellDefined, WeightSystem)
+Headline
+  whether a WeightSystem is a valid combined weight system
+Usage
+  isWellDefined cws
+Inputs
+  cws:WeightSystem
+Outputs
+  :Boolean
+    true if {\tt cws} is a non-empty list of rows $\{d, q_0, \ldots, q_n\}$ such
+    that every entry is an integer, every $q_i \ge 0$, $d = q_0 + \cdots + q_n$
+    and $d > 0$, all rows have the same length, and for each $i$ some row has
+    $q_i > 0$
+Description
+  Text
+    The last condition says that no variable has weight zero in every row.
+
+    A result of @TO weightSystem@ always satisfies these conditions.  This
+    function is for checking one made some other way.
+  Example
+    isWellDefined weightSystem {10, 1, 2, 3, 4}
+    isWellDefined new WeightSystem from {{10, 1, 2, 3, 4}}
+    isWellDefined new WeightSystem from {{3, 1, 1, 1, 0}}
+    isWellDefined new WeightSystem from {{4, 1, 1, 1}}
+  Text
+    When @TO "debugLevel"@ is positive, the reason for returning false is printed.
+  Example
+    debugLevel = 1
+    isWellDefined new WeightSystem from {{2, 1, 1}, {3, 1, 1, 1}}
+    debugLevel = 0
+SeeAlso
+  weightSystem
+  weightSystems
 ///
 
 doc ///
@@ -2311,6 +2407,7 @@ uninstallPackage "PALPInterface"
 restart
 elapsedTime installPackage "PALPInterface"
 elapsedTime check "PALPInterface"
+viewHelp PALPInterface
 
 -- Questions to check:
 --  weight systems: do the integers need to be in monotone increasing order?
