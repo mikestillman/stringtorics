@@ -299,6 +299,9 @@ weightSystem List := WeightSystem => opts -> q -> (
     if msg =!= null then fail msg else cws
     )
 
+-- two WeightSystems are equal when they have the same rows
+WeightSystem == WeightSystem := Boolean => (a, b) -> toList a == toList b
+
 -- weightSystemProblem cws
 --   cws: a WeightSystem
 --   returns null if cws is well-formed, i.e. it is a non-empty list of rows {d, q_0, ..., q_n} where
@@ -510,7 +513,9 @@ weightSystems ZZ := List => opts -> n -> (
         ws := value("{" | replace(" +", ",", substring(m#1, ell)) | "}");
         if #ws =!= n + 2 then error("unexpected cws.x output line: " | ell);
         ws);
-    if hi === infinity and lo > 0 then select(L, ws -> ws#0 >= lo) else L
+    if hi === infinity and lo > 0 then L = select(L, ws -> ws#0 >= lo);
+    -- cws.x output is already a valid weight system, so skip weightSystem's check
+    apply(L, ws -> new WeightSystem from {ws})
     )
 
 -- The vertices of Delta(q).  This is palpMVertices on a weight system; it is
@@ -1271,8 +1276,8 @@ Inputs
     degree
 Outputs
   L:List
-    of the IP weight systems $\{d, q_0, \ldots, q_n\}$ of dimension $n$, in the
-    order PALP produces them
+    of the IP weight systems $\{d, q_0, \ldots, q_n\}$ of dimension $n$, each a
+    @TO WeightSystem@ with one row, in the order PALP produces them
 Description
   Text
     A weight system is a list $\{d, q_0, \ldots, q_n\}$ of positive integers with
@@ -1311,7 +1316,7 @@ Description
     in dimension 5 that fails.
   Example
     all(L, palpIsReflexive)
-    member({7, 1, 1, 1, 1, 1, 2}, weightSystems(5, Degrees => 7))
+    member(weightSystem {7, 1, 1, 1, 1, 1, 2}, weightSystems(5, Degrees => 7))
     palpIsReflexive {7, 1, 1, 1, 1, 1, 2}
   Text
     Restricting the degree:
@@ -1375,6 +1380,7 @@ Key
   (weightSystem, List)
   [weightSystem, Verify]
   WeightSystem
+  (symbol ==, WeightSystem, WeightSystem)
 Headline
   make a (combined) weight system
 Usage
@@ -1394,7 +1400,8 @@ Outputs
 Description
   Text
     An object of type {\tt WeightSystem} is a combined weight system, stored as
-    its list of rows; a single weight system is one with just one row.  See
+    its list of rows; a single weight system is one with just one row.  Two of
+    them are equal, under {\tt ==}, when they have the same rows.  See
     @TO weightSystems@ for the definitions.
   Example
     weightSystem {10, 1, 2, 3, 4}
@@ -1405,7 +1412,7 @@ Description
     be smaller than the first.
   Example
     cws = weightSystem {3,1,1,1,0,0,0, 3,0,0,0,1,1,1}
-    cws === weightSystem {{3,1,1,1,0,0,0}, {3,0,0,0,1,1,1}}
+    cws == weightSystem {{3,1,1,1,0,0,0}, {3,0,0,0,1,1,1}}
     weightSystem {2,1,1,0, 1,0,0,1}
     toPalp cws
   Text
@@ -1862,25 +1869,25 @@ TEST ///
   -- cws.x enumerates the weight systems of a given dimension
   wss = weightSystems 3
   assert(#wss == 95)
-  assert(wss#0 == {4, 1, 1, 1, 1})
-  assert(wss#90 == {44, 4, 5, 13, 22})
-  assert all(wss, ws -> ws#0 == sum drop(ws, 1))     -- degree is the sum of the weights
-  assert all(wss, ws -> #ws == 5)
+  assert all(wss, ws -> instance(ws, WeightSystem) and #ws == 1 and isWellDefined ws)
+  assert(wss#0 == weightSystem {4, 1, 1, 1, 1})
+  assert(wss#90 == weightSystem {44, 4, 5, 13, 22})
+  assert all(wss, ws -> #(ws#0) == 5)
 
   -- a degree range; cws.x then appends a summary line, which must not be parsed
   assert(#weightSystems(5, Degrees => (20,20)) == 61)
   assert(#weightSystems(5, Degrees => (10,10)) == 5)
   assert(weightSystems(5, Degrees => 10) == weightSystems(5, Degrees => {10,10}))
-  assert(member({10, 1, 1, 2, 2, 2, 2}, weightSystems(5, Degrees => 10)))
+  assert(member(weightSystem {10, 1, 1, 2, 2, 2, 2}, weightSystems(5, Degrees => 10)))
 
   assert(try (weightSystems(3, Degrees => {1,2,3}); false) else true)
 
   -- the default is Degrees => {0, infinity}; a lower bound alone filters the
   -- full list, and agrees with a finite range reaching the largest degree, 66
   assert(weightSystems(3, Degrees => {0, infinity}) == wss)
-  assert(weightSystems(3, Degrees => {40, infinity}) == select(wss, ws -> ws#0 >= 40))
+  assert(weightSystems(3, Degrees => {40, infinity}) == select(wss, ws -> ws#0#0 >= 40))
   assert(set weightSystems(3, Degrees => {40, infinity}) === set weightSystems(3, Degrees => {40, 66}))
-  assert(weightSystems 1 == {{2, 1, 1}})
+  assert(weightSystems 1 == {weightSystem {2, 1, 1}})
   assert(#weightSystems 2 == 3)
   -- PALP aborts on lo > hi, and needs a finite range in dimension 5 and up
   ans = trap weightSystems(3, Degrees => {8, 6})
@@ -2098,7 +2105,7 @@ TEST ///
   do assert(numRows f V === 1)
 
   -- there is exactly one weight system in dimension one
-  assert(weightSystems 1 == {{2,1,1}})
+  assert(weightSystems 1 == {weightSystem {2,1,1}})
   assert(lift(vertices weightSystemPolytope {2,1,1}, ZZ) == matrix{{-1,1}})
 
   -- PALP itself aborts on a dimension one weight system, failing an assertion
@@ -2191,6 +2198,9 @@ TEST ///
   -- a weight that is 0 in every row is rejected
   assert(try (weightSystem {3,1,1,1,0}; false) else true)
   assert(weightSystem({3,1,1,1,0}, Verify => false) === null)
+  -- == compares the rows
+  assert(weightSystem {3,1,1,1,0,0,0, 3,0,0,0,1,1,1} == weightSystem {{3,1,1,1,0,0,0}, {3,0,0,0,1,1,1}})
+  assert(weightSystem {10,1,2,3,4} != weightSystem {10,4,3,2,1})
 
   -- weights that add to greater than the sum (first entry of each block) are not allowed.
   (ans, err) = trap weightSystem {10,2,3,6,0,1}
