@@ -55,6 +55,12 @@ exportMutable {
 palpVerbosity = 0
 
 WeightSystem = new Type of BasicList
+NefPartition = new Type of HashTable
+  -- a nef partition contains keys (the codimension is the 
+  -- Partition (a list of lists of integer indices)
+  -- HodgeNumbers (if collected): a list of h11, h12 (in dim 3.  what else in other dimensions?)
+  -- Type (P, D, regular). P = projection, D = product (I think).
+  -- Vertices (a list of integer lists, used to determine what rays the nef partition correspond to).
 
 -------------------------------------------------
 -- Locating the PALP executables -----------------
@@ -284,7 +290,10 @@ weightSystem List := WeightSystem => opts -> q -> (
     )
 
 isWellDefined WeightSystem := Boolean => cws -> (
-    
+    -- check the following:
+    -- each list in cws is of the form {sum, w0, w1, ..., wm}
+    --  where each wi, sum is an integer, wi >= 0, sum = w0 + ... + wm
+    -- no column i in 0, ..., m have a_i = 0 for all a an element of cws.
     )
 
 -- XXX
@@ -638,8 +647,7 @@ palpNefPoints = out -> (
 --   "Points"     the N-lattice points, one per column, or null if PALP said nothing
 --   "Partitions" one entry per nef partition, each a list of the parts that PALP
 --                printed, as column indices into "Points"
--- An empty list of partitions is an answer, not a failure: it says this polytope
--- has no nef partition of that codimension.
+-- An empty list of partitions means: no nef partitions of the given codimension
 palpNefPartitions = method()
 palpNefPartitions(Matrix, ZZ) :=
 palpNefPartitions(List, ZZ) := HashTable => (A, c) -> (
@@ -749,7 +757,7 @@ Description
     ws = {10, 1, 2, 3, 4}
     V = weightSystemVertices ws
     palpNormalForm V
-      P = convexHull V
+    P = convexHull V
     isReflexive P
   Text
     The columns of the matrix are the vertices.  PALP itself prints a point set
@@ -2335,6 +2343,51 @@ TEST ///
   palpNefPartitions(verts, 2)
   
 ///
+
+
+"TEST"
+/// -- checking nef partitions, codim = 3 in dim 5 (gives a surface, not 3-fold).
+-- XXX
+  needsPackage "NormalToricVarieties"
+  wss = weightSystems(5, Degrees => {20,20}) -- 61 different ws's
+  wssr = for ws in wss list (
+      verts := weightSystemVertices ws;
+      P := convexHull verts;
+      if not isReflexive P then continue else ws) -- 41 of them give reflexive
+  for ws in wssr list elapsedTime palpNefPartitions(ws, 2)  
+  
+  ws = {20, 1, 2, 2, 2, 3, 10}
+  assert(ws == wsorig)
+
+  verts = weightSystemVertices ws
+  P = convexHull verts
+  isReflexive P
+  P' = polar P
+  isReflexive P'
+  V = normalToricVariety P
+  V' = normalToricVariety P'
+  assert isSimplicial V
+  assert not isSimplicial V'
+  rays V'
+  Ds = for i from 0 to # rays V' - 1 list V'_i
+  ds = select(drop(drop(subsets(#rays V), 1), -1), s -> s#0 == 0)
+  Dlist = for d in ds list sum(d, i -> V_i)
+  select(Dlist, d -> not isNef d)
+  Ds/isNef
+
+
+  Ds = for i from 0 to # rays V' - 1 list V'_i
+  ds = select(drop(drop(subsets(#rays V'), 1), -1), s -> s#0 == 0);
+  Dlist = for d in ds list sum(d, i -> V'_i);
+  elapsedTime select(Dlist, d -> isNef d) -- slow?
+  -- IN PROGRESS?? select(drop(subsets Ds, -1), d ->
+
+  elapsedTime palpNefPartitions(ws, 2) -- very slow...!
+  weightSystemVertices ws
+  P'' = weightSystemPolytope ws -- very slow...!
+  vertices P'' -- ouch!
+///
+
 end--
 
 -* Development section *-
@@ -2401,3 +2454,62 @@ palpRun("poly", "-v", {10,1,2,3,4})      -- raw poly.x output for any polytope o
 palpVerbosity = 2                        -- then every call prints its command, input and output
 
 elapsedTime r = runProgram(palpProgram "cws", "-w4");
+
+echo '20 2 3 3 4 4 4' | nef-11d.x -f -D -P  -Lp -c2
+echo '20 2 3 3 4 4 4' | nef-11d.x -f -D -P  -Lv -c2
+
+toPalp palpNVertices {20, 2, 3, 3, 4, 4, 4}
+toPalp palpNPoints {20, 2, 3, 3, 4, 4, 4}
+
+-- Let's take the ws, and compute the N lattice polytope.  Use that as input to the nef code, with -N
+
+echo '5 7
+      2 0 0 0 0 -3 -2
+      1 0 0 1 0 -3 -2
+      0 0 1 0 0 -2 -1
+      0 1 0 0 0 -2 -1
+      0 0 0 0 1 -2 -1' | nef-11d.x -N -f -D -P -c2
+
+-- now in M2 directly.      
+nefx = palpProgram("nef-11d")
+palpRun("nef", "-f -D -P -Lv -c2",  {20, 2, 3, 3, 4, 4, 4}, KeepFiles => true)
+debug PALPInterface
+methods runPALP
+runPALP(nefx, "-D -P -Lv -c2",  toPalp {20, 2, 3, 3, 4, 4, 4}, KeepFiles => true)
+runPALP(nefx, "-D -P -Lv -c2 -N", toPalp palpNVertices {20, 2, 3, 3, 4, 4, 4})
+palpNVertices ws
+palpNPoints ws
+
+-- This is P^2 x P^1 x P^2
+ws = {3, 1, 1, 1, 0, 0, 0, 0, 0,
+    2, 0, 0, 0, 1, 1, 0, 0, 0,
+    3, 0, 0, 0, 0, 0, 1, 1, 1}
+runPALP(nefx, "-D -P -Lv -c2 -N", toPalp palpNVertices ws)
+palpVerbosity = 1
+
+needsPackage "PALPInterface"
+--fromPalpMatrix "6 3 2 1 0 0 0 0 0 0 0 0  13 6 4 0 1 0 0 0 0 0 1 1  7 3 2 0 0 1 0 0 0 0 1 0  8 3 2 0 0 0 1 0 0 1 1 0  15 6 4 0 0 0 0 1 1 1 1 1"
+cws = {6, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0,  13, 6, 4, 0, 1, 0, 0, 0, 0, 0, 1, 1,  7, 3, 2, 0, 0, 1, 0, 0, 0, 0, 1, 0,  8, 3, 2, 0, 0, 0, 1, 0, 0, 1, 1, 0,  15, 6, 4, 0, 0, 0, 0, 1, 1, 1, 1, 1}
+ws = weightSystem cws
+matrix toList ws
+palpNVertices cws
+palpMVertices cws
+P = convexHull oo
+isReflexive P
+
+needsPackage "NormalToricVarieties"
+V = normalToricVariety P
+assert isFano V
+assert not isSimplicial V
+assert (isAmple (-toricDivisor V))
+transpose matrix rays V
+
+elapsedTime palpNefPartitions(cws, 2)
+D1 = V_2 + V_6 + V_10
+D2 = -toricDivisor V - D1
+assert isNef D1
+assert isNef D2
+for i from 0 to 10 list isNef V_i
+
+palpVerbosity = 4
+elapsedTime palpNefPartitions(cws, 3)
