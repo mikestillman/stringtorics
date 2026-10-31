@@ -171,7 +171,7 @@ toPalp Matrix := String => M -> (
         newline)
     )
 toPalp List := String => wlist -> (
-    if isNestedWeightSystem wlist then wlist = flatten wlist;
+    wlist = flatten wlist;   -- a list of rows, or already flat
     if #wlist === 0 then error "expected a non-empty weight system";
     if not all(wlist, a -> instance(a, ZZ)) then error "expected a list of integers";
     demark(" ", toString \ wlist) | newline
@@ -261,53 +261,53 @@ checkPalpInput Matrix := M -> (
 
 weightSystem = method(Options => {Verify => true})
 weightSystem List := WeightSystem => opts -> q -> (
-    -- q: a list of integers, a (possibly combined) weight system, given as a list of integers.
-    -- returns a WeightSystem (i.e. a combined weight system)
-    blocks := {};
-    cur := {q#0};
-    rem := q#0;
-    for a in drop(q, 1) do (
-        if a > rem then (
-            if rem > 0 then (
-                if opts.Verify then error "weights sum to more than expected sum";
-                if debugLevel > 0 then << "weights sum to more than expected sum" << endl;
-                return null;
-                );
-            blocks = append(blocks, cur);
-            cur = {a};
-            rem = a;
-            )
-        else (
-            cur = append(cur, a);
-            rem = rem - a;
-            ));
-    if rem > 0 then (
-        if opts.Verify then error "weights sum to less than expected sum";
-        if debugLevel > 0 then << "weights sum to less than expected sum" << endl;
-        return null;
-        );
-    cws := new WeightSystem from append(blocks, cur);
-    -- the rows add up; check the rest (rows of the same length, no weight zero in every row)
-    msg := weightSystemProblem cws;
-    if msg =!= null then (
+    -- q: a (possibly combined) weight system, either flat, as PALP writes it,
+    --    {d_1, q_10, ..., q_1n, d_2, q_20, ..., q_2n, ...}, or as a list of rows
+    --    {{d_1, q_10, ..., q_1n}, {d_2, q_20, ..., q_2n}, ...}
+    -- returns a WeightSystem, the list of rows.  If q is not a weight system,
+    --    this is an error, or with Verify => false, null.
+    fail := msg -> (
         if opts.Verify then error msg;
         if debugLevel > 0 then << msg << endl;
-        return null;
-        );
-    cws
+        null);
+    cws := if #q > 0 and all(q, r -> instance(r, List)) then new WeightSystem from q
+    else (
+        if #q === 0 or not all(q, a -> instance(a, ZZ)) then return fail(
+            "expected a weight system, a non-empty list of integers or a list of rows, got "
+            | toString q);
+        -- split q into rows the way PALP does (ReadCwsPp in Coord.c): a row is a
+        -- degree followed by weights adding up to it; zeros that come next still
+        -- belong to the row, and the next positive number starts a new row
+        blocks := {};
+        cur := {q#0};
+        rem := q#0;
+        for a in drop(q, 1) do (
+            if a > rem then (
+                if rem > 0 then return fail "weights sum to more than expected sum";
+                blocks = append(blocks, cur);
+                cur = {a};
+                rem = a;
+                )
+            else (
+                cur = append(cur, a);
+                rem = rem - a;
+                ));
+        if rem > 0 then return fail "weights sum to less than expected sum";
+        new WeightSystem from append(blocks, cur));
+    msg := weightSystemProblem cws;
+    if msg =!= null then fail msg else cws
     )
 
 -- weightSystemProblem cws
 --   cws: a WeightSystem
---   returns null if cws is a non-empty list of rows {d, q_0, ..., q_n} where
+--   returns null if cws is well-formed, i.e. it is a non-empty list of rows {d, q_0, ..., q_n} where
 --     (1) every entry is an integer, and every q_i >= 0,
 --     (2) d = q_0 + ... + q_n, and d > 0,
 --     (3) every row has the same length,
 --     (4) for each i, some row has q_i > 0,
---   and otherwise a String saying what is wrong.
--- A variable with weight zero in every row makes the polytope unbounded, and
--- PALP does not notice: poly.x -v on 3 1 1 1 0 prints a 3 by 3 matrix.
-weightSystemProblem = cws -> (
+--   and otherwise returns a String saying what is wrong.
+weightSystemProblem = method()
+weightSystemProblem WeightSystem := cws -> (
     if #cws === 0 then return "expected at least one weight system";
     for r in cws do (
         if not instance(r, List) then return "expected a list, got " | toString r;
@@ -335,25 +335,9 @@ isWellDefined WeightSystem := Boolean => cws -> (
     msg === null
     )
 
--- isNestedWeightSystem q
---   q: a List, a weight system as the user gave it
---   returns true if q is a list of rows {{d_1, q_10, ..., q_1n}, {d_2, ...}, ...},
---      false if it is written flat, as PALP writes it.
-isNestedWeightSystem = q -> #q > 0 and all(q, r -> instance(r, List))
-
--- A weight system given as a list, flat or as a list of rows.  A flat list is
--- split into rows the way PALP splits it (ReadCwsPp in Coord.c), by weightSystem;
--- requiring the first entry of each row to be the sum of the rest also rules out
--- PALP's other reading of a list, "q_0 ... q_n d" with the degree last.
+-- weightSystem checks q, raising an error if it is not a weight system.
 checkPalpInput List := q -> (
-    cws := if isNestedWeightSystem q then new WeightSystem from q
-           else if all(q, a -> instance(a, ZZ) and a >= 0) and #q > 0 and q#0 > 0
-           then weightSystem q   -- raises an error if q is not a weight system
-           else error(
-               "expected a weight system {d, q_0, ..., q_n} of nonnegative integers with d = q_0 + ... + q_n,"
-               | " or several of them one after another, got " | toString q);
-    msg := weightSystemProblem cws;   -- needed only for a list of rows
-    if msg =!= null then error msg;
+    cws := weightSystem q;
     -- poly.x fails an assertion in ReadCwsPp and aborts on a single weight system of dimension one
     if #cws === 1 and #(cws#0) === 3 then error(
         "PALP aborts on a weight system of dimension one; give the polytope as a "
@@ -1982,9 +1966,9 @@ TEST ///
   assert match("more than expected sum", err {10,2,3,6,0,1})
   assert match("less than expected sum", err {10,1,2,3,3})
   assert match("q_3 is 0", err {3,1,1,1,0})               -- PALP answers this, wrongly
-  assert match("expected a weight system", err {10,-1,2,3,6})
+  assert match("nonnegative", err {10,-1,2,3,6})
   assert match("expected a weight system", err {10,1,2,3,4/1})
-  assert match("expected a weight system", err {0,0,0,1,1})
+  assert match("positive", err {0,0,0,1,1})
   assert match("same number", err {3,1,1,1,0,0, 3,0,0,0,1,1,1})
   assert match("q_6 is 0 in every row", err {3,1,1,1,0,0,0,0, 3,0,0,0,1,1,1,0})
   assert match("more than expected sum", err {1,1,1,3})    -- PALP would read this as degree 3, degree last
