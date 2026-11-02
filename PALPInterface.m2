@@ -12,7 +12,10 @@ newPackage(
     HomePage => "https://github.com/mikestillman/stringtorics",
     AuxiliaryFiles => false,
     DebuggingMode => true,
-    PackageImports => {"Polyhedra", "NormalToricVarieties", "LLLBases"}
+    -- Polyhedra is exported, so that vertices (of a NefPartition, for instance)
+    -- and the Polyhedron returned by weightSystemPolytope can be used at once
+    PackageExports => {"Polyhedra"},
+    PackageImports => {"NormalToricVarieties", "LLLBases"}
     )
 
 export {
@@ -44,6 +47,16 @@ export {
     "palpNefPartitions",
     "palpNefPartitionsNew",      -- temporary name, while it replaces palpNefPartitions
     "NefPartition",
+    "Codim",                     -- the keys of a NefPartition
+    "Parts",
+    "Vertices",
+    "Properties",
+    "Euler",                     -- with HodgeNumbers, keys of its cache
+    "Projection",                -- the possible entries of its Properties
+    "DirectProduct",
+    "DualProjection",
+    "hodgeNumbers",
+    "properties",
     "HodgeNumbers",
     "Products",
     "Projections",
@@ -616,6 +629,15 @@ palpNefPoints = out -> (
     else palpPointMatrix concatenate between(newline, drop(L, i))
     )
 
+-- the block of vertices of Delta^* that nef.x -V prints, one vertex per column,
+-- numbered as in the V fields of its partition lines
+palpNefVertices = out -> (
+    L := lines out;
+    i := position(L, ell -> match("Vertices of P:", ell));
+    if i === null then null
+    else palpPointMatrix concatenate between(newline, drop(L, i))
+    )
+
 -- Returns a hash table with
 --   "Points"     the N-lattice points, one per column, or null if PALP said nothing
 --   "Partitions" one entry per nef partition, each a list of the parts that PALP
@@ -666,52 +688,71 @@ palpNefPartitionFromLine = (ell, nv, c, V, relabel) -> (
     if #parts =!= c - 1 then error("unexpected nef.x output line: " | ell);
     parts = append(parts, toList(0 ..< nv) - set flatten parts);
     parts = apply(parts, p -> sort apply(p, i -> relabel#i));
-    H := new MutableHashTable from {
-        "Codim" => c,
-        "Parts" => parts,
-        "Vertices" => V,
-        "Product" => member("D", toks),
-        "Projection" => any(parts, p -> #p === 1),
-        "DualProjection" => member("DP", toks)
+    props := {};
+    if any(parts, p -> #p === 1) then props = append(props, Projection);
+    if member("D", toks) then props = append(props, DirectProduct);
+    if member("DP", toks) then props = append(props, DualProjection);
+    n := new NefPartition from {
+        Codim => c,
+        Parts => parts,
+        Vertices => V,
+        Properties => props,
+        symbol cache => new CacheTable
         };
     h := palpParseHodge toks;
     if h =!= null then (
-        H#"HodgeNumbers" = h#0;
-        H#"Euler" = h#1;
+        n.cache.HodgeNumbers = h#0;
+        n.cache.Euler = h#1;
         );
-    new NefPartition from H
+    n
     )
 
+-- The input describes the reflexive polytope Delta^* on the N side, whose
+-- vertices are the rays of the fan:
+--   a Matrix             whose columns are the vertices of Delta^*, or some or
+--                        all of its nonzero lattice points, including the vertices
+--   a NormalToricVariety its rays are used, as such a matrix
+--   a weight system      (a List or WeightSystem) this describes Delta, on the M
+--                        side, as everywhere else in the package
 -- Returns a list of NefPartitions, each a hash table with
---   "Codim"          c
---   "Parts"          a list of c lists of indices of columns of "Vertices", one
+--   Codim            c
+--   Parts            a list of c lists of indices of columns of Vertices, one
 --                    list per part, partitioning all the vertices
---   "Vertices"       the vertices of the dual polytope Delta^* in the N lattice,
---                    one per column, in our coordinates.  With Lattice => "N"
---                    they are in the order they appear among the columns of A
---                    (so if A is exactly the vertices, the indices are its column
---                    indices); otherwise in the order PALP uses.
---   "Product", "Projection", "DualProjection"   Booleans (see above)
---   "HodgeNumbers"   {h^{1,1}, ..., h^{1,dim-1}}, unless HodgeNumbers => false
---   "Euler"          the Euler characteristic, unless HodgeNumbers => false
+--   Vertices         the vertices of Delta^* in the N lattice, one per column.
+--                    For a matrix (or variety) they are in the order they appear
+--                    among its columns (rays), so if those are exactly the
+--                    vertices, the indices are its column indices; for a weight
+--                    system, in the order PALP uses.
+--   Properties       a sublist of {Projection, DirectProduct, DualProjection}
+--   cache            a CacheTable, holding HodgeNumbers {h^{1,1}, ..., h^{1,dim-1}}
+--                    and Euler, the Euler characteristic, unless
+--                    HodgeNumbers => false; hodgeNumbers and euler compute them
+--                    when they are not there
 -- or null if nef.x prints nothing, which it does for a polytope that is not
 -- reflexive.
 palpNefPartitionsNew = method(Options => {
         HodgeNumbers => true,     -- false: nef.x -p, which skips the Hodge numbers
         Products => false,        -- nef.x -D: include direct products
         Projections => false,     -- nef.x -P: include projections
-        KeepSymmetric => false,   -- nef.x -s: keep partitions equivalent under symmetries
-        Lattice => "M"            -- "N": the columns of A span Delta^* (nef.x -N)
+        KeepSymmetric => false    -- nef.x -s: keep partitions equivalent under symmetries
         })
+palpNefPartitionsNew(NormalToricVariety, ZZ) := List => opts -> (X, c) ->
+    palpNefPartitionsWith(transpose matrix rays X, c, opts)
 palpNefPartitionsNew(Matrix, ZZ) :=
 palpNefPartitionsNew(List, ZZ) :=
-palpNefPartitionsNew(WeightSystem, ZZ) := List => opts -> (A, c) -> (
+palpNefPartitionsNew(WeightSystem, ZZ) := List => opts -> (A, c) -> palpNefPartitionsWith(A, c, opts)
+
+-- The body of palpNefPartitionsNew; opts is its option table.  A matrix is given
+-- to nef.x with -N, so that it is read as Delta^*.  We ask for -V, the vertices
+-- of Delta^*, rather than -Lp, all its lattice points: the vertices are all we
+-- use, and -Lp also computes the relations among the points (the "L vector"),
+-- which fails on some inputs -- an assertion in TriMat_to_Weight on the weight
+-- system {36,7,8,9,12}, and in Make_L when Delta^* has more than VERT_Nmax points.
+palpNefPartitionsWith = (A, c, opts) -> (
     if c < 1 then error "expected a positive codimension";
-    if not member(opts.Lattice, {"M", "N"}) then error "expected Lattice => \"M\" or \"N\"";
-    nside := opts.Lattice === "N";
-    if nside and not instance(A, Matrix) then error "expected a matrix for Lattice => \"N\"";
+    nside := instance(A, Matrix);
     if nside and ring A === QQ then A = try lift(A, ZZ) else A;
-    args := (if nside then "-N " else "") | "-Lp -c" | toString c
+    args := (if nside then "-N " else "") | "-V -c" | toString c
         | (if opts.HodgeNumbers then "" else " -p")
         | (if opts.Products then " -D" else "")
         | (if opts.Projections then " -P" else "")
@@ -724,9 +765,8 @@ palpNefPartitionsNew(WeightSystem, ZZ) := List => opts -> (A, c) -> (
     info := palpParseInfo first L;
     if not info#?"N" or #info#"N" =!= 2 then error("unexpected nef.x output: " | first L);
     nv := info#"N"#1;
-    P := palpNefPoints out;
-    if P === null or numColumns P < nv then error("unexpected nef.x output:" | newline | out);
-    V := P_(toList(0 ..< nv));
+    V := palpNefVertices out;
+    if V === null or numColumns V =!= nv then error("unexpected nef.x output:" | newline | out);
     relabel := toList(0 ..< nv);
     if nside then (
         -- renumber PALP's vertices in the order they first appear among the columns of A
@@ -743,13 +783,26 @@ palpNefPartitionsNew(WeightSystem, ZZ) := List => opts -> (A, c) -> (
     )
 
 -- The kinds of nef partition that nef.x reports, computed directly, as a check
--- on what PALP says.
---   parts: a list of lists of column indices of V, one list per part
---   V: the vertices of Delta^* in the N lattice, one per column (boundary points
---      may also be included, as long as each is in the part it belongs to)
+-- on what PALP says.  All three take the same input:
+--   V      an integer matrix whose columns are the vertices of the reflexive
+--          polytope Delta^* in the N lattice (the N side: the rays of the fan of
+--          the toric variety), one vertex per column.  Other nonzero lattice
+--          points of the boundary of Delta^* may be included as extra columns,
+--          as long as each is put in the part it belongs to.  Leave out the
+--          origin: it is not a ray and belongs to no part (if it is included
+--          anyway, in any part, none of the three answers changes).
+--   parts  a nef partition E_1, ..., E_c of those columns: a list of c disjoint
+--          lists of column indices, together containing every column.
+-- Write E_S for the union of the parts E_j with j in S.
 
--- PALP's REC_Dir_Product (Nefpart.c): some nonempty proper set S of parts has
--- dim span(E_S) + dim span(E_rest) = dim N, so Delta^* is a free sum
+-- isDirectProduct(parts, V) is true when the parts split into two nonempty
+-- groups S and T (each part in exactly one) with
+--     dim span(E_S) + dim span(E_T) = dim N,
+-- the spans being the linear spans in N_R.  Since all of the columns together
+-- span N_R, this says N_R = span(E_S) (+) span(E_T), so Delta^* is the free sum
+-- of conv(0, E_S) and conv(0, E_T), the toric variety is a product, and the
+-- complete intersection is a product of one in each factor.  The code tries each
+-- S containing part 0 (so that S and T are not both tried).
 isDirectProduct = method()
 isDirectProduct(List, Matrix) := Boolean => (parts, V) -> (
     n := numRows V; c := #parts;
@@ -758,64 +811,109 @@ isDirectProduct(List, Matrix) := Boolean => (parts, V) -> (
         S = prepend(0, S);
         rank V_(flatten parts_S) + rank V_(flatten parts_(others - set S)) == n)))
 
--- PALP's Remove_Proj on the N side: some nabla_j = conv(0, E_j) has only 2
--- lattice points
+-- isProjection(parts, V) is true when for some j the polytope
+--     nabla_j = conv({0} \cup E_j)    (in N_R)
+-- has exactly 2 lattice points, 0 and one other.  Since every vertex of Delta^*
+-- is a primitive lattice vector, this happens exactly when the part E_j is a
+-- single vertex v, so that the j-th divisor of the nef partition is the single
+-- toric divisor D_v.
 isProjection = method()
 isProjection(List, Matrix) := Boolean => (parts, V) -> any(parts, p ->
     #latticePoints convexHull(V_p | map(ZZ^(numRows V), ZZ^1, 0)) == 2)
 
--- PALP's Remove_Proj on the M side: some Delta_j = {m : <m,v> >= -1 for v in E_j,
--- <m,v> >= 0 for the other v} has only 2 lattice points
+-- isDualProjection(parts, V) is true when for some j the polytope
+--     Delta_j = {m in M_R : <m,v> >= -1 for each column v in E_j,
+--                           <m,v> >=  0 for each column v not in E_j}
+-- has exactly 2 lattice points, 0 and one other.  Delta_j, on the M side, is the
+-- polytope of the j-th divisor of the nef partition, sum_{v in E_j} D_v, and
+-- Delta = Delta_1 + ... + Delta_c.  The Delta_j are the parts of the dual nef
+-- partition, so this says that the dual nef partition is a projection.  Every
+-- column of V is used as a constraint, so V must contain all the vertices.
 isDualProjection = method()
 isDualProjection(List, Matrix) := Boolean => (parts, V) -> any(parts, p -> (
     a := transpose matrix {apply(numColumns V, i -> if member(i, p) then 1 else 0)};
     #latticePoints polyhedronFromHData(- transpose V, a) == 2))
 
-isDirectProduct NefPartition := Boolean => N -> isDirectProduct(N#"Parts", N#"Vertices")
-isProjection NefPartition := Boolean => N -> isProjection(N#"Parts", N#"Vertices")
-isDualProjection NefPartition := Boolean => N -> isDualProjection(N#"Parts", N#"Vertices")
+isDirectProduct NefPartition := Boolean => n -> isDirectProduct(n.Parts, n.Vertices)
+isProjection NefPartition := Boolean => n -> isProjection(n.Parts, n.Vertices)
+isDualProjection NefPartition := Boolean => n -> isDualProjection(n.Parts, n.Vertices)
+
+-- The polytopes Delta_i = {m : <m,v> >= -1 for v in E_i, <m,v> >= 0 for the
+-- other columns v} on the M side, one for each part, as matrices of their
+-- vertices.  Delta_i is a lattice polytope exactly when the i-th divisor
+-- sum_{v in E_i} D_v is Cartier, so a vertex that is not a lattice point means
+-- the parts do not form a nef partition, and that is an error here.
+nefPartitionDeltas = (parts, V) -> for i from 0 to #parts - 1 list (
+    D := polyhedronFromHData(- transpose V,
+        transpose matrix {apply(numColumns V, k -> if member(k, parts#i) then 1 else 0)});
+    try lift(vertices D, ZZ) else error(
+        "expected a nef partition, but Delta_" | toString i | " is not a lattice polytope")
+    )
 
 -- The vertices of the Cayley polytope of a nef partition, one per column, in
 -- Z^(c-1) x M (Lattice => "M") or Z^(c-1) x N (Lattice => "N").  The first c-1
 -- coordinates are 0 for part 0 and e_i for part i, as in PALP's Make_Gore_Poly
 -- (E_Poly.c); the rest run over the vertices of
---   Delta_i = {m : <m,v> >= -1 for v in E_i, <m,v> >= 0 for the other v}   (M side)
---   nabla_i = conv(0, E_i)                                               (N side)
--- These are the Gorenstein polytopes of the nef partition and of its dual.
--- On the M side, Delta_i is a lattice polytope exactly when E_i gives a Cartier
--- divisor, so a non-lattice vertex means the parts do not form a nef partition.
+--   Delta_i (see nefPartitionDeltas)    (M side)
+--   nabla_i = conv(0, E_i)              (N side)
+-- These are the Gorenstein polytopes of the nef partition and of its dual.  On
+-- the M side this is an error if the parts do not form a nef partition.
 cayleyPolytopeVertices = method(Options => {Lattice => "M"})
 cayleyPolytopeVertices(List, Matrix) := Matrix => opts -> (parts, V) -> (
     if not member(opts.Lattice, {"M", "N"}) then error "expected Lattice => \"M\" or \"N\"";
     c := #parts;
     n := numRows V;
-    cols := flatten for i from 0 to c - 1 list (
-        P := if opts.Lattice === "N"
-            then convexHull(map(ZZ^n, ZZ^1, 0) | V_(parts#i))
-            else polyhedronFromHData(- transpose V,
-                transpose matrix {apply(numColumns V, k -> if member(k, parts#i) then 1 else 0)});
-        Q := try lift(vertices P, ZZ) else error(
-            "expected a nef partition, but Delta_" | toString i | " is not a lattice polytope");
-        for m in entries transpose Q list apply(c - 1, d -> if d + 1 == i then 1 else 0) | m);
-    transpose matrix cols
+    pieces := if opts.Lattice === "N"
+        then for p in parts list lift(vertices convexHull(map(ZZ^n, ZZ^1, 0) | V_p), ZZ)
+        else nefPartitionDeltas(parts, V);
+    transpose matrix flatten for i from 0 to c - 1 list
+        for m in entries transpose pieces#i list apply(c - 1, d -> if d + 1 == i then 1 else 0) | m
     )
-cayleyPolytopeVertices NefPartition := Matrix => opts -> N ->
-    cayleyPolytopeVertices(N#"Parts", N#"Vertices", Lattice => opts.Lattice)
+cayleyPolytopeVertices NefPartition := Matrix => opts -> n ->
+    cayleyPolytopeVertices(n.Parts, n.Vertices, Lattice => opts.Lattice)
 
 -- The Hodge numbers of one nef partition, from nef.x -G, which reads its input
--- as the support polytope (in M) of a reflexive Gorenstein cone of index c and
--- computes its stringy Hodge numbers (AnalyseGorensteinCone in E_Poly.c).
--- Returns a hash table with "HodgeNumbers" {h^{1,1}, ..., h^{1,dim-1}} and "Euler".
+-- as the support polytope of a reflexive Gorenstein cone of index c and computes
+-- its stringy Hodge numbers (AnalyseGorensteinCone in E_Poly.c).  We give it the
+-- N side Cayley polytope with -N.  The M side one, without -N, gives the same
+-- answer, but more slowly: on {12,1,1,2,2,2,2,2} in codimension 3, 42 seconds
+-- rather than 26 for one partition, which is also what nef.x -c3 itself takes.
+-- The nef condition is checked first (nefPartitionDeltas); otherwise only PALP's
+-- check of the index of the cone would catch a partition that is not nef.
+-- Returns a hash table with HodgeNumbers {h^{1,1}, ..., h^{1,dim-1}} and Euler.
+-- Given a NefPartition, it also stores them in its cache.
 palpHodgeNumbers = method()
 palpHodgeNumbers(List, Matrix) := HashTable => (parts, V) -> (
-    out := runPALP(palpProgram "nef", "-G -c" | toString(#parts),
-        palpInput cayleyPolytopeVertices(parts, V));
+    nefPartitionDeltas(parts, V);
+    out := runPALP(palpProgram "nef", "-G -N -c" | toString(#parts),
+        palpInput cayleyPolytopeVertices(parts, V, Lattice => "N"));
     L := select(lines out, ell -> match("H:", ell));
     if #L =!= 1 then error("unexpected nef.x -G output:" | newline | out);
     h := palpParseHodge select(separate(" +", first L), x -> x =!= "");
-    new HashTable from {"HodgeNumbers" => h#0, "Euler" => h#1}
+    new HashTable from {HodgeNumbers => h#0, Euler => h#1}
     )
-palpHodgeNumbers NefPartition := HashTable => N -> palpHodgeNumbers(N#"Parts", N#"Vertices")
+palpHodgeNumbers NefPartition := HashTable => n -> (
+    h := palpHodgeNumbers(n.Parts, n.Vertices);
+    n.cache.HodgeNumbers = h.HodgeNumbers;
+    n.cache.Euler = h.Euler;
+    h)
+
+-- Access to the parts of a NefPartition.  The Hodge numbers and Euler
+-- characteristic are computed (by palpHodgeNumbers) if they are not already in
+-- the cache.
+parts NefPartition := List => n -> n.Parts
+vertices NefPartition := Matrix => n -> n.Vertices
+-- codim is method(Options => true) in Core, so its methods take options this way
+codim NefPartition := {} >> opts -> n -> n.Codim
+properties = method()
+properties NefPartition := List => n -> n.Properties
+hodgeNumbers = method()
+hodgeNumbers NefPartition := List => n -> (
+    if not n.cache#?HodgeNumbers then palpHodgeNumbers n;
+    n.cache.HodgeNumbers)
+euler NefPartition := ZZ => n -> (
+    if not n.cache#?Euler then palpHodgeNumbers n;
+    n.cache.Euler)
 
 -------------------------------------------------
 -- Nef partitions without PALP --------------------
@@ -1823,6 +1921,224 @@ SeeAlso
 
 doc ///
 Key
+  palpNefPartitionsNew
+  (palpNefPartitionsNew, Matrix, ZZ)
+  (palpNefPartitionsNew, NormalToricVariety, ZZ)
+  (palpNefPartitionsNew, List, ZZ)
+  (palpNefPartitionsNew, WeightSystem, ZZ)
+  [palpNefPartitionsNew, HodgeNumbers]
+  [palpNefPartitionsNew, Products]
+  [palpNefPartitionsNew, Projections]
+  [palpNefPartitionsNew, KeepSymmetric]
+Headline
+  the nef partitions of a reflexive polytope, with their Hodge numbers
+Usage
+  L = palpNefPartitionsNew(A, c)
+Inputs
+  A:{Matrix,NormalToricVariety,List,WeightSystem}
+    a matrix over the integers whose columns are the vertices of the reflexive
+    polytope $\Delta^*$ in the N lattice, or some or all of its nonzero lattice
+    points (including the vertices); or a normal toric variety, whose rays are
+    used in the same way; or a (combined) weight system, as a @TO List@ or a
+    @TO WeightSystem@, which describes the polytope $\Delta$ in the M lattice
+  c:ZZ
+    the codimension, that is, the number of parts
+  HodgeNumbers => Boolean
+    whether to compute the Hodge numbers (if false, PALP's option {\tt -p})
+  Products => Boolean
+    whether to include the nef partitions that are direct products ({\tt -D})
+  Projections => Boolean
+    whether to include the nef partitions that are projections ({\tt -P})
+  KeepSymmetric => Boolean
+    whether to keep nef partitions that are equivalent to another one under a
+    symmetry of the polytope ({\tt -s})
+Outputs
+  L:List
+    of @TO NefPartition@s, or @TO null@ if the polytope is not reflexive
+Description
+  Text
+    Let $\Delta^* \subset N_{\mathbb{R}}$ be a reflexive polytope, so that the cones
+    over its faces form the fan of a Gorenstein toric Fano variety, whose rays
+    are the vertices of $\Delta^*$.  A nef partition of codimension $c$ is a
+    partition $E_1, \ldots, E_c$ of the vertices such that each divisor
+    $D_j = \sum_{v \in E_j} D_v$ is Cartier and nef.  Equivalently, writing
+    $\Delta_j$ for the polytope of $D_j$ in $M_{\mathbb{R}}$,
+    $\Delta = \Delta_1 + \cdots + \Delta_c$.  The general complete intersection
+    of sections of $D_1, \ldots, D_c$ is then a Calabi-Yau variety of dimension
+    $\dim \Delta - c$, and its (stringy) Hodge numbers depend only on the
+    polytopes.
+
+    This function calls the PALP program {\tt nef.x}.  Each element of the
+    result is a @TO NefPartition@, which records the vertices of $\Delta^*$,
+    one per column, and the $c$ parts, each a list of column indices; see
+    @TO NefPartition@ for how to get at these, and at the Hodge numbers.  For
+    example, the weight system $\{10, 1, 1, 2, 2, 2, 2\}$ gives three
+    Calabi-Yau threefolds in codimension two.
+  Example
+    L = palpNefPartitionsNew({10, 1, 1, 2, 2, 2, 2}, 2);
+    #L
+    n = first L;
+    parts n
+    vertices n
+    (hodgeNumbers n, euler n)
+    apply(L, hodgeNumbers)
+  Text
+    All $c$ parts are listed, and together they contain every vertex.  (PALP
+    itself prints only $c-1$ of them; the one it leaves out is put last.)
+
+    A matrix is read as the polytope $\Delta^*$ in the N lattice, and the
+    indices in {\tt "Parts"} follow the order of its columns.  For the cross
+    polytope, the toric variety is $(\mathbb{P}^1)^4$, and in codimension three the
+    complete intersections are curves, which have no $h^{1,i}$.
+  Example
+    A = id_(ZZ^4) | -id_(ZZ^4)
+    L = palpNefPartitionsNew(A, 3);
+    #L
+    vertices first L == A
+    apply(L, parts)
+    apply(L, n -> (hodgeNumbers n, euler n))
+  Text
+    The columns may include lattice points of $\Delta^*$ other than its
+    vertices.  The vertices are then those among them, in the order they
+    appear, and the other points do not appear in the parts.
+
+    For a normal toric variety, its rays are used.  When the rays are exactly
+    the vertices of $\Delta^*$, as for a smooth Fano variety, the parts are lists
+    of ray indices, and can be given directly to @TO nefPartitionDivisors@.
+  Example
+    needsPackage "NormalToricVarieties"
+    X = smoothFanoToricVariety(3, 5);
+    L = palpNefPartitionsNew(X, 2);
+    vertices first L == transpose matrix rays X
+    apply(L, parts)
+    all(L, n -> all(nefPartitionDivisors(X, parts n), isNef))
+  Text
+    By default PALP leaves out two kinds of nef partition.  A projection is one
+    in which some part is a single vertex $v$, so that $D_j$ is the toric divisor
+    $D_v$; the complete intersection is then one of codimension $c-1$ in the
+    toric variety $D_v$.  A direct product is one whose parts split into two
+    groups spanning complementary subspaces of $N_{\mathbb{R}}$, so that the toric
+    variety and the complete intersection are products.  These, and the dual
+    projections, are listed by @TO (properties, NefPartition)@.  For $\mathbb{P}^5$ in
+    codimension two, there are the complete intersections of degrees $(3,3)$ and
+    $(2,4)$, and, as a projection, the quintic threefold in a hyperplane.
+  Example
+    L = palpNefPartitionsNew({6, 1, 1, 1, 1, 1, 1}, 2, Projections => true);
+    apply(L, n -> (parts n, hodgeNumbers n, properties n))
+  Text
+    PALP also keeps only one nef partition from each class of those equivalent
+    under symmetries of the polytope.  Which one it keeps depends on how it
+    numbers the vertices, so the same polytope given in different ways can give
+    different, but equivalent, representatives.  With {\tt KeepSymmetric => true}
+    all of them are listed.
+  Example
+    #palpNefPartitionsNew({10, 1, 1, 2, 2, 2, 2}, 2, KeepSymmetric => true)
+  Text
+    Computing the Hodge numbers can take much longer than finding the nef
+    partitions, especially in codimension three and higher.  For the
+    complete intersection of degrees $(2,2,3)$ in $\mathbb{P}^6$, finding the nef
+    partition takes a fraction of a second, but its Hodge numbers take about 20
+    seconds.  With {\tt HodgeNumbers => false} they are not computed, and
+    @TO hodgeNumbers@ computes them later, when they are asked for.
+  Example
+    L = palpNefPartitionsNew({7, 1, 1, 1, 1, 1, 1, 1}, 3, HodgeNumbers => false)
+    parts first L
+  Text
+    A polytope that is not reflexive gives @TO null@, and a reflexive polytope
+    with no nef partition of the given codimension gives the empty list.
+  Example
+    palpNefPartitionsNew({9, 1, 1, 2, 5}, 2) === null
+    palpNefPartitionsNew({36, 7, 8, 9, 12}, 2)
+Caveat
+  Codimension $c$ needs a PALP built for dimension at least $\dim N + c - 1$;
+  see @TO "palpDmax"@.  This is the new version of @TO palpNefPartitions@, which
+  it will replace.
+SeeAlso
+  NefPartition
+  palpNefPartitions
+  nefPartitionDivisors
+  naiveNefPartitions
+  "palpDmax"
+///
+
+doc ///
+Key
+  NefPartition
+  Codim
+  Parts
+  Vertices
+  Properties
+  Euler
+  Projection
+  DirectProduct
+  DualProjection
+  (parts, NefPartition)
+  (vertices, NefPartition)
+  (codim, NefPartition)
+  (euler, NefPartition)
+  hodgeNumbers
+  (hodgeNumbers, NefPartition)
+  properties
+  (properties, NefPartition)
+Headline
+  the class of nef partitions of reflexive polytopes
+Description
+  Text
+    A nef partition, as returned by @TO palpNefPartitionsNew@, is a hash table
+    with these keys:
+
+    {\tt Vertices}: the vertices of the reflexive polytope $\Delta^*$ in the N
+    lattice, one per column of a matrix;
+
+    {\tt Parts}: the $c$ parts $E_1, \ldots, E_c$, each a list of column
+    indices into {\tt Vertices}, which together contain every vertex;
+
+    {\tt Codim}: the number $c$ of parts;
+
+    {\tt Properties}: a list of those of the symbols {\tt Projection},
+    {\tt DirectProduct} and {\tt DualProjection} that apply.  A projection has
+    a part consisting of a single vertex; a direct product has its parts falling
+    into two groups that span complementary subspaces of $N_{\mathbb{R}}$; and a
+    dual projection is one whose dual nef partition is a projection.
+
+    These are given by the functions @TO (vertices, NefPartition)@,
+    @TO (parts, NefPartition)@, @TO (codim, NefPartition)@ and
+    @TO (properties, NefPartition)@, or as {\tt n.Vertices}, {\tt n.Parts}, and
+    so on.
+  Example
+    n = first palpNefPartitionsNew({10, 1, 1, 2, 2, 2, 2}, 2, HodgeNumbers => false);
+    vertices n
+    parts n
+    codim n
+    properties n
+    n.Parts
+  Text
+    The Hodge numbers $h^{1,1}, h^{1,2}, \ldots$ of the general complete
+    intersection, and its Euler characteristic, are kept in the cache of the
+    nef partition, under the keys {\tt HodgeNumbers} and {\tt Euler}.
+    @TO palpNefPartitionsNew@ puts them there, unless it is given
+    {\tt HodgeNumbers => false}.  The functions @TO hodgeNumbers@ and
+    @TO (euler, NefPartition)@ return them, first computing them, with
+    {\tt palpHodgeNumbers}, if they are not there.
+  Example
+    n.cache#?HodgeNumbers
+    hodgeNumbers n
+    euler n
+    n.cache#?HodgeNumbers
+  Text
+    For $\mathbb{P}^5$ in codimension two, the quintic threefold in a
+    hyperplane appears as a projection.
+  Example
+    L = palpNefPartitionsNew({6, 1, 1, 1, 1, 1, 1}, 2, Projections => true);
+    apply(L, n -> (parts n, properties n))
+SeeAlso
+  palpNefPartitionsNew
+  nefPartitionDivisors
+///
+
+
+doc ///
+Key
   parsePALPNefPartitions
   (parsePALPNefPartitions, String)
 Headline
@@ -2142,45 +2458,61 @@ TEST ///
   ws = {10,1,1,2,2,2,2}
   L = palpNefPartitionsNew(ws, 2)
   assert(#L == 3 and all(L, N -> instance(N, NefPartition)))
-  V = (L#0)#"Vertices"
+  V = (L#0).Vertices
   assert(set entries transpose V === set entries transpose palpNVertices ws)
   -- each nef partition has c parts, which partition the vertices
-  assert all(L, N -> #N#"Parts" == 2 and sort flatten N#"Parts" == toList(0 ..< numColumns V))
-  assert((L#0)#"HodgeNumbers" == {2, 86} and (L#0)#"Euler" == -168)
-  assert not any(L, N -> N#"Projection" or N#"Product")
+  assert all(L, N -> #(N.Parts) == 2 and sort flatten N.Parts == toList(0 ..< numColumns V))
+  assert((L#0).cache.HodgeNumbers == {2, 86} and (L#0).cache.Euler == -168)
+  assert not any(L, N -> member(Projection, N.Properties) or member(DirectProduct, N.Properties))
   -- projections, products, Hodge numbers, symmetric copies are optional
   LP = palpNefPartitionsNew(ws, 2, Projections => true, HodgeNumbers => false)
-  assert(#LP == 4 and #select(LP, N -> N#"Projection") == 1)
-  assert not any(palpNefPartitionsNew(ws, 2, HodgeNumbers => false), N -> N#?"HodgeNumbers")
+  assert(#LP == 4 and #select(LP, N -> member(Projection, N.Properties)) == 1)
+  assert not any(palpNefPartitionsNew(ws, 2, HodgeNumbers => false), N -> N.cache#?HodgeNumbers)
   assert(#palpNefPartitionsNew(ws, 2, Products => true, Projections => true, KeepSymmetric => true, HodgeNumbers => false) == 15)
   LD = palpNefPartitionsNew({3,1,1,1,0,0,0, 3,0,0,0,1,1,1}, 2, Products => true)
-  assert(#select(LD, N -> N#"Product") == 1)
+  assert(#select(LD, N -> member(DirectProduct, N.Properties)) == 1)
   -- codimension 3: three parts
   L3 = palpNefPartitionsNew(ws, 3, HodgeNumbers => false)
-  assert(#L3 == 1 and #(L3#0)#"Parts" == 3)
-  -- the same answer from the M-lattice vertices; nothing for a polytope that is not reflexive
-  assert(apply(palpNefPartitionsNew(palpMVertices ws, 2, HodgeNumbers => false), N -> N#"Parts") == apply(L, N -> N#"Parts"))
+  assert(#L3 == 1 and #((L3#0).Parts) == 3)
+  -- inputs on which nef.x -Lp fails (which is why we use -V): the weight system
+  -- {36,7,8,9,12}, which has no nef partitions, and a Delta^* with 1386 points
+  assert(palpNefPartitionsNew({36,7,8,9,12}, 2) == {})
+  assert(palpNefPartitionsNew(palpMVertices {12,1,1,2,2,2,2,2}, 2, HodgeNumbers => false) == {})
+  -- nothing for a polytope that is not reflexive
   assert(palpNefPartitionsNew({9,1,1,2,5}, 2) === null)
   -- N side input: the parts index the columns of the given vertices
   NV = palpNVertices ws
-  LN = palpNefPartitionsNew(NV, 2, Lattice => "N", KeepSymmetric => true, HodgeNumbers => false)
-  assert((LN#0)#"Vertices" == NV)
-  asCoords = L -> set apply(L, N -> set apply(N#"Parts", p -> set apply(p, i -> (entries transpose N#"Vertices")#i)))
+  LN = palpNefPartitionsNew(NV, 2, KeepSymmetric => true, HodgeNumbers => false)
+  assert((LN#0).Vertices == NV)
+  asCoords = L -> set apply(L, N -> set apply(N.Parts, p -> set apply(p, i -> (entries transpose N.Vertices)#i)))
   assert(asCoords LN === asCoords palpNefPartitionsNew(ws, 2, KeepSymmetric => true, HodgeNumbers => false))
+  -- a NormalToricVariety: its rays are the N side.  Here it is the variety of the
+  -- normal fan of Delta, whose rays are the vertices of Delta^*
+  needsPackage "NormalToricVarieties"
+  X = normalToricVariety convexHull palpMVertices ws
+  LX = palpNefPartitionsNew(X, 2, KeepSymmetric => true, HodgeNumbers => false)
+  assert((LX#0).Vertices == transpose matrix rays X)
+  assert(asCoords LX === asCoords LN)
   -- a polytope not from a weight system: the cross polytope, so the toric variety is (P^1)^4;
   -- in codimension 3 the complete intersections are curves, with no h^{1,i}
-  L4 = palpNefPartitionsNew(id_(ZZ^4) | -id_(ZZ^4), 3, Lattice => "N")
-  assert(#L4 == 5 and all(L4, N -> N#"HodgeNumbers" == {} and N#"Euler" == 0))
+  L4 = palpNefPartitionsNew(id_(ZZ^4) | -id_(ZZ^4), 3)
+  assert(#L4 == 5 and all(L4, N -> N.cache.HodgeNumbers == {} and N.cache.Euler == 0))
+  -- the accessor functions, and Hodge numbers computed when asked for, then cached
+  n = first palpNefPartitionsNew(ws, 2, HodgeNumbers => false)
+  assert(parts n === n.Parts and vertices n === n.Vertices and codim n === 2 and properties n === {})
+  assert(n.Parts == (L#0).Parts and not n.cache#?HodgeNumbers)
+  assert(hodgeNumbers n == {2, 86} and euler n == -168 and n.cache#?HodgeNumbers)
+  assert(properties last LP === {Projection})
 ///
 
 TEST ///
   -- isDirectProduct, isProjection, isDualProjection agree with what nef.x reports
-  agree = L -> all(L, N -> isProjection N === N#"Projection"
-      and isDirectProduct N === N#"Product" and isDualProjection N === N#"DualProjection")
-  L = palpNefPartitionsNew(id_(ZZ^3) | -id_(ZZ^3), 2, Lattice => "N", KeepSymmetric => true,
+  agree = L -> all(L, N -> isProjection N === member(Projection, N.Properties)
+      and isDirectProduct N === member(DirectProduct, N.Properties) and isDualProjection N === member(DualProjection, N.Properties))
+  L = palpNefPartitionsNew(id_(ZZ^3) | -id_(ZZ^3), 2, KeepSymmetric => true,
       Projections => true, Products => true, HodgeNumbers => false)
   assert(agree L and any(L, isDualProjection) and any(L, isDirectProduct) and any(L, isProjection))
-  L = palpNefPartitionsNew(id_(ZZ^4) | -id_(ZZ^4), 3, Lattice => "N",
+  L = palpNefPartitionsNew(id_(ZZ^4) | -id_(ZZ^4), 3,
       Projections => true, Products => true, HodgeNumbers => false)
   assert(agree L and #L == 19)
   L = palpNefPartitionsNew({10,1,1,2,2,2,2}, 2, Projections => true, Products => true, HodgeNumbers => false)
@@ -2196,17 +2528,28 @@ TEST ///
   -- palpHodgeNumbers, one nef partition at a time, agrees with nef.x's own list
   ws = {10,1,1,2,2,2,2}
   L = palpNefPartitionsNew(ws, 2)
-  assert all(L, N -> (h := palpHodgeNumbers N;
-      h#"HodgeNumbers" == N#"HodgeNumbers" and h#"Euler" == N#"Euler"))
+  assert all(L, N -> (old := (N.cache.HodgeNumbers, N.cache.Euler);
+      h := palpHodgeNumbers N; (h.HodgeNumbers, h.Euler) == old))
   -- the Cayley polytope lives in Z^(c-1) x M, with one vertex for each vertex of each Delta_i
   C = cayleyPolytopeVertices L#0
   assert(numRows C == 5 + 1)
-  assert(set entries transpose C === set entries transpose cayleyPolytopeVertices((L#0)#"Parts", (L#0)#"Vertices"))
+  assert(set entries transpose C === set entries transpose cayleyPolytopeVertices((L#0).Parts, (L#0).Vertices))
   -- the N side Cayley polytope is that of the dual nef partition: mirror Hodge numbers
   assert match("H:86 2 \\[168\\]", palpRun("nef", "-G -c2", cayleyPolytopeVertices(L#0, Lattice => "N")))
   -- a curve, in codimension 3 in (P^1)^4
-  N4 = first palpNefPartitionsNew(id_(ZZ^4) | -id_(ZZ^4), 3, Lattice => "N", HodgeNumbers => false)
-  assert(palpHodgeNumbers N4 === new HashTable from {"HodgeNumbers" => {}, "Euler" => 0})
+  N4 = first palpNefPartitionsNew(id_(ZZ^4) | -id_(ZZ^4), 3, HodgeNumbers => false)
+  assert(palpHodgeNumbers N4 === new HashTable from {HodgeNumbers => {}, Euler => 0})
+
+  -- MES tests
+  ws = {12,1,1,2,2,2,2,2}
+  L = palpNefPartitionsNew(ws, 3, HodgeNumbers => false)
+  elapsedTime palpHodgeNumbers L#0 -- 41 sec, MES MBP M4
+  elapsedTime palpHodgeNumbers L#1 -- 9 sec, MES MBP M4
+  elapsedTime L1 = palpNefPartitionsNew(ws, 3) -- computes Hodge numbers too, does it in 33.4 sec total.
+
+  -- MES: Claude, please check.
+  palpNefPartitionsNew(palpNVertices ws, 3, HodgeNumbers => false)
+  palpNefPartitionsNew(palpNPoints ws, 3, HodgeNumbers => false)
 ///
 
 TEST ///
