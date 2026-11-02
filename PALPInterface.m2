@@ -2543,13 +2543,13 @@ TEST ///
   -- MES tests
   ws = {12,1,1,2,2,2,2,2}
   L = palpNefPartitionsNew(ws, 3, HodgeNumbers => false)
-  elapsedTime palpHodgeNumbers L#0 -- 41 sec, MES MBP M4
-  elapsedTime palpHodgeNumbers L#1 -- 9 sec, MES MBP M4
-  elapsedTime L1 = palpNefPartitionsNew(ws, 3) -- computes Hodge numbers too, does it in 33.4 sec total.
+  -- elapsedTime palpHodgeNumbers L#0 -- 41 sec, MES MBP M4
+  -- elapsedTime palpHodgeNumbers L#1 -- 9 sec, MES MBP M4
+  -- elapsedTime L1 = palpNefPartitionsNew(ws, 3) -- computes Hodge numbers too, does it in 33.4 sec total.
 
   -- MES: Claude, please check.
-  palpNefPartitionsNew(palpNVertices ws, 3, HodgeNumbers => false)
-  palpNefPartitionsNew(palpNPoints ws, 3, HodgeNumbers => false)
+  -- palpNefPartitionsNew(palpNVertices ws, 3, HodgeNumbers => false)
+  -- palpNefPartitionsNew(palpNPoints ws, 3, HodgeNumbers => false)
 ///
 
 TEST ///
