@@ -40,6 +40,7 @@ export {
 
     -- weight systems
     "weightSystems",
+    "Reflexive",
     "weightSystemVertices",
     "weightSystemPolytope",
 
@@ -52,10 +53,12 @@ export {
     "Vertices",
     "Properties",
     "Euler",                     -- with HodgeNumbers, keys of its cache
+    "HodgeZero",
     "Projection",                -- the possible entries of its Properties
     "DirectProduct",
     "DualProjection",
     "hodgeNumbers",
+    "hodgeZero",
     "properties",
     "HodgeNumbers",
     "Products",
@@ -509,7 +512,7 @@ palpIsReflexive WeightSystem := Boolean => A -> palpNVertices A =!= null
 -- which lists all 184026 weight systems of dimension 4 in about three minutes;
 -- in dimension 5 and higher it fails an assertion.  So an unbounded range of
 -- degrees is answered by the second mode, keeping the degrees >= lo afterwards.
-weightSystems = method(Options => {Degrees => {0, infinity}})
+weightSystems = method(Options => {Degrees => {0, infinity}, Reflexive => false})
 weightSystems ZZ := List => opts -> n -> (
     if n < 1 then error "expected a positive dimension";
     drange := opts.Degrees;
@@ -539,10 +542,16 @@ weightSystems ZZ := List => opts -> n -> (
     -- carries a summary "#=184026 #cand=...".
     -- With a range, cws.x adds a summary line of its own, beginning with #.
     -- Keep the leading run of integers of each line, and read it with one value.
+    -- The flags contain "r" exactly when the polytope is reflexive (cws.x prints
+    -- this in every mode; in dimension at most 4 every line has it).
     L := for ell in lines result#"output" list (
         if match("^ *(#|$)", ell) then continue;
         m := regex("^ *([0-9]+( +[0-9]+)*)", ell);
         if m === null then error("unexpected cws.x output line: " | ell);
+        if opts.Reflexive then (
+            -- the first token after the integers is the flags, such as "r" or "rt"
+            rest := select(separate(" +", substring(ell, m#1#0 + m#1#1)), x -> x =!= "");
+            if #rest === 0 or not match("^[a-z]*r[a-z]*$", first rest) then continue);
         ws := value("{" | replace(" +", ",", substring(m#1, ell)) | "}");
         if #ws =!= n + 2 then error("unexpected cws.x output line: " | ell);
         ws);
@@ -668,9 +677,18 @@ palpNefPartitions(WeightSystem, ZZ) := HashTable => (A, c) -> (
 --   D   PALP found a direct product;  DP  the dual nef partition is a projection
 -- PALP does not label projections; one is a partition with a part consisting of
 -- a single vertex (Remove_Proj in E_Poly.c).
--- The Hodge numbers in a line of nef.x output, given as its list of tokens:
--- "H:2 86 [-168]" gives ({2, 86}, -168), and for a curve, where PALP prints just
--- "H:[0]", ({}, 0).  Returns null if there is no H: field.
+-- The Hodge numbers in a line of nef.x output, given as its list of tokens.
+-- Returns (h1, chi, h0), or null if there is no H: field, where
+--   h1   {h^{1,1}, ..., h^{1,d-1}}, d being the dimension of the complete
+--        intersection, so d = #h1 + 1
+--   chi  the Euler characteristic, printed in brackets
+--   h0   {h^{0,0}, ..., h^{0,d}}.  After the brackets PALP prints "h<i>=<v>" for
+--        each 1 <= i <= d/2 with h^{0,i} nonzero, and "h0=<v>" when h^{0,0} is not
+--        1, which happens only for direct products.  The rest are 1 and 0, and
+--        h^{0,i} = h^{0,d-i}, since the canonical class is trivial (Serre duality).
+-- For example "H:2 86 [-168]" gives ({2, 86}, -168, {1, 0, 0, 1}),
+-- "H:4 [0] h1=2" gives ({4}, 0, {1, 2, 1}), and for a curve, where PALP prints
+-- just "H:[0]", the result is ({}, 0, {1, 1}).
 palpParseHodge = toks -> (
     i := position(toks, t -> match("^H:", t));
     if i === null then return null;
@@ -678,7 +696,14 @@ palpParseHodge = toks -> (
     if toks#i =!= "H:" then hs = prepend(substring(toks#i, 2), hs);
     j := position(hs, t -> match("^\\[-?[0-9]+\\]$", t));
     if j === null then error("unexpected Hodge numbers in nef.x output: " | demark(" ", toks));
-    (apply(take(hs, j), value), value substring(hs#j, 1, #hs#j - 2))
+    h1 := apply(take(hs, j), value);
+    d := #h1 + 1;
+    h0 := new MutableList from prepend(1, toList(d : 0));
+    for t in drop(hs, j + 1) do (
+        m := regex("^h([0-9]+)=(-?[0-9]+)$", t);
+        if m =!= null then h0#(value substring(m#1, t)) = value substring(m#2, t));
+    for k from 0 to d do if 2 * k > d then h0#k = h0#(d - k);
+    (h1, value substring(hs#j, 1, #hs#j - 2), toList h0)
     )
 
 -- relabel#i is the index in V of PALP's vertex number i.
@@ -703,6 +728,7 @@ palpNefPartitionFromLine = (ell, nv, c, V, relabel) -> (
     if h =!= null then (
         n.cache.HodgeNumbers = h#0;
         n.cache.Euler = h#1;
+        n.cache.HodgeZero = h#2;
         );
     n
     )
@@ -880,7 +906,8 @@ cayleyPolytopeVertices NefPartition := Matrix => opts -> n ->
 -- rather than 26 for one partition, which is also what nef.x -c3 itself takes.
 -- The nef condition is checked first (nefPartitionDeltas); otherwise only PALP's
 -- check of the index of the cone would catch a partition that is not nef.
--- Returns a hash table with HodgeNumbers {h^{1,1}, ..., h^{1,dim-1}} and Euler.
+-- Returns a hash table with HodgeNumbers {h^{1,1}, ..., h^{1,d-1}}, Euler, and
+-- HodgeZero {h^{0,0}, ..., h^{0,d}} (see palpParseHodge).
 -- Given a NefPartition, it also stores them in its cache.
 palpHodgeNumbers = method()
 palpHodgeNumbers(List, Matrix) := HashTable => (parts, V) -> (
@@ -890,12 +917,13 @@ palpHodgeNumbers(List, Matrix) := HashTable => (parts, V) -> (
     L := select(lines out, ell -> match("H:", ell));
     if #L =!= 1 then error("unexpected nef.x -G output:" | newline | out);
     h := palpParseHodge select(separate(" +", first L), x -> x =!= "");
-    new HashTable from {HodgeNumbers => h#0, Euler => h#1}
+    new HashTable from {HodgeNumbers => h#0, Euler => h#1, HodgeZero => h#2}
     )
 palpHodgeNumbers NefPartition := HashTable => n -> (
     h := palpHodgeNumbers(n.Parts, n.Vertices);
     n.cache.HodgeNumbers = h.HodgeNumbers;
     n.cache.Euler = h.Euler;
+    n.cache.HodgeZero = h.HodgeZero;
     h)
 
 -- Access to the parts of a NefPartition.  The Hodge numbers and Euler
@@ -914,6 +942,10 @@ hodgeNumbers NefPartition := List => n -> (
 euler NefPartition := ZZ => n -> (
     if not n.cache#?Euler then palpHodgeNumbers n;
     n.cache.Euler)
+hodgeZero = method()
+hodgeZero NefPartition := List => n -> (
+    if not n.cache#?HodgeZero then palpHodgeNumbers n;
+    n.cache.HodgeZero)
 
 -------------------------------------------------
 -- Nef partitions without PALP --------------------
@@ -1566,6 +1598,7 @@ Key
   weightSystems
   (weightSystems, ZZ)
   [weightSystems, Degrees]
+  [weightSystems, Reflexive]
 Headline
   the weight systems of a given dimension
 Usage
@@ -1576,6 +1609,8 @@ Inputs
   Degrees => {List, ZZ}
     a range {lo, hi} of degrees, where hi may be @TO infinity@, or a single
     degree
+  Reflexive => Boolean
+    whether to return only the weight systems whose polytope is reflexive
 Outputs
   L:List
     of the IP weight systems $\{d, q_0, \ldots, q_n\}$ of dimension $n$, each a
@@ -1620,6 +1655,19 @@ Description
     all(L, palpIsReflexive)
     member(weightSystem {7, 1, 1, 1, 1, 1, 2}, weightSystems(5, Degrees => 7))
     palpIsReflexive {7, 1, 1, 1, 1, 1, 2}
+  Text
+    In dimension 5 and higher many IP weight systems are not reflexive, and
+    functions that need a reflexive polytope, such as
+    @TO palpNefPartitionsNew@, return @TO null@ for them.  With
+    {\tt Reflexive => true} only the reflexive ones are returned.  This uses
+    the mark {\tt cws.x} puts on each of them, so it costs nothing extra, and
+    gives the same answer as selecting them with @TO palpIsReflexive@.
+  Example
+    W = weightSystems(6, Degrees => 20);
+    R = weightSystems(6, Degrees => 20, Reflexive => true);
+    (#W, #R)
+    #select(weightSystems(5, Degrees => 10), palpIsReflexive)
+    weightSystems(5, Degrees => 10, Reflexive => true)
   Text
     Restricting the degree:
   Example
@@ -2069,6 +2117,7 @@ Key
   Vertices
   Properties
   Euler
+  HodgeZero
   Projection
   DirectProduct
   DualProjection
@@ -2078,6 +2127,8 @@ Key
   (euler, NefPartition)
   hodgeNumbers
   (hodgeNumbers, NefPartition)
+  hodgeZero
+  (hodgeZero, NefPartition)
   properties
   (properties, NefPartition)
 Headline
@@ -2113,18 +2164,29 @@ Description
     properties n
     n.Parts
   Text
-    The Hodge numbers $h^{1,1}, h^{1,2}, \ldots$ of the general complete
-    intersection, and its Euler characteristic, are kept in the cache of the
-    nef partition, under the keys {\tt HodgeNumbers} and {\tt Euler}.
+    The Hodge numbers $h^{1,1}, h^{1,2}, \ldots, h^{1,d-1}$ of the general
+    complete intersection $X$, of dimension $d$, and its Euler characteristic,
+    are kept in the cache of the nef partition, under the keys
+    {\tt HodgeNumbers} and {\tt Euler}, along with the list
+    $h^{0,0}, h^{0,1}, \ldots, h^{0,d}$ under {\tt HodgeZero}.  That list is
+    $1, 0, \ldots, 0, 1$ unless the nef partition is a direct product, when
+    $X$ may have several components ($h^{0,0} > 1$), or none
+    ($h^{0,0} = 0$), or be a product with a factor having $h^{0,i} \ne 0$.
     @TO palpNefPartitionsNew@ puts them there, unless it is given
-    {\tt HodgeNumbers => false}.  The functions @TO hodgeNumbers@ and
-    @TO (euler, NefPartition)@ return them, first computing them, with
-    {\tt palpHodgeNumbers}, if they are not there.
+    {\tt HodgeNumbers => false}.  The functions @TO hodgeNumbers@,
+    @TO (euler, NefPartition)@ and @TO hodgeZero@ return them, first computing
+    them, with {\tt palpHodgeNumbers}, if they are not there.
   Example
     n.cache#?HodgeNumbers
     hodgeNumbers n
     euler n
-    n.cache#?HodgeNumbers
+    hodgeZero n
+  Text
+    For $\mathbb{P}^2 \times \mathbb{P}^2$, one of the nef partitions is a direct
+    product, and its complete intersection is a product of two elliptic curves.
+  Example
+    L = palpNefPartitionsNew({3,1,1,1,0,0,0, 3,0,0,0,1,1,1}, 2, Products => true);
+    apply(L, n -> (properties n, hodgeNumbers n, hodgeZero n))
   Text
     For $\mathbb{P}^5$ in codimension two, the quintic threefold in a
     hyperplane appears as a projection.
@@ -2415,6 +2477,13 @@ TEST ///
   ans = trap weightSystems 5
   assert(ans#0 === null and match("weightSystems\\(5, Degrees => \\{0, 20\\}\\)", toString ans#1))
   assert(try (weightSystems(3, Degrees => {1, 2.5}); false) else true)
+  -- Reflexive => true keeps the weight systems whose polytope is reflexive,
+  -- read from the flags cws.x prints; in dimension at most 4 that is all of them
+  R = weightSystems(5, Degrees => 10, Reflexive => true)
+  assert(#R == 4 and all(R, palpIsReflexive))
+  assert not any(toList(set weightSystems(5, Degrees => 10) - set R), palpIsReflexive)
+  assert(weightSystems(3, Reflexive => true) == wss)
+  assert(#weightSystems(6, Degrees => 20, Reflexive => true) == 36)
 ///
 
 TEST ///
@@ -2471,6 +2540,9 @@ TEST ///
   assert(#palpNefPartitionsNew(ws, 2, Products => true, Projections => true, KeepSymmetric => true, HodgeNumbers => false) == 15)
   LD = palpNefPartitionsNew({3,1,1,1,0,0,0, 3,0,0,0,1,1,1}, 2, Products => true)
   assert(#select(LD, N -> member(DirectProduct, N.Properties)) == 1)
+  -- h^{0,0}, ..., h^{0,d}: for the product, E x E; otherwise a K3 surface
+  assert(apply(LD, N -> N.cache.HodgeZero) == {{1,2,1}, {1,0,1}, {1,0,1}, {1,0,1}})
+  assert((L#0).cache.HodgeZero == {1,0,0,1})
   -- codimension 3: three parts
   L3 = palpNefPartitionsNew(ws, 3, HodgeNumbers => false)
   assert(#L3 == 1 and #((L3#0).Parts) == 3)
@@ -2497,11 +2569,18 @@ TEST ///
   -- in codimension 3 the complete intersections are curves, with no h^{1,i}
   L4 = palpNefPartitionsNew(id_(ZZ^4) | -id_(ZZ^4), 3)
   assert(#L4 == 5 and all(L4, N -> N.cache.HodgeNumbers == {} and N.cache.Euler == 0))
+  -- elliptic curves; among the products, several curves, or none at all
+  assert all(L4, N -> N.cache.HodgeZero == {1,1})
+  L4P = palpNefPartitionsNew(id_(ZZ^4) | -id_(ZZ^4), 3, Products => true)
+  assert(set apply(L4P, N -> N.cache.HodgeZero) === set {{1,1}, {2,2}, {4,4}})
   -- the accessor functions, and Hodge numbers computed when asked for, then cached
   n = first palpNefPartitionsNew(ws, 2, HodgeNumbers => false)
   assert(parts n === n.Parts and vertices n === n.Vertices and codim n === 2 and properties n === {})
   assert(n.Parts == (L#0).Parts and not n.cache#?HodgeNumbers)
   assert(hodgeNumbers n == {2, 86} and euler n == -168 and n.cache#?HodgeNumbers)
+  -- hodgeZero also computes when needed
+  m = first palpNefPartitionsNew(ws, 2, HodgeNumbers => false)
+  assert(hodgeZero m == {1, 0, 0, 1} and m.cache#?HodgeNumbers)
   assert(properties last LP === {Projection})
 ///
 
@@ -2528,8 +2607,8 @@ TEST ///
   -- palpHodgeNumbers, one nef partition at a time, agrees with nef.x's own list
   ws = {10,1,1,2,2,2,2}
   L = palpNefPartitionsNew(ws, 2)
-  assert all(L, N -> (old := (N.cache.HodgeNumbers, N.cache.Euler);
-      h := palpHodgeNumbers N; (h.HodgeNumbers, h.Euler) == old))
+  assert all(L, N -> (old := (N.cache.HodgeNumbers, N.cache.Euler, N.cache.HodgeZero);
+      h := palpHodgeNumbers N; (h.HodgeNumbers, h.Euler, h.HodgeZero) == old))
   -- the Cayley polytope lives in Z^(c-1) x M, with one vertex for each vertex of each Delta_i
   C = cayleyPolytopeVertices L#0
   assert(numRows C == 5 + 1)
@@ -2538,7 +2617,7 @@ TEST ///
   assert match("H:86 2 \\[168\\]", palpRun("nef", "-G -c2", cayleyPolytopeVertices(L#0, Lattice => "N")))
   -- a curve, in codimension 3 in (P^1)^4
   N4 = first palpNefPartitionsNew(id_(ZZ^4) | -id_(ZZ^4), 3, HodgeNumbers => false)
-  assert(palpHodgeNumbers N4 === new HashTable from {HodgeNumbers => {}, Euler => 0})
+  assert(palpHodgeNumbers N4 === new HashTable from {HodgeNumbers => {}, Euler => 0, HodgeZero => {1, 1}})
 
   -- MES tests
   ws = {12,1,1,2,2,2,2,2}
@@ -2550,6 +2629,18 @@ TEST ///
   -- MES: Claude, please check.
   -- palpNefPartitionsNew(palpNVertices ws, 3, HodgeNumbers => false)
   -- palpNefPartitionsNew(palpNPoints ws, 3, HodgeNumbers => false)
+
+  Ws = weightSystems(6, Degrees => 20, Reflexive => true);
+  Ns = for ws in Ws list (
+      n := palpNefPartitionsNew(ws, 3, HodgeNumbers => false);
+      if n === null or #n === 0 then continue;
+      n)
+  -- for n in flatten Ns list elapsedTime palpHodgeNumbers n  -- very slow, it appears....!
+  -- #0: 239 sec
+  -- #1: 157 sec
+  -- #2, #3, #4: 7.7, 9.7, 12.5 sec
+  -- #5: 93 sec
+  
 ///
 
 TEST ///
