@@ -293,6 +293,8 @@ isFavorable ReflexivePolytope := Boolean => Q -> (
 
 computeH11H21 = Q -> (
     if Q#?"h11" then return;
+    if dim Q =!= 4 then
+        error "Hodge numbers for a ReflexivePolytope are only implemented currently for dim=4";
     -- input: a 4D reflexive polytope
     -- consequences: h11, h21, favorable are all set in Q.cache
     A := annotatedFaces Q; -- polytope on N side.
@@ -319,8 +321,6 @@ computeH11H21 = Q -> (
     )
 
 hh(Sequence, ReflexivePolytope) := (pq, Q) -> (
-    if dim Q =!= 4 then
-        error "Hodge numbers for a ReflexivePolytope are only implemented currently for dim=4";
     computeH11H21 Q;
     (p,q) := pq;
     if p > q then (p, q) = (q, p);

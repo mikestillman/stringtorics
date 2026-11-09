@@ -2635,6 +2635,10 @@ TEST ///
       n := palpNefPartitionsNew(ws, 3, HodgeNumbers => false);
       if n === null or #n === 0 then continue;
       n)
+  for i from 0 to #Ws-1 list (
+      n := palpNefPartitionsNew(Ws#i, 3, HodgeNumbers => false);
+      if n === null or #n === 0 then continue;
+      i => n)
   -- for n in flatten Ns list elapsedTime palpHodgeNumbers n  -- very slow, it appears....!
   -- #0: 239 sec
   -- #1: 157 sec

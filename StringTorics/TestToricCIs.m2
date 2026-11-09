@@ -110,3 +110,107 @@ TEST ///
   saturate(ideal F + ideal jacobian F, ideal V) -- X is smooth
   -- hh^*(OO_V(-1,3)) -- ouch!  needs to work...
 ///
+
+-*
+  restart
+  needsPackage "StringTorics"
+*-
+"TEST"
+///
+  debug needsPackage "StringTorics" -- remove 'debug'?
+
+  -- idea: create a toric simplicial variety of dim 6, corresponding to
+  --ws = {12,1,1,2,2,2,2,2}
+  ws = {20, 1, 1, 1, 2, 3, 6, 6}  
+  -- now triangulate it using all of the lattice points not in facets
+  palpNVertices ws
+  palpNPoints ws
+  Q = reflexive palpNVertices ws
+  Ts = allTriangulations palpNPoints ws
+  tri = first select(Ts, t -> isStar t and isFine t and isRegularTriangulation t)
+  maxT = (max tri)/(d -> drop(d, -1)) -- this is the triangulation we want of the 6D point set, pts 0..7
+  pts = drop(entries transpose palpNPoints ws, -1)
+  V = normalToricVariety(pts, maxT)
+  isWellDefined V
+  isSimplicial V
+  isSmooth V -- false...
+  -- Now, given V, let's check nef partitions...
+  --  {{0, 5}, {1, 2}, {3, 4, 6, 7}}
+  Vs = for i from 0 to # rays V - 1 list V_i
+  Vs/isNef
+  -- this is *not* a nef partition!!
+  isNef(V_0 + V_5)
+  isNef(V_1 + V_2)
+  isNef(V_3 + V_4 + V_5 + V_6 + V_7)
+  isNef (-toricDivisor V)
+  X = completeIntersection(V, {V_0 + V_5, V_1 + V_2, V_3 + V_4 + V_5 + V_6 + V_7}, Basis => {0,1,2}, Variables => {a,b,c})
+  hodgeDiamond X -- this appears wrong!
+
+  -- this one is!
+  isNef(V_0 + V_4)
+  isNef(V_3 + V_6)
+  isNef(V_1 + V_2 + V_5 + V_7 + V_8)
+  isNef (-toricDivisor V)
+  X = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8}, Basis => {0,1,2}, Variables => {a,b,c})
+  hodgeDiamond X -- this appears correct! (And no variables...)
+
+  D0 = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8, V_0});
+  hodgeDiamond D0
+  D1 = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8, V_1});
+  hodgeDiamond D1
+  D2 = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8, V_2});
+  hodgeDiamond D2
+  D3 = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8, V_3});
+  hodgeDiamond D3
+  D4 = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8, V_4});
+  hodgeDiamond D4
+  D5 = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8, V_5});
+  hodgeDiamond D5
+  D6 = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8, V_6});
+  hodgeDiamond D6
+  D7 = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8, V_7});
+  hodgeDiamond D7  -- D7 has 2 components, probably both P^2's!
+  D8 = completeIntersection(V, {V_0 + V_4, V_3 + V_6, V_1 + V_2 + V_5 + V_7 + V_8, V_8});
+  hodgeDiamond D8  -- intersection here appears to be 0??
+
+  intersectionRing X
+  
+  
+  intersectionRing X
+  faceDimensions Q
+  annotatedFaces Q
+  P = polytope Q
+  makeCY
+  methods triangulations
+  verts = {{0, 0, 0, 0, 0, 1}, {-1, -1, -2, -3, -6, -6}, {0, 1, 0, 0, 0, 0}, {0, 0, 1, 0, 0, 0}, {0, 0, 0, 1, 0, 0}, {0, 0, 0, 0, 1, 0}, {1, 0, 0, 0, 0, 0}, {0, 0, 0, -1, -2, -2}}
+  vertsM = {{-1, -1, -1, -1, -1, -1}, {11, -1, -1, -1, -1, -1}, {-1, 5, -1, -1, -1, -1}, {-1, -1, 5, -1, -1, -1}, {-1, -1, -1, 5, -1, -1}, {-1, -1, -1, -1, 5, -1}, {-1, -1, -1, -1, -1, 5}}
+  P = convexHull transpose matrix vertsM
+  isReflexive P
+  V0 = normalToricVariety P
+  dim P == 6
+  isSimplicial V0
+  rays V0
+  max V0
+  latticePoints polar P
+  vertices polar P
+  Q = reflexive P
+  makeCY Q
+///  
+
+debug needsPackage "ReflexivePolytopesDB"
+kreuzerSkarkeURL ZZ := URL => opts -> (h11) -> (
+    getopt := (ksStr, m2Key, opts) -> (
+        if opts#m2Key === null then ""
+        else (ksStr | "=" | toString opts#m2Key)
+        );
+    valV := getopt("V", Vertices, opts);
+    valM := getopt("M", LatticePoints, opts);
+    valN := getopt("N", DualLatticePoints, opts);
+    valF := getopt("F", Facets, opts);
+    valH21 := getopt("h12", H12, opts);
+    valL := getopt("L", Limit, opts);
+    str := "https://quark.itp.tuwien.ac.at/cgi-bin/cy/cydata.cgi?h11="|toString h11;
+    ksopts := {valV, valM, valN, valF, valH21, valL};
+    ksopts = select(ksopts, x -> x =!= "");
+    URL concatenate between("&", prepend(str,ksopts))
+    )

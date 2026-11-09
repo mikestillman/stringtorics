@@ -10,7 +10,7 @@ label KSEntry := ZZ => (ks) -> (
     value substring(str, ans#1#0, ans#1#1)
     )
   
-hodgeNumbers = method()
+--hodgeNumbers = method() -- now defined in PALPInterface.m2
 hodgeNumbers KSEntry := (ks) -> (
     str := toString ks;
     ans := regex("H:([0-9]+),([0-9]+)", str);

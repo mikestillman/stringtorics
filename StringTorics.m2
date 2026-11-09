@@ -22,8 +22,8 @@ newPackage(
             "Topcom",
             "Triangulations",
             "InverseSystems",
-            "IntegerEquivalences"
---            "PALPInterface"
+            "IntegerEquivalences",
+            "PALPInterface"
             },
         PackageImports => {
             "LLLBases"
@@ -248,7 +248,7 @@ export {
     "Basis",
     
     -- Creating databases of polytopes (with precomputed data).
-    "hodgeNumbers", -- of KSEntry: gives (h11, h12) from KSEntry.  Should be in ReflexivePolytopesDB?
+    --"hodgeNumbers", -- of KSEntry: gives (h11, h12) from KSEntry.  Should be in ReflexivePolytopesDB? Now defined in PALPInterface
     "createCYDatabaseFiles",
     "combineCYDatabaseFiles",
 
@@ -388,9 +388,9 @@ findEquivalence(CalabiYauInToric, CalabiYauInToric) := (X1, X2) -> (
     )
 
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
---load (currentFileDirectory | "StringTorics/CYPolytope.m2")
 cyPolytope = reflexivePolytope
 load (currentFileDirectory | "StringTorics/ReflexivePolytopes.m2")
+load (currentFileDirectory | "StringTorics/CYPolytopeNew.m2")
 load (currentFileDirectory | "StringTorics/CalabiYauInToric.m2")
 load (currentFileDirectory | "StringTorics/IntersectionNumbers.m2")
 load (currentFileDirectory | "StringTorics/GVInvariants.m2")
@@ -860,6 +860,7 @@ restart
   
   check IntegerEquivalences -- 8 checks, finishes to completion, 1 takes 6.6 sec (now it takes 9.7 sec 4/30/2026)
   check "DanilovKhovanskii" -- 10 checks, finishes, 3 take some time (3.9sec, 4.9sec, 16.5 sec).
+  check "PALPInterface"
   elapsedTime check "StringTorics" -- 78 sec, 6/7/2026
     -- currently: 48 tests, finishes to completion.  Longest tests: 9.2, 7.1, 5.9 sec
     -- works offline (so not accessing KS database).
