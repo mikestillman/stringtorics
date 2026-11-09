@@ -2,6 +2,62 @@
   restart
   needsPackage "StringTorics"
 *-
+/// -- MES: In process (chosen by opus 5.5) -- test of: simplexes and polar dual simplexes
+  debug needsPackage "StringTorics"
+  simplexVerts = d -> append(entries id_(ZZ^d), toList(d:-1));
+
+  set1 = hashTable for d from 1 to 8 list elapsedTime d => cyPolytopeNew simplexVerts d
+  set2 = hashTable for d from 1 to 8 list d => elapsedTime polar set1#d
+  for d from 1 to 8 list elapsedTime vertices set1#d
+  for d from 1 to 8 list elapsedTime vertices set2#d
+
+  -- the old `latticePoints` code is way slow.
+  for d from 1 to 8 list elapsedTime # latticePoints set1#d
+  for d from 1 to 8 list elapsedTime # latticePoints set2#d
+
+
+  tryStep = (name, f) -> (
+    r := try elapsedTiming f() else (
+        << "    " << name << ": ERROR" << endl; return null);
+    << "    " << name << ": " << r#0 << "s" << endl; r#1);
+
+  for d from 1 to 8 list tryStep("eg"|d, () -> reflexivePolytope simpleVerts d)
+  
+  bench1 = (name, makeQ) -> (
+    << "== " << name << endl;
+    Q := tryStep("construct", makeQ);
+    if Q === null then return;
+    tryStep("dim", () -> dim Q);
+    tryStep("latticePoints #=" | toString(try #latticePoints Q else "?"), () -> latticePoints Q);
+    tryStep("annotatedFaces", () -> #annotatedFaces Q);
+    tryStep("automorphisms", () -> #automorphisms Q);
+    );
+  bench = (name, makeQ) -> (
+    << "== " << name << endl;
+    Q := tryStep("construct", makeQ);
+    if Q === null then return;
+    tryStep("dim", () -> dim Q);
+    tryStep("latticePoints #=" | toString(try #latticePoints Q else "?"), () -> latticePoints Q);
+    tryStep("rays", () -> #rays Q);
+    tryStep("annotatedFaces", () -> #annotatedFaces Q);
+    tryStep("isFavorable", () -> isFavorable Q);
+    tryStep("automorphisms", () -> #automorphisms Q);
+    alarm 60;
+    tryStep("degrees", () -> #degrees Q);
+    alarm 0;
+    );
+  for d in {1,2,3,5,6,7,8} do (
+    bench("simplex N d="|d, () -> reflexivePolytope simplexVerts d);
+    if d <= 6 then bench("simplex M (polar) d="|d, () -> polar reflexivePolytope simplexVerts d);
+    );
+  bench("ws 5D {1,1,1,1,2,2}", () -> reflexivePolytope palpNVertices {8,1,1,1,1,2,2});
+  bench("ws 5D {40,5,6,7,7,7,8}", () -> reflexivePolytope palpNVertices {40,5,6,7,7,7,8});
+///
+
+-*
+  restart
+  needsPackage "StringTorics"
+*-
 /// -- test of: reflexivePolytope, polar.
   -- this example is from this:
   tope = KSEntry "4 6  M:57 6 N:9 8 H:4,52 [-96] id:40
@@ -286,3 +342,31 @@ TEST ///
   -- topcomAllTriangulations(A, Homogenize => false, Fine => true) -- 121
   -- dump Q
 ///
+
+end--
+-- We want ReflexivePolytope's to be easy to construct in dimensions up to 6, 7, 8...
+Q = reflexive KSEntry "4 8  M:10 8 N:55 15 H:50,5 [90]
+    1    0    0   -1    1   -1    0    2
+    0    1    0    0   -1    0    0   -1
+    0    0    1   -1    1    1    0    0
+    0    0    0    0    0    0    1   -1"
+degrees Q
+
+Q = reflexive KSEntry"4 6  M:11 6 N:119 7 H:100,4 [192]
+    1    0    0   -3    0   -4
+    0    1    0   -2    0    0
+    0    0    1    0    0   -2
+    0    0    0    0    1   -1"
+elapsedTime degrees Q -- 133 sec.  90 x 94...  IMPROVE!
+
+-- TODO: reflexive should take a WeightSystem...
+
+methods weightSystems
+ws5 = weightSystems(5, Degrees => 40, Reflexive => true);
+Q = reflexive palpNVertices {40, 5, 6, 7, 7, 7, 8}
+dim Q
+vertices Q
+latticePoints Q
+faceDimensions Q
+degrees Q
+basisIndices Q
