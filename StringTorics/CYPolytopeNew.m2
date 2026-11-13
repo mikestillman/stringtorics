@@ -56,21 +56,20 @@ isWellDefined CYPolytopeNew := Boolean => Q -> isReflexive Q -- TODO: this is no
 
 -- `cyPolytopeNew` Polyhedron: create a CYPolytopeNew object from a Polyhedra Polyhedron object
 cyPolytopeNew Polyhedron := CYPolytopeNew => opts -> P2 -> (
-    if not isReflexive P2 then error "expected a reflexive polytope";
-    verts := vertexList P2;
-    -- (LP, LPdim) := latticePointsAndDimensions P2;
-    -- verts := for i from 0 to #LP - 1 list if LPdim#i === 0 then LP_i else continue;
+    if not isReflexive P2 then error "expected a reflexive polytope";  -- POLYHEDRA call
+    verts := vertices P2;  -- POLYHEDRA call
+    (vertsZZ, err) := trap lift(verts, ZZ);
+    if err =!= null then error err;
     Q := new CYPolytopeNew from {
         symbol cache => new CacheTable,
-        "vertices" => verts,
+        "vertices" => entries transpose vertsZZ,
         "id" => if opts.ID === null then 0 else opts.ID
         };
     Q.cache#"N polytope" = P2;
-    -- Q.cache#"latticePoints" = LP;
-    -- Q.cache#"faceDimensions" = LPdim;
     Q
     )
 
+-- REVIEW
 dump CYPolytopeNew := String => {} >> opts -> (Q) -> (
     s1 := "ReflexiveData\n";
     strs := for field in CYPolytopeNewFields list (
@@ -89,6 +88,7 @@ dump CYPolytopeNew := String => {} >> opts -> (Q) -> (
     concatenate strs
     )
 
+-- REVIEW
 --getKeyPair = method()
 getKeyPair String := Sequence => str -> (
     str1 := replace("^ *", "", str);
@@ -97,6 +97,7 @@ getKeyPair String := Sequence => str -> (
     toSequence result
     )
 
+-- REVIEW
 cyPolytopeNew String := CYPolytopeNew => opts -> str -> (
     L := lines str;
     if L#0 != "ReflexiveData" then error ("string is not in proper format, received: "|L#0);
@@ -119,10 +120,12 @@ cyPolytopeNew String := CYPolytopeNew => opts -> str -> (
     Q1
     )
 
+-- REVIEW
 cyPolytopeNew List := CYPolytopeNew => opts -> vertices -> (
     P2 := convexHull transpose matrix vertices;
     cyPolytopeNew(P2, opts)
     )
+-- REVIEW
 cyPolytopeNew Matrix := CYPolytopeNew => opts -> vertices -> (
     P2 := convexHull vertices;
     cyPolytopeNew(P2, opts)
@@ -144,6 +147,7 @@ cyPolytopeNew Matrix := CYPolytopeNew => opts -> vertices -> (
 -- cyPolytope KSEntry := opts -> tope -> cyPolytopeNew(tope, opts)
 -- cyPolytope String := opts -> str -> cyPolytopeNew(str, opts)
 
+-- REVIEW
 cyPolytopeNew KSEntry := CYPolytopeNew => opts -> tope -> (
     -- KSEntry is a Kreuzer-Skarke polytope entry, returned from
     --   CYPolytopeNewsDB functions.
@@ -152,15 +156,62 @@ cyPolytopeNew KSEntry := CYPolytopeNew => opts -> tope -> (
     cyPolytopeNew(P2, opts, ID => label tope)
     )
 
+-- REVIEW
 vertices CYPolytopeNew := Q -> Q#"vertices"
 
-latticePoints CYPolytopeNew := Q -> (
-    if not Q.cache#?"latticePoints" then (
-        computeRaysAndDimensions Q;
-        );
-    Q.cache#"latticePoints"
+halfspaces CYPolytopeNew := Q -> (
+    -- TODO: if this lies on an affine space, place those into here too?
+    -- But a current restriction/assumption is that Q has full dimension.
+    Q.cache#"halfspaces" ??= (
+        (A,b) := halfspaces polytope Q;
+        (AZZ, err1) := trap lift(A, ZZ);
+        (bZZ, err2) := trap lift(b, ZZ);
+        if AZZ === null then error err1;
+        if bZZ === null then error err2;
+        (AZZ, bZZ)
+        )
     )
 
+latticePoints CYPolytopeNew := Matrix => Q -> (
+    Q.cache#"latticePoints" ??= (
+        (AZZ, bZZ) := halfspaces Q;
+        normalizLatticePoints(AZZ, bZZ)
+        )
+    )
+
+latticePointListNew = method()
+latticePointListNew CYPolytopeNew := Q -> (
+    lp := latticePoints Q;
+    P := polytope Q;
+    L := entries transpose lp;
+    return for p in L list minimalFace(P, p);
+    elapsedTime L1 := sort for i from 0 to #L-1 list (
+        f := minimalFace(P, L#i);
+        {dim(P,f), L#i, f}
+        );
+    --L1 := sort for i from 0 to #L-1 list {faceDim(P,minimalFace(P,L#i)),L#i};
+    L2 := L1/(x -> x#1); -- select the actual lattice point
+    -- now set the hash tables:
+    -- lattice point => index
+    H0 := hashTable for i from 0 to #L2-1 list L2#i => i;
+    P.cache.TCILatticePointHash = H0;
+    -- face => interior lattice points
+    H1 := partition(x -> last x, L1); -- partition on minimal face
+    H2 := applyPairs(H1, (k,v) -> (k,v/(v1 -> H0#(v1#1))));
+    P.cache.TCIInteriorLatticeHash = H2;
+    L2
+    )
+
+
+-- REVIEW
+-- latticePoints CYPolytopeNew := Q -> (
+--     if not Q.cache#?"latticePoints" then (
+--         computeRaysAndDimensions Q;
+--         );
+--     Q.cache#"latticePoints"
+--     )
+
+-- REVIEW, make sure indices are correct!
 --faceDimensions = method()
 faceDimensions CYPolytopeNew := Q -> (
     if not Q.cache#?"latticePoints" then (
@@ -169,6 +220,7 @@ faceDimensions CYPolytopeNew := Q -> (
     Q.cache#"faceDimensions"
     )
 
+-- REVIEW
 --faceDimension = method()
 faceDimension(CYPolytopeNew, ZZ) := ZZ => (Q, indx) -> (
     LPdims := faceDimensions Q;
@@ -179,15 +231,19 @@ faceDimension(CYPolytopeNew, ZZ) := ZZ => (Q, indx) -> (
 
 dim CYPolytopeNew := ZZ => Q -> rank matrix vertices Q
 
+-- REVIEW
 --computeRaysAndDimensions = method(Options => { InteriorFacets => false })
 computeRaysAndDimensions CYPolytopeNew := opts -> Q -> (
-    -- sets faceDimensions too, 
+    -- sets faceDimensions too,
+    -- BUG: make sure points correspond to points
+    --   also, really slow...
     P2 := polytope Q;
     (LP, LPdim) := latticePointsAndDimensions P2;
     Q.cache#"latticePoints" = LP;
     Q.cache#"faceDimensions" = LPdim;
     )
 
+-- REVIEW
 rays CYPolytopeNew := List => { InteriorFacets => false } >> opts -> (Q -> (
     if not Q.cache#?"latticePoints" then (
         computeRaysAndDimensions Q; -- this keeps lattice points sorted in increasing face dimension, *always*
@@ -202,6 +258,7 @@ rays CYPolytopeNew := List => { InteriorFacets => false } >> opts -> (Q -> (
     --for i from 0 to #LP-1 list if LPdim#i <= topdim then LP#i else continue
     ))
 
+-- REVIEW
 polytope(CYPolytopeNew, String) := Polyhedron => (Q, which) -> (
     if not Q.cache#?"N polytope" then (
         Q.cache#"N polytope" = convexHull transpose matrix vertices Q;
@@ -219,10 +276,13 @@ polytope(CYPolytopeNew, String) := Polyhedron => (Q, which) -> (
     else
       error "expected second argument to be either \"M\" or \"N\""
     )
-polytope CYPolytopeNew := Polyhedron => cyData -> polytope(cyData, "N")
+-- REVIEW
+polytope CYPolytopeNew := Polyhedron => Q -> polytope(Q, "N")
 
+-- REVIEW
 polar CYPolytopeNew := CYPolytopeNew => Q -> cyPolytopeNew polytope(Q, "M")
 
+-- REVIEW
 annotatedFaces CYPolytopeNew := Q -> (
     if not Q.cache#?"annotatedFaces" then (
         -- note: annotatedFaces uses the list of lattice points of P2, but that is the same as
@@ -233,6 +293,7 @@ annotatedFaces CYPolytopeNew := Q -> (
     Q.cache#"annotatedFaces"
     )
 
+-- REVIEW
 --findTwoFaceInteriorDivisors = method()
 findTwoFaceInteriorDivisors CYPolytopeNew := List => Q -> (
     -- returns a list of:
@@ -249,11 +310,13 @@ findTwoFaceInteriorDivisors CYPolytopeNew := List => Q -> (
         )
     )
 
+-- REVIEW
 findSuitableSet = (setstotry, Z) -> (
     for g in setstotry do if abs det(Z_g) == 1 then return g;
     null
     )
 
+-- REVIEW
 computeGLSM = Q -> (
     -- input: Q:CYPolytopeNew
     -- consequences: fields "glsm", "basisIndices", "toricBasisIndices" are set, if they have not been set yet.
@@ -282,22 +345,26 @@ computeGLSM = Q -> (
     Q.cache#"glsm" = entries transpose GLSM;
     )
 
+-- REVIEW
 degrees CYPolytopeNew := List => Q -> (
     if not Q.cache#?"glsm" then computeGLSM Q;
     Q.cache#"glsm"
     )
 
+-- REVIEW
 --basisIndices = method()
 basisIndices CYPolytopeNew := List => Q -> (
     if not Q.cache#?"basisIndices" then computeGLSM Q;
     Q.cache#"basisIndices"
     )
 
+-- REVIEW
 isFavorable CYPolytopeNew := Boolean => Q -> (
     if not Q.cache#?"favorable" then computeH11H21 Q;
     Q.cache#"favorable"
     )
 
+-- REVIEW
 computeH11H21 = Q -> (
     if Q#?"h11" then return;
     if dim Q =!= 4 then
@@ -327,6 +394,7 @@ computeH11H21 = Q -> (
     Q.cache#"favorable" = (twoFacesN == 0);
     )
 
+-- REVIEW
 hh(Sequence, CYPolytopeNew) := (pq, Q) -> (
     computeH11H21 Q;
     (p,q) := pq;
@@ -352,10 +420,12 @@ hh(Sequence, CYPolytopeNew) := (pq, Q) -> (
 -- Isomorphisms and automorphisms --
 ------------------------------------
 -- The heavy lifting (such as it is) is in MyPolyhedra.m2
+-- REVIEW
 isomorphisms(CYPolytopeNew, CYPolytopeNew) := (P, Q) -> (
     isomorphisms(polytope P, polytope Q, annotatedFaces P, annotatedFaces Q)
     )
 
+-- REVIEW
 computeAutomorphisms = Q -> (
     -- Q is a CYPolytopeNew
     -- this functions sets "automorphisms" and "autPermutations" in Q.cache, if needed.
@@ -379,11 +449,13 @@ computeAutomorphisms = Q -> (
         ); 
     )
 
+-- REVIEW
 automorphisms CYPolytopeNew := Q -> (
     computeAutomorphisms Q;
     Q.cache#"automorphisms"
     )
 --automorphismsAsPermutations = method()
+-- REVIEW
 automorphismsAsPermutations CYPolytopeNew := Q -> (
     computeAutomorphisms Q;
     Q.cache#"autPermutations"
@@ -394,6 +466,7 @@ automorphismsAsPermutations CYPolytopeNew := Q -> (
 -- Both point configurations --
 -- and vector configurations --
 -------------------------------
+-- REVIEW
 --isTriangulationOfPolytope = method()
 isTriangulationOfPolytope(CYPolytopeNew, List) := Boolean => (Q, T) -> (
     -- important assumption: T *is* a triangulation of the vector configuration given
@@ -405,9 +478,11 @@ isTriangulationOfPolytope(CYPolytopeNew, List) := Boolean => (Q, T) -> (
         );
     true
     )
+-- REVIEW
 isTriangulationOfPolytope(CYPolytopeNew, Triangulation) := (Q, T) -> isTriangulationOfPolytope(Q, max T)
 
 -- local function
+-- REVIEW
 computeFRVTs = Q -> (
     -- sets "ptriangulations", "vtriangulations" (these are the ones that are *not* in ptriangulations.
     -- also sets "allPtriangulations", "allVtriangulations"
@@ -432,6 +507,7 @@ computeFRVTs = Q -> (
     Q.cache#"allFRVTs" = true; -- currently, we have not coded the partial computation of these fans..
     )
 
+-- REVIEW
 computeFRSTs = Q -> (
     if Q.cache#?"allFRSTs" and Q.cache#"allFRSTs" then return;
     Ts := findAllFRSTs transpose matrix rays Q;
@@ -439,11 +515,13 @@ computeFRSTs = Q -> (
     Q.cache#"allFRSTs" = true;
     );
 
+-- REVIEW
 findAllFRSTs CYPolytopeNew := List => Q -> (
     if not Q.cache#?"allFRSTs" then computeFRSTs Q;
     Q.cache#"ptriangulations"
     )
 
+-- REVIEW
 findAllFRVTs = method()
 findAllFRVTs CYPolytopeNew := List => Q -> (
     if not Q.cache#?"allFRVTs" then computeFRVTs Q;
@@ -453,12 +531,14 @@ findAllFRVTs CYPolytopeNew := List => Q -> (
 -- TODO: this can't always be right??  It knows nothing about the
 -- order of rays, and which rays, we are using.
 --findOneFRST = method()
+-- REVIEW
 findOneFRST CYPolytopeNew := Q -> (
     -- TODO: this is NOT correct if any rays interior to facets 
     last regularStarTriangulation polytope Q -- the 'last' removes the list of vertices
     )
 
 --restrictTriangulation = method()
+-- REVIEW
 restrictTriangulation(ZZ, CYPolytopeNew, List) := List => (d, Q, tri) -> (
     -- given Q, we use its annotated faces and the given triangulation, to
     -- write down the triangulation of the dim d-faces of the
@@ -486,6 +566,7 @@ restrictTriangulation(ZZ, CYPolytopeNew, List) := List => (d, Q, tri) -> (
 
 
 --normalizeByAutomorphisms = method()
+-- REVIEW
 normalizeByAutomorphisms(List, List) := (gPerms, T) -> (
     -- gPerms should be a list of permutations of 0..#rays-1, for a CYPolytoe Q.
     -- T should be a list of list of integer indices into the rays of Q.
@@ -506,6 +587,7 @@ normalizeByAutomorphisms(List, List) := (gPerms, T) -> (
 --   normalizeByAutomorphisms: doesn't use CYPolytope, so is fine as is.
 --   restrictTriangulation
 --partitionFRSTsByDFaceEquivalence = method(Options => {Automorphisms => true})
+-- REVIEW
 partitionFRSTsByDFaceEquivalence(ZZ, CYPolytopeNew) := HashTable => opts -> (d, Q) -> (
     Ts := findAllFRSTs Q;
     gPerms := if opts.Automorphisms then 
@@ -522,7 +604,7 @@ partitionFRSTsByDFaceEquivalence(ZZ, CYPolytopeNew) := HashTable => opts -> (d, 
 -- TODO: working on this.  Use partitionFRSTsByDFaceEquivalence above to help here.
 --makeCYs = method(Options => {Ring => null, PicardRing => null, NTFE => true, Automorphisms => true, Limit => infinity}) -- opts.Ring same as opts.PicardRing: ZZ[h11 variables].
 --findAllCYs = method(Options => options makeCYs)
-
+-- REVIEW
 makeCYs CYPolytopeNew :=
 findAllCYs CYPolytopeNew := List => opts -> Q -> (
     if opts#PicardRing =!= null and opts#Ring =!= null then error "can't set both PicardRing, Ring, they are synonyms!";
@@ -567,6 +649,7 @@ findAllCYs CYPolytopeNew := List => opts -> Q -> (
 
 -- Old generateTriangulations via bistellar flips moved to ScratchCYPolytopeNews.m2
 
+-- REVIEW
 --computeBasics = method()
 computeBasics CYPolytopeNew := Q -> (
     computeRaysAndDimensions Q;

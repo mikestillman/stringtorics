@@ -4,55 +4,193 @@
 *-
 /// -- MES: In process (chosen by opus 5.5) -- test of: simplexes and polar dual simplexes
   debug needsPackage "StringTorics"
+
   simplexVerts = d -> append(entries id_(ZZ^d), toList(d:-1));
+  dualSimplexVerts = d -> entries transpose lift(vertices polar convexHull transpose matrix simplexVerts d, ZZ)
 
-  set1 = hashTable for d from 1 to 8 list elapsedTime d => cyPolytopeNew simplexVerts d
-  set2 = hashTable for d from 1 to 8 list d => elapsedTime polar set1#d
-  for d from 1 to 8 list elapsedTime vertices set1#d
-  for d from 1 to 8 list elapsedTime vertices set2#d
+  -- Creation of CYPolytopeNew's for simplices and dual simplices.
+  set1 = hashTable for d from 1 to 9 list elapsedTime d => simplexVerts d
+  set2 = hashTable for d from 1 to 9 list elapsedTime d => dualSimplexVerts d
 
-  -- the old `latticePoints` code is way slow.
-  for d from 1 to 8 list elapsedTime # latticePoints set1#d
-  for d from 1 to 8 list elapsedTime # latticePoints set2#d
+  simp1 = hashTable for d from 1 to 9 list elapsedTime d => cyPolytopeNew set1#d
+  simp2 = hashTable for d from 1 to 9 list elapsedTime d => cyPolytopeNew set2#d
 
+  for d from 1 to 9 list elapsedTime vertices simp1#d
+  for d from 1 to 9 list elapsedTime vertices simp2#d
 
-  tryStep = (name, f) -> (
-    r := try elapsedTiming f() else (
-        << "    " << name << ": ERROR" << endl; return null);
-    << "    " << name << ": " << r#0 << "s" << endl; r#1);
+  for d from 1 to 9 list elapsedTime halfspaces simp1#d
+  for d from 1 to 9 list elapsedTime halfspaces simp2#d
 
-  for d from 1 to 8 list tryStep("eg"|d, () -> reflexivePolytope simpleVerts d)
+  for d from 1 to 9 list elapsedTime dim simp1#d
+  for d from 1 to 9 list elapsedTime dim simp2#d
   
-  bench1 = (name, makeQ) -> (
-    << "== " << name << endl;
-    Q := tryStep("construct", makeQ);
-    if Q === null then return;
-    tryStep("dim", () -> dim Q);
-    tryStep("latticePoints #=" | toString(try #latticePoints Q else "?"), () -> latticePoints Q);
-    tryStep("annotatedFaces", () -> #annotatedFaces Q);
-    tryStep("automorphisms", () -> #automorphisms Q);
-    );
-  bench = (name, makeQ) -> (
-    << "== " << name << endl;
-    Q := tryStep("construct", makeQ);
-    if Q === null then return;
-    tryStep("dim", () -> dim Q);
-    tryStep("latticePoints #=" | toString(try #latticePoints Q else "?"), () -> latticePoints Q);
-    tryStep("rays", () -> #rays Q);
-    tryStep("annotatedFaces", () -> #annotatedFaces Q);
-    tryStep("isFavorable", () -> isFavorable Q);
-    tryStep("automorphisms", () -> #automorphisms Q);
-    alarm 60;
-    tryStep("degrees", () -> #degrees Q);
-    alarm 0;
-    );
-  for d in {1,2,3,5,6,7,8} do (
-    bench("simplex N d="|d, () -> reflexivePolytope simplexVerts d);
-    if d <= 6 then bench("simplex M (polar) d="|d, () -> polar reflexivePolytope simplexVerts d);
-    );
-  bench("ws 5D {1,1,1,1,2,2}", () -> reflexivePolytope palpNVertices {8,1,1,1,1,2,2});
-  bench("ws 5D {40,5,6,7,7,7,8}", () -> reflexivePolytope palpNVertices {40,5,6,7,7,7,8});
+  
+  -- the old `latticePoints` code is way slow: `# latticePoints set2#8` takes 225 sec.
+  -- before changing old lattice point code.
+  for d from 1 to 9 list elapsedTime numcols latticePoints simp1#d
+  for d from 1 to 9 list elapsedTime numcols latticePoints simp2#d
+
+  -- This one is pretty slow...
+  for d from 8 to 8 list elapsedTime latticePointListNew simp1#d
+  for d from 8 to 8 list elapsedTime latticePointListNew simp2#d;
+
+  polyt1 = hashTable for d from 1 to 9 list d => elapsedTime polytope simp1#d
+  polyt2 = hashTable for d from 1 to 9 list d => elapsedTime polytope simp2#d
+
+  -- list of all faces isn't fast, but at d=9, still under a second (.83 sec simp1#9, .89 sec sim2#9))
+  polyt1 = hashTable for d from 1 to 9 list d => elapsedTime faces polytope simp1#d;
+  polyt2 = hashTable for d from 1 to 9 list d => elapsedTime faces polytope simp2#d;
+
+  -- the main time in heere appears to be in `faces Polyhedron`.  Can we speed that up?
+  -- TODO: I want this associated to the CYPolytopeNew, I think...  for example, for:
+  -- BUG: these are not necessarily for the order of vertices in the CYPolytopeNew
+  hashTable for d from 1 to 9 list d => elapsedTime faceDimensionHash polytope simp1#d;
+  hashTable for d from 1 to 9 list d => elapsedTime faceDimensionHash polytope simp2#d;
+
+  -- the following is just an indication for amount of time it takes to do `vertices` for Polyhedron.
+  polytp1 = hashTable for d from 1 to 9 list d => elapsedTime polytope(simp1#d, "M")
+  polytp2 = hashTable for d from 1 to 9 list d => elapsedTime polytope(simp2#d, "M")
+  for d from 1 to 9 list elapsedTime vertices polytp1#d
+  for d from 1 to 9 list elapsedTime vertices polytp2#d
+
+  faceDimensions simp2#3
+  latticePoints simp2#3
+  -- The key thing to speed up, or determine exactly what we need: where the lattice points sit.
+  -- This seems to take real time.
+
+  -- automorphisms.  This is slow in higher dimension (simp1#6: 2.5 sec)
+  -- TODO: speed this up?  Do we need it for larger dimensions?
+  for d from 1 to 9 list print (elapsedTime # automorphisms simp1#d);
+  for d from 1 to 6 list print (elapsedTime # automorphisms simp2#d); -- simp2#5: 2.7 sec
+
+  -- elapsedTime boundedLatticePoints(A,b, Bound => max flatten entries vP, Limit => 10000000, NodeLimit => 10000000);
+
 ///
+
+
+-*
+  restart
+  needsPackage "StringTorics"
+*-
+/// -- test of larger examples in KreuzerSkarke, dim=3
+  debug needsPackage "StringTorics"
+
+  eg1 = KSEntry "4 9  M:68 9 N:341 9 H:250,46 [408] id:96
+    1    0    0    0  -21  -39  -43  -49  -63
+    0    1    0    0  -13  -26  -28  -32  -42
+    0    0    1    0   -6  -10  -12  -14  -18
+    0    0    0    1   -1   -2   -2   -2   -2"
+  eg2 = KSEntry "4 10  M:68 10 N:342 10 H:250,46 [408] id:97
+    1    0    0    0  -19   -1   -3   -4   -4  -25
+    0    1    0    0  -13    0   -1   -1   -2  -16
+    0    0    1    0   -5    0   -1   -2   -1   -8
+    0    0    0    1   -1    1    2    2    2    2"
+  eg3 = KSEntry "4 11  M:68 11 N:346 11 H:250,46 [408] id:98
+    1    0    0    0  -19   -1  -21   -3   -5   -8  -17
+    0    1    0    0  -13    0  -14   -1   -2   -4  -10
+    0    0    1    0   -5    0   -6   -1   -2   -3   -6
+    0    0    0    1   -1    1    0    2    2    4    4"
+  eg4 = KSEntry "4 11  M:68 11 N:346 11 H:250,46 [408] id:99
+    1    0    0    0  -19   -1  -21   -3   -5   -6  -16
+    0    1    0    0  -13    0  -14   -1   -2   -3   -9
+    0    0    1    0   -5    0   -6   -1   -2   -2   -6
+    0    0    0    1   -1    1    0    2    2    3    5"
+
+  eg300a = KSEntry "4 9  M:26 9 N:415 10 H:300,14 [572] id:0
+    1    0    0   -7    0  -23   -1   -3   -7
+    0    1    0   -4    0  -15   -1   -2   -5
+    0    0    1   -2    0   -6    0   -1   -2
+    0    0    0    0    1   -1    1    1    1"
+  eg300b = KSEntry "4 9  M:27 9 N:411 9 H:300,14 [572] id:1
+    1    0    0   -3    0  -23   -1   -3   -7
+    0    1    0   -1    0  -15   -1   -2   -5
+    0    0    1   -1    0   -6    0   -1   -2
+    0    0    0    0    1   -1    1    1    1"
+
+  eg491 = KSEntry "4 5  M:26 5 N:680 5 H:491,11 [960] id:0
+    1    0    0    0  -42
+    0    1    0    0  -28
+    0    0    1    0  -12
+    0    0    0    1   -1"
+
+  set1 = {eg1, eg2, eg3, eg4, eg300a, eg300b, eg491}
+
+  polys = for ks in set1 list elapsedTime cyPolytopeNew ks;
+
+  for p in polys list elapsedTime vertices p
+  for p in polys list elapsedTime polar p;
+  for p in polys list elapsedTime dim p;
+  for p in polys list elapsedTime numcols latticePoints p
+  for p in polys list elapsedTime faces polytope p; -- < .02 each, not so bad.
+  for p in polys list elapsedTime faces polar polytope p; -- < .09 sec each
+  for p in polys list elapsedTime annotatedFaces p; -- expensive: over .33 seconds each
+  for p in polys list elapsedTime hh^(2,1) p -- not fast, almost all of cost is in annotatedFaces.
+  for p in polys list elapsedTime # automorphisms p -- none have automorphisms, I guess.  When alot, it takes a lot longer.
+  for p in polys list elapsedTime isFavorable p -- 
+  for p in polys list elapsedTime isFavorable polar p -- 
+  
+///
+
+-*
+  restart
+  needsPackage "StringTorics"
+*-
+"TEST" -- add back in when CYPolytopeNew is incorporated.
+/// -- test of weight systems of larger dimension
+  debug needsPackage "StringTorics"
+  eg1 = {8,1,1,1,1,2,2}
+  eg2 = {40,5,6,7,7,7,8}
+  set5 = {eg1, eg2}
+
+  polys5 = for ws in set5 list elapsedTime cyPolytopeNew palpNVertices ws;
+
+  for p in polys5 list elapsedTime dim p
+  for p in polys5 list elapsedTime vertices p
+  for p in polys5 list elapsedTime polar p;
+
+  for p in polys5 list elapsedTime numcols latticePoints p
+  for p in polys5 list elapsedTime faces polytope p; -- < .09 each, not so bad yet
+  for p in polys5 list elapsedTime faces polar polytope p; -- < .09 sec each
+  for p in polys5 list elapsedTime annotatedFaces p; -- expensive: over .33 seconds each
+
+  for p in polys5 list elapsedTime faceDimensionHash polytope p; -- < .09 each, not so bad yet
+  for p in polys5 list elapsedTime faceDimensions p; 
+
+
+  for p in polys5 list elapsedTime hh^(2,1) p -- not fast, almost all of cost is in annotatedFaces.
+  for p in polys5 list elapsedTime # automorphisms p -- none have automorphisms, I guess.  When alot, it takes a lot longer.
+  for p in polys5 list elapsedTime isFavorable p -- 
+  for p in polys5 list elapsedTime isFavorable polar p -- 
+
+  ws = weightSystem{50, 1, 1, 1, 2, 4, 16, 25}
+  palpNefPartitions(ws, 3)
+  elapsedTime wss = weightSystems(6, Degrees => 50, Reflexive => true); -- 3.3 sec, 874 of these.
+  for w in wss list (
+      elapsedTime n := palpNefPartitions(w, 3);
+      if #n#"Partitions" > 0 then print n#"Partitions";
+      w => n)
+  Q = cyPolytopeNew palpNVertices ws
+
+  elapsedTime dim Q
+  elapsedTime vertices Q
+  Q' = elapsedTime polar Q
+
+  elapsedTime latticePointList polytope Q
+  elapsedTime latticePointList polytope Q'; -- 62495 lattice points
+  elapsedTime latticePoints Q';
+
+  vQ = matrix vertices Q
+  vQ' = transpose matrix vertices Q'  
+  vQ * vQ'  
+  elapsedTime annotatedFaces Q -- quite long, due to latticePoints...
+  
+
+
+  -- bench("ws 5D {1,1,1,1,2,2}", () -> reflexivePolytope palpNVertices {8,1,1,1,1,2,2});
+  -- bench("ws 5D {40,5,6,7,7,7,8}", () -> reflexivePolytope palpNVertices {40,5,6,7,7,7,8});
+///
+
+
 
 -*
   restart

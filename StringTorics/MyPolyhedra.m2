@@ -201,6 +201,39 @@ latticePointList(Polyhedron, List) := (P,f) -> (
     positions(entries(LP1 * V2_g), x -> all(x, x1 -> x1 == -1))
     )
 
+latticePointListNew = method()
+latticePointListNew Polyhedron := (cacheValue symbol TCILatticePointList) (P -> (
+    -- this reorders the lattice points via dimension of smallest face containing them
+    Q := P; -- use Q for calling functions in Polyhedra, just for doc...
+    (A,b) := halfspaces Q;
+    (A, b) = (lift(A, ZZ), lift(b, ZZ));
+    --elapsedTime lp := latticePoints Q;
+    lp := normalizLatticePoints(A, b);
+    L := entries transpose lp; -- already over ZZ...
+    -- the following is our putative list of lattice points.
+    ----L := sort for p in lp list flatten entries lift(p,ZZ);
+    -- now we reorder this list, and set:
+    --   TCILatticePointList
+    --   TCILatticePointHash
+    --   TCIInteriorLatticeHash
+    elapsedTime L1 := elapsedTime for i from 0 to #L-1 list (
+        f := minimalFace(P, L#i);
+        {dim(P,f), L#i, f}
+        );
+    --L1 := sort for i from 0 to #L-1 list {faceDim(P,minimalFace(P,L#i)),L#i};
+    L2 := L1/(x -> x#1); -- select the actual lattice point
+    -- now set the hash tables:
+    -- lattice point => index
+    H0 := hashTable for i from 0 to #L2-1 list L2#i => i;
+    P.cache.TCILatticePointHash = H0;
+    -- face => interior lattice points
+    H1 := partition(x -> last x, L1); -- partition on minimal face
+    H2 := applyPairs(H1, (k,v) -> (k,v/(v1 -> H0#(v1#1))));
+    P.cache.TCIInteriorLatticeHash = H2;
+    L2
+    ))
+
+
 latticePointHash = method()
 latticePointHash Polyhedron := P -> (
     latticePointList P;
