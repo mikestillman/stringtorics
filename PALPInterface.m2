@@ -37,6 +37,8 @@ export {
     "palpNPoints",
     "palpInfo",
     "palpIsReflexive",
+    "palpIsIP",
+    "palpIsCanonical",
 
     -- weight systems
     "weightSystems",
@@ -492,6 +494,40 @@ palpIsReflexive = method()
 palpIsReflexive Matrix :=
 palpIsReflexive List :=
 palpIsReflexive WeightSystem := Boolean => A -> palpNVertices A =!= null
+
+-- poly.x -I prints "No IP" when the origin is not an interior point of the
+-- polytope, and nothing when it is.  PALP calls a polytope IP when every facet
+-- inequality <a,x> + c >= 0 has c > 0, so the origin must be strictly inside.
+palpIsIP = method()
+palpIsIP Matrix :=
+palpIsIP List :=
+palpIsIP WeightSystem := Boolean => A -> (
+    out := runPALP(palpProgram "poly", "-I", palpInput A);
+    if match("No IP", out) then false
+    else if isBlankString out then true
+    else error("unexpected output from poly.x -I:" | newline | out))
+
+-- Canonical: IP, and the origin is the only interior lattice point.  A reflexive
+-- polytope is canonical, and poly.x -e says whether it is one, so the lattice
+-- points are only needed when it is not.  Then -e prints one inequality
+-- <a,x> + c >= 0 per line, as a_1 ... a_n c, in the coordinates -p uses, and a
+-- point is interior when all of these are strictly positive.
+palpIsCanonical = method()
+palpIsCanonical Matrix :=
+palpIsCanonical List :=
+palpIsCanonical WeightSystem := Boolean => A -> (
+    if not palpIsIP A then return false;
+    b := palpReadBlock runPALP(palpProgram "poly", "-e", palpInput A);
+    if b === null then error "expected output from poly.x -e";
+    (ne, n, rows) := b;
+    if all(rows, r -> #r === n) then return true;     -- vertices of the dual: reflexive
+    if not all(rows, r -> #r === n + 1) then error(
+        "unexpected output from poly.x -e: rows of length " | toString unique apply(rows, length));
+    E := matrix rows;
+    pts := palpMPoints A;
+    if numRows pts =!= n then error "poly.x -p and -e disagree about the dimension";
+    vals := E_{0 ..< n} * pts + E_{n} * matrix {toList(numColumns pts : 1)};
+    #select(numColumns pts, j -> all(flatten entries vals_{j}, x -> x > 0)) === 1)
 
 -------------------------------------------------
 -- Weight systems --------------------------------
@@ -959,7 +995,10 @@ naiveNefPartitions(NormalToricVariety, ZZ) := List => (V, cod) -> (
     if cod < 1 then error "expected a positive number of parts";
     n := #rays V;
     if cod > n then return {};
-    isNefPart := memoize(b -> isNef sum(b, i -> V_i));
+    -- Batyrev-Borisov need each divisor Cartier as well as nef, so that its
+    -- polytope Delta_j is a lattice polytope; isNef alone only checks nefness
+    -- over QQ, which on a singular V admits partitions that are not nef partitions.
+    isNefPart := memoize(b -> (D := sum(b, i -> V_i); isCartier D and isNef D));
     result := new MutableList;
     -- restricted growth strings visit each set partition of {0, ..., n-1} once
     recurse := null;
@@ -1017,8 +1056,9 @@ Description
     dimension four.  Along the way it acquired a good deal of functionality that
     is useful on its own: normal forms of lattice polytopes, the lattice points
     of a polytope and of its dual, the enumeration of weight systems, and nef
-    partitions.  This package makes that functionality available inside
-    Macaulay2.
+    partitions.  This package makes some of that functionality available inside
+    Macaulay2.  If you wish more functionality added, please contact the author of
+    this package.
   Text
     The program, its source and its documentation are at
     @HREF "https://hep.itp.tuwien.ac.at/~kreuzer/CY/CYpalp.html"@; the reference
@@ -1028,15 +1068,60 @@ Description
     M. Kreuzer and H. Skarke, PALP: A Package for Analyzing Lattice Polytopes
     with Applications to Toric Geometry, Comput. Phys. Commun. 157 (2004)
     87-106, arXiv:math/0204356.
+  -- Text
+  --   PALP is a separate program, and must be installed before any of these
+  --   functions will run.  On a machine already set up for Macaulay2, use
+  -- Pre
+  --   brew install macaulay2/tap/palp
+  -- Text
+  --   The package itself loads whether or not PALP is present; the executables are
+  --   looked for only when a function needs one.  If they are installed somewhere
+  --   that is not on your path, add that directory to @TO "programPaths"@.
   Text
-    PALP is a separate program, and must be installed before any of these
-    functions will run.  On a machine already set up for Macaulay2, use
-  Pre
-    brew install macaulay2/tap/palp
+    @SUBSECTION "Polytope functions"@
   Text
-    The package itself loads whether or not PALP is present; the executables are
-    looked for only when a function needs one.  If they are installed somewhere
-    that is not on your path, add that directory to @TO "programPaths"@.
+        @UL {
+        TO palpMVertices,
+        TO palpInfo,
+        TO palpIsReflexive,
+        TO palpIsIP,
+        TO palpIsCanonical
+        }@
+  Text
+    @SUBSECTION "Weight Systems"@
+  Text
+    Polytopes in PALP are given either by a matrix whose columns are its vertices, or by a weight system,
+    (or combined weight system).  Reflexive polytopes of dimension at most 4 can be obtained
+    using @TO "ReflexivePolytopesDB::ReflexivePolytopesDB"@.  There are too many reflexive polytopes of dimension at least five
+    to enumerate.  Instead, weight systems are a good way to generate reflexive polytopes
+    (and they can be used to in principle generate all reflexive polytopes in higher dimensions).
+  Text
+    @UL {
+        TO WeightSystem,
+        TO (weightSystems, ZZ),
+        TO (weightSystem, List),
+        TO (isWellDefined, WeightSystem),
+        TO palpMVertices
+        }@
+  Text
+    @SUBSECTION "Nef partitions"@
+  Text
+    @UL {
+        TO NefPartition,
+        TO palpNefPartitions,
+        TO isProjection,
+        TO isDirectProduct,
+        TO cayleyPolytopeVertices,
+        TO naiveNefPartitions,
+        TO nefPartitionDivisors,
+        TO palpHodgeNumbers
+        }@
+  Text
+    @SUBSECTION "Normal forms of polytopes"@
+  Text
+    @UL {
+        TO palpNormalForm
+        }@
   Text
     A first computation: the polytope of a weight system, its vertices, and its
     normal form.
@@ -1589,8 +1674,116 @@ Caveat
   This agrees with @TO "Polyhedra::isReflexive"@, but goes through PALP rather
   than computing the dual in Macaulay2.
 SeeAlso
+  palpIsIP
+  palpIsCanonical
   palpInfo
   palpNPoints
+///
+
+doc ///
+Key
+  palpIsIP
+  (palpIsIP, Matrix)
+  (palpIsIP, List)
+  (palpIsIP, WeightSystem)
+Headline
+  whether the origin is an interior point of a polytope
+Usage
+  palpIsIP A
+Inputs
+  A:Matrix
+    over the integers, whose columns span the polytope, or a (combined) weight
+    system, as a @TO List@ or a @TO WeightSystem@
+Outputs
+  :Boolean
+    true when the origin lies in the interior of the polytope
+Description
+  Text
+    PALP calls a polytope IP when the origin is an interior point, that is,
+    when every facet inequality $\langle a, x \rangle + c \ge 0$ has $c > 0$.
+    This asks @TT "poly.x -I"@, which prints @TT "No IP"@ exactly when the
+    polytope is not IP.  A reflexive polytope is IP, but an IP polytope need not
+    be reflexive, and the summary line of @TO palpInfo@ does not tell the two
+    kinds of non-reflexive polytope apart.
+  Example
+    palpIsIP matrix{{1,0,0,-1},{0,1,0,-1},{0,0,1,-1}}
+    palpIsIP matrix{{2,0,0,-1},{0,1,0,-1},{0,0,1,-1}}
+    palpIsReflexive matrix{{2,0,0,-1},{0,1,0,-1},{0,0,1,-1}}
+  Text
+    The origin must be strictly inside: a vertex, or a point outside, does not
+    count.
+  Example
+    palpIsIP matrix{{0,1,0,0},{0,0,1,0},{0,0,0,1}}
+    palpIsIP matrix{{1,2,1,1},{0,0,1,0},{0,0,0,1}}
+  Text
+    A weight system is IP when its polytope $\Delta(q)$ is.  PALP computes the
+    polytope even when it is not, so @TO weightSystemVertices@ alone does not
+    tell you.
+  Example
+    palpIsIP {5, 1, 1, 1, 1, 1}
+    palpIsIP {9, 1, 1, 2, 5}
+    weightSystemVertices {9, 1, 1, 2, 5}
+Caveat
+  The same question can be answered without PALP by
+  @TT "inInterior(0, convexHull A)"@, using @TO "Polyhedra::inInterior"@.
+SeeAlso
+  palpIsCanonical
+  palpIsReflexive
+  palpInfo
+///
+
+doc ///
+Key
+  palpIsCanonical
+  (palpIsCanonical, Matrix)
+  (palpIsCanonical, List)
+  (palpIsCanonical, WeightSystem)
+Headline
+  whether the origin is the only interior lattice point of a polytope
+Usage
+  palpIsCanonical A
+Inputs
+  A:Matrix
+    over the integers, whose columns span the polytope, or a (combined) weight
+    system, as a @TO List@ or a @TO WeightSystem@
+Outputs
+  :Boolean
+    true when the polytope is IP and the origin is its only interior lattice
+    point
+Description
+  Text
+    A reflexive polytope is canonical, and a canonical polytope is IP, but
+    neither converse holds.  The fan polytope of the weighted projective space
+    $P(1,1,1,2)$ is canonical but not reflexive, while the simplex below it is
+    IP but has a second interior lattice point.
+  Example
+    M = matrix{{1,0,0,-1},{0,1,0,-1},{0,0,1,-2}}
+    palpIsCanonical M, palpIsReflexive M
+    S = matrix{{2,0,0,-1},{0,1,0,-1},{0,0,1,-1}}
+    palpIsIP S, palpIsCanonical S
+    interiorLatticePoints convexHull S
+  Text
+    This first asks @TO palpIsIP@, then @TT "poly.x -e"@: a reflexive polytope
+    is canonical, and otherwise PALP prints the facet inequalities, which are
+    checked against the lattice points from @TO palpMPoints@.
+  Text
+    For a single weight system, IP and canonical are the same: an interior
+    lattice point $m$ of $\Delta(q)$ has every $m_i \ge 0$ and
+    $\sum q_i m_i = 0$, so it is the origin.  In dimension five many of these are
+    not reflexive.
+  Example
+    L = weightSystems(5, Degrees => 10);
+    #L, #select(L, palpIsReflexive), #select(L, palpIsCanonical)
+Caveat
+  Some authors also require the vertices of a canonical Fano polytope to be
+  primitive lattice vectors; this does not check that.  Counting the lattice
+  points needs @TT "poly.x -p"@, which can be slow in high dimension when the
+  polytope is not reflexive.  @TT "interiorLatticePoints convexHull A"@, from
+  @TO "Polyhedra::interiorLatticePoints"@, answers the same question without PALP.
+SeeAlso
+  palpIsIP
+  palpIsReflexive
+  palpMPoints
 ///
 
 doc ///
@@ -1749,10 +1942,51 @@ Outputs
     the list of rows $\{\{d_1, q_{10}, \ldots, q_{1n}\}, \{d_2, q_{20}, \ldots, q_{2n}\}, \ldots\}$
 Description
   Text
+    A {\bf weight system} is a list $\{d, q_0, \ldots, q_n\}$ of positive
+    integers with $d = q_0 + \cdots + q_n$: the degree $d$ followed by the
+    weights $q_i$.  A {\bf combined weight system} is a list of $r \ge 1$ rows
+    $\{d_j, q_{j0}, \ldots, q_{jn}\}$, all of the same length, such that
+  Code
+    UL {
+        "every entry is an integer, and every weight q_ji is at least 0;",
+        "each degree is the sum of its row, d_j = q_j0 + ... + q_jn, and is positive;",
+        "every column has a positive weight in some row."
+        }
+  Text
+    So a weight system is a combined weight system with one row, and zero
+    weights occur only when there are several rows.  The weights need not be
+    coprime: $\{6, 2, 2, 2\}$ is a weight system, and gives the same polytope as
+    $\{3, 1, 1, 1\}$, since the polytope below depends only on the ratios of
+    the weights in each row.  These are the inputs PALP
+    accepts, as described in the PALP paper of Kreuzer and Skarke
+    (Comput. Phys. Commun. 157 (2004), arXiv:math/0204356, section 2).
+  Text
+    The polytope of a combined weight system is
+    $\Delta(q) = \operatorname{conv}\{ x \in \mathbb{Z}^{n+1} : \sum_i q_{ji} x_i = 0
+    \text{ for all } j, \ x_i \ge -1 \text{ for all } i \}$,
+    a lattice polytope in the lattice
+    $\{ x \in \mathbb{Z}^{n+1} : \sum_i q_{ji} x_i = 0 \text{ for all } j \}$,
+    of dimension $n + 1 - r$ when the rows are linearly independent.
+    Its lattice points $x$ correspond to the monomials $\prod_i y_i^{x_i + 1}$
+    in variables $y_0, \ldots, y_n$ of multidegree $(d_1, \ldots, d_r)$, where
+    $y_i$ has multidegree $(q_{1i}, \ldots, q_{ri})$.  The weight system is called IP when the
+    origin is an interior point of $\Delta(q)$, and reflexive when $\Delta(q)$ is;
+    see @TO palpIsIP@ and @TO palpIsReflexive@.  PALP computes $\Delta(q)$ for
+    every combined weight system, IP or not.
+  Text
+    Kreuzer and Skarke's classification papers use a narrower notion, which
+    this package does not impose.  There the weights are positive reals summing
+    to 1, the barycentric coordinates of the origin in a simplex of lattice
+    points containing it in its interior, and a combined weight system is the
+    collection of these for several such simplices, with weight 0 on the
+    vertices outside each simplex (Kreuzer-Skarke, Rev. Math. Phys. 14 (2002),
+    arXiv:math/0001106, section 2.2; Skarke, Mod. Phys. Lett. A 11 (1996),
+    arXiv:alg-geom/9603007).  Scaled to integers, each such row is a weight
+    system in the sense above.
+  Text
     An object of type {\tt WeightSystem} is a combined weight system, stored as
-    its list of rows; a single weight system is one with just one row.  Two of
-    them are equal, under {\tt ==}, when they have the same rows.  See
-    @TO weightSystems@ for the definitions.
+    its list of rows.  Two of them are equal, under {\tt ==}, when they have the
+    same rows.
   Example
     weightSystem {10, 1, 2, 3, 4}
   Text
@@ -2360,11 +2594,12 @@ Inputs
     the number of parts
 Outputs
   L:List
-    of partitions of the rays of V into c parts, each part having nef sum
+    of partitions of the rays of V into c parts, each part having a nef
+    Cartier sum
 Description
   Text
     A nef partition of codimension $c$ is a partition of the rays into $c$ parts
-    the sum of whose divisors is nef in each part.  This looks for them directly,
+    such that in each part the sum of the divisors is Cartier and nef.  This looks for them directly,
     with no help from PALP, which makes it a useful check on
     @TO palpNefPartitions@.
   Example
@@ -2387,6 +2622,19 @@ Description
     L = palpNefPartitions(V, 2, HodgeNumbers => false,
         KeepSymmetric => true, Projections => true, Products => true);
     set apply(L, n -> set apply(parts n, set)) === set apply(naiveNefPartitions(V, 2), p -> set apply(p, set))
+  Text
+    Both conditions matter when $V$ is singular.  Here $V$ is simplicial, so every
+    torus-invariant divisor is $\QQ$-Cartier, and 31 of the 63 splits of its 7
+    rays into two parts are nef over $\QQ$.  Only 4 of them have both parts
+    Cartier, and these are the nef partitions PALP finds.
+  Example
+    W = normalToricVariety convexHull weightSystemVertices {20, 1, 1, 1, 2, 6, 9};
+    isSimplicial W, isSmooth W
+    #select(drop(drop(subsets toList(0 ..< #rays W), 1), -1),
+        a -> a#0 === 0 and isNef sum(a, i -> W_i) and isNef sum(toList(0 ..< #rays W) - set a, i -> W_i))
+    L = naiveNefPartitions(W, 2)
+    #palpNefPartitions(W, 2, HodgeNumbers => false,
+        KeepSymmetric => true, Projections => true, Products => true)
 Caveat
   Every set partition of the rays into c parts is examined, so this is only
   practical when there are few rays.
@@ -2836,7 +3084,7 @@ TEST ///
 ///
 
 TEST ///
-  -- nef partitions found directly, with no help from PALP
+  -- nef partitions found directly, without PALP
   needsPackage "NormalToricVarieties"
   V = smoothFanoToricVariety(3, 5)
   n = #rays V
@@ -2847,7 +3095,7 @@ TEST ///
 
   P2 = naiveNefPartitions(V, 2)
   assert(#P2 > 0)
-  for p in P2 do (
+  elapsedTime for p in P2 do (
       assert(#p == 2);
       assert(sort flatten p == toList(0..n-1));          -- a partition of the rays
       assert all(p, b -> isNef sum(b, i -> V_i));        -- each part is nef
@@ -2860,11 +3108,36 @@ TEST ///
   -- PALP, keeping everything, finds the same nef partitions, on every smooth
   -- Fano threefold (whose rays are the vertices of Delta^*)
   asSets = L -> set apply(L, p -> set apply(p, set))
-  for i from 0 to 17 do (
+  -- the following is currently too long.  Instead we choose 3 values of i in this range.
+  --elapsedTime for i from 0 to 17 do elapsedTime (
+  elapsedTime for i in {1,4,6} do elapsedTime (
       X := smoothFanoToricVariety(3, i);
       assert(asSets naiveNefPartitions(X, 2) === asSets apply(palpNefPartitions(X, 2,
                   HodgeNumbers => false, KeepSymmetric => true, Projections => true, Products => true), parts)))
   assert(try (naiveNefPartitions(V, 0); false) else true)
+
+  -- On a singular variety each part must be Cartier as well as nef.  This W is
+  -- simplicial, and 31 of the 63 splits of its 7 rays into two parts are nef
+  -- over QQ, but only 4 have both parts Cartier.  PALP finds the same 4.
+  W = normalToricVariety convexHull weightSystemVertices {20, 1, 1, 1, 2, 6, 9}
+  assert(isSimplicial W and not isSmooth W and #rays W == 7)
+  splits = select(drop(drop(subsets toList(0 ..< 7), 1), -1), a -> a#0 === 0)
+  splitDivisors = for a in splits list (d := sum(a, i -> W_i); {d, -toricDivisor W - d})
+  splitDivisorsCartier = select(splitDivisors, x -> isCartier x#0 and isCartier x#1)
+  nefParts = select(splitDivisorsCartier, x -> isNef x#0 and isNef x#1)
+
+  assert(#splits === 63)
+  assert(#splitDivisors === 63)
+  assert(#splitDivisorsCartier === 7)
+  assert(#nefParts === 4)
+
+  elapsedTime NW = naiveNefPartitions(W, 2)
+  assert(#NW == 4)
+  assert all(NW, p -> all(p, b -> isCartier sum(b, i -> W_i)))
+  assert(asSets NW === asSets apply(palpNefPartitions(W, 2, HodgeNumbers => false,
+              KeepSymmetric => true, Projections => true, Products => true), parts))
+  -- the default leaves out the projection and the symmetric copies
+  assert(#palpNefPartitions({20, 1, 1, 1, 2, 6, 9}, 2, HodgeNumbers => false) == 1)
 ///
 
 TEST ///
@@ -3194,7 +3467,7 @@ TEST ///
   assert(numColumns palpMVertices {10,1,2,3,4} == 7)
 ///
 
-"TEST" -- TODO MES: FIXME or remove me...
+"TEST"
 /// -- checking nef partitions, codim = 3 or higher...
   -- Start with a weight system in dim 6.
   needsPackage "NormalToricVarieties"
@@ -3261,10 +3534,6 @@ TEST ///
 ///
 
 
--*
-  restart
-  needsPackage "PALPInterface"
-*-  
 "TEST"
 /// -- checking nef partitions, codim = 3 in dim 5 (gives a surface, not 3-fold).
 -- XXX
@@ -3274,46 +3543,17 @@ TEST ///
       verts := weightSystemVertices ws;
       P := convexHull verts;
       if not isReflexive P then continue else ws) -- 41 of them give reflexive
-  wsref = weightSystems(5, Degrees => {20,20}, Reflexive => true) -- 61 different ws's
-  assert(#wsref === #wssr)
+  for ws in wssr list elapsedTime palpNefPartitions(ws, 2)  
+  
+  ws = {20, 1, 2, 2, 2, 3, 10}
+  assert(ws == wsorig)
 
-  -- palpNefPartitions should return a list...
-  for ws in wssr list elapsedTime ws => palpNefPartitions(ws, 2)  
-
-  ws = {20, 1, 1, 1, 2, 6, 9} -- first one that has a nef partition
-  nefs = palpNefPartitions(ws, 2)
-  peek nefs#0 . cache
-
-  palpNefPartitions(palpNVertices ws, 2)
-  palpNefPartitions(palpNVertices ws, 2, KeepSymmetric => true, Products => true, Projections => true)
-  -- ws = {20, 1, 2, 2, 2, 3, 10}
-  -- assert({ws} == toList wsorig)
-
-  -- FIX ME: check that the given nef partition is the only one for this example.
   verts = weightSystemVertices ws
   P = convexHull verts
   isReflexive P
   P' = polar P
   isReflexive P'
   V = normalToricVariety P
-  isNef(V_0 + V_1 + V_2 + V_3 + V_4 + V_5 + V_6)
-
-  D = V_1 + V_4 -- is a nef partition
-  isNef D
-  isNef(-toricDivisor V - D) 
-
-  D = V_2 + V_4 -- not one!
-  isNef D
-  isNef(-toricDivisor V - D)  -- not a nef partition
-
-  D = V_0 + V_1 -- is a nef partition
-  isNef D
-  isNef(-toricDivisor V - D) 
-
-  Ds = apply(drop(drop(subsets({0,1,2,3,4,5,6}), 1), -1), a -> sum(a, i -> V_i))
-  for D in Ds list if isNef D and isNef(-toricDivisor V - D) then {D, -toricDivisor V - D} else continue
-  transpose matrix rays V
-  
   V' = normalToricVariety P'
   assert isSimplicial V
   assert not isSimplicial V'
@@ -3321,9 +3561,8 @@ TEST ///
   Ds = for i from 0 to # rays V' - 1 list V'_i
   ds = select(drop(drop(subsets(#rays V), 1), -1), s -> s#0 == 0)
   Dlist = for d in ds list sum(d, i -> V_i)
-  select(Dlist, d -> isNef d)
+  select(Dlist, d -> not isNef d)
   Ds/isNef
-  palpNefPartitions(ws, 1)
 
 
   Ds = for i from 0 to # rays V' - 1 list V'_i
@@ -3338,37 +3577,44 @@ TEST ///
   vertices P'' -- ouch!
 ///
 
+
+TEST ///
+  -- palpIsIP and palpIsCanonical, against Polyhedra
+  needsPackage "Polyhedra"
+  refl  = matrix{{1,0,0,-1},{0,1,0,-1},{0,0,1,-1}}      -- reflexive
+  ipnr  = matrix{{2,0,0,-1},{0,1,0,-1},{0,0,1,-1}}      -- IP, (1,0,0) also interior
+  canon = matrix{{1,0,0,-1},{0,1,0,-1},{0,0,1,-2}}      -- canonical, not reflexive
+  vert0 = matrix{{0,1,0,0},{0,0,1,0},{0,0,0,1}}         -- origin is a vertex
+  outside = matrix{{1,2,1,1},{0,0,1,0},{0,0,0,1}}       -- origin outside
+  onfacet = matrix{{1,0,-1,0,0},{0,1,0,-1,0},{0,0,0,0,1}} -- origin on a facet
+  origin = map(ZZ^3, ZZ^1, 0)
+  for M in {refl, ipnr, canon, vert0, outside, onfacet} do (
+      P := convexHull M;
+      assert(palpIsIP M === inInterior(origin, P));
+      assert(palpIsCanonical M === (inInterior(origin, P) and #interiorLatticePoints P == 1)));
+  assert(palpIsIP ipnr and not palpIsCanonical ipnr and not palpIsReflexive ipnr)
+  assert(palpIsCanonical canon and not palpIsReflexive canon)
+  assert(not palpIsIP vert0 and not palpIsIP outside and not palpIsIP onfacet)
+  -- QQ matrices with integer entries are accepted, as elsewhere
+  assert palpIsCanonical vertices convexHull canon
+
+  -- weight systems: PALP gives vertices even when q is not IP
+  assert(palpIsIP {5,1,1,1,1,1} and palpIsCanonical {5,1,1,1,1,1})
+  for q in {{9,1,1,2,5}, {8,1,1,3,3}, {7,1,2,4}} do (
+      assert(weightSystemVertices q =!= null);
+      assert(not palpIsIP q and not palpIsCanonical q);
+      assert(not inInterior(map(ZZ^(#q - 2), ZZ^1, 0), convexHull weightSystemVertices q)));
+  -- for a single weight system, IP means canonical; in dimension 5 not all are reflexive
+  L = weightSystems(5, Degrees => 10)
+  assert(all(L, palpIsIP) and all(L, palpIsCanonical))
+  assert(#select(L, palpIsReflexive) < #L)
+  -- a combined weight system
+  assert palpIsCanonical {3,1,1,1,0,0,0, 3,0,0,0,1,1,1}
+///
+
 end--
 
 -* Development section *-
-
--- Moved from the palpHodgeNumbers TEST (too slow for check):
--- MES tests
-ws = {12,1,1,2,2,2,2,2}
-L = palpNefPartitions(ws, 3, HodgeNumbers => false)
--- elapsedTime palpHodgeNumbers L#0 -- 41 sec, MES MBP M4
--- elapsedTime palpHodgeNumbers L#1 -- 9 sec, MES MBP M4
--- elapsedTime L1 = palpNefPartitions(ws, 3) -- computes Hodge numbers too, does it in 33.4 sec total.
-
--- MES: Claude, please check.
--- palpNefPartitions(palpNVertices ws, 3, HodgeNumbers => false)
--- palpNefPartitions(palpNPoints ws, 3, HodgeNumbers => false)
-
-Ws = weightSystems(6, Degrees => 20, Reflexive => true);
-Ns = for ws in Ws list (
-    n := palpNefPartitions(ws, 3, HodgeNumbers => false);
-    if n === null or #n === 0 then continue;
-    n)
-for i from 0 to #Ws-1 list (
-    n := palpNefPartitions(Ws#i, 3, HodgeNumbers => false);
-    if n === null or #n === 0 then continue;
-    i => n)
--- for n in flatten Ns list elapsedTime palpHodgeNumbers n  -- very slow, it appears....!
--- #0: 239 sec
--- #1: 157 sec
--- #2, #3, #4: 7.7, 9.7, 12.5 sec
--- #5: 93 sec
-
 
 restart
 needsPackage "PALPInterface"
@@ -3493,3 +3739,31 @@ for i from 0 to 10 list isNef V_i
 
 palpVerbosity = 4
 elapsedTime palpNefPartitions(cws, 3)
+
+-- Moved from the palpHodgeNumbers TEST (too slow for check):
+-- MES tests
+ws = {12,1,1,2,2,2,2,2}
+L = palpNefPartitions(ws, 3, HodgeNumbers => false)
+-- elapsedTime palpHodgeNumbers L#0 -- 41 sec, MES MBP M4
+-- elapsedTime palpHodgeNumbers L#1 -- 9 sec, MES MBP M4
+-- elapsedTime L1 = palpNefPartitions(ws, 3) -- computes Hodge numbers too, does it in 33.4 sec total.
+
+-- MES: Claude, please check.
+-- palpNefPartitions(palpNVertices ws, 3, HodgeNumbers => false)
+-- palpNefPartitions(palpNPoints ws, 3, HodgeNumbers => false)
+
+Ws = weightSystems(6, Degrees => 20, Reflexive => true);
+Ns = for ws in Ws list (
+    n := palpNefPartitions(ws, 3, HodgeNumbers => false);
+    if n === null or #n === 0 then continue;
+    n)
+for i from 0 to #Ws-1 list (
+    n := palpNefPartitions(Ws#i, 3, HodgeNumbers => false);
+    if n === null or #n === 0 then continue;
+    i => n)
+-- for n in flatten Ns list elapsedTime palpHodgeNumbers n  -- very slow, it appears....!
+-- #0: 239 sec
+-- #1: 157 sec
+-- #2, #3, #4: 7.7, 9.7, 12.5 sec
+-- #5: 93 sec
+

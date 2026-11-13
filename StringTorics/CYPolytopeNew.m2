@@ -179,28 +179,28 @@ latticePoints CYPolytopeNew := Matrix => Q -> (
         )
     )
 
-latticePointListNew = method()
-latticePointListNew CYPolytopeNew := Q -> (
-    lp := latticePoints Q;
-    P := polytope Q;
-    L := entries transpose lp;
-    return for p in L list minimalFace(P, p);
-    elapsedTime L1 := sort for i from 0 to #L-1 list (
-        f := minimalFace(P, L#i);
-        {dim(P,f), L#i, f}
-        );
-    --L1 := sort for i from 0 to #L-1 list {faceDim(P,minimalFace(P,L#i)),L#i};
-    L2 := L1/(x -> x#1); -- select the actual lattice point
-    -- now set the hash tables:
-    -- lattice point => index
-    H0 := hashTable for i from 0 to #L2-1 list L2#i => i;
-    P.cache.TCILatticePointHash = H0;
-    -- face => interior lattice points
-    H1 := partition(x -> last x, L1); -- partition on minimal face
-    H2 := applyPairs(H1, (k,v) -> (k,v/(v1 -> H0#(v1#1))));
-    P.cache.TCIInteriorLatticeHash = H2;
-    L2
-    )
+-- latticePointListNew = method()
+-- latticePointListNew CYPolytopeNew := Q -> (
+--     lp := latticePoints Q;
+--     P := polytope Q;
+--     L := entries transpose lp;
+--     return for p in L list minimalFace(P, p);
+--     elapsedTime L1 := sort for i from 0 to #L-1 list (
+--         f := minimalFace(P, L#i);
+--         {dim(P,f), L#i, f}
+--         );
+--     --L1 := sort for i from 0 to #L-1 list {faceDim(P,minimalFace(P,L#i)),L#i};
+--     L2 := L1/(x -> x#1); -- select the actual lattice point
+--     -- now set the hash tables:
+--     -- lattice point => index
+--     H0 := hashTable for i from 0 to #L2-1 list L2#i => i;
+--     P.cache.TCILatticePointHash = H0;
+--     -- face => interior lattice points
+--     H1 := partition(x -> last x, L1); -- partition on minimal face
+--     H2 := applyPairs(H1, (k,v) -> (k,v/(v1 -> H0#(v1#1))));
+--     P.cache.TCIInteriorLatticeHash = H2;
+--     L2
+--     )
 
 
 -- REVIEW
@@ -311,13 +311,13 @@ findTwoFaceInteriorDivisors CYPolytopeNew := List => Q -> (
     )
 
 -- REVIEW
-findSuitableSet = (setstotry, Z) -> (
+findSuitableSetNew = (setstotry, Z) -> (
     for g in setstotry do if abs det(Z_g) == 1 then return g;
     null
     )
 
 -- REVIEW
-computeGLSM = Q -> (
+computeGLSMNew = Q -> (
     -- input: Q:CYPolytopeNew
     -- consequences: fields "glsm", "basisIndices", "toricBasisIndices" are set, if they have not been set yet.
     if Q.cache#?"glsm" then return;
@@ -332,7 +332,7 @@ computeGLSM = Q -> (
     nonfavs := for f in nonfavsList list f#0; -- list of indices of non-favorable divisors.
     rest := sort toList(set(0..numcols D-1) - set nonfavs);
     setstotry := for f in subsets(rest, numrows D - #nonfavs) list (f | nonfavs); -- really want to do these 1 by 1...?
-    good := findSuitableSet(setstotry, D);
+    good := findSuitableSetNew(setstotry, D);
     if good === null then error "rats: cannot find basis set including all the non-favorables";
     H := hashTable nonfavsList;
     basind := flatten for i in good list if not H#?i then i else (
@@ -347,25 +347,25 @@ computeGLSM = Q -> (
 
 -- REVIEW
 degrees CYPolytopeNew := List => Q -> (
-    if not Q.cache#?"glsm" then computeGLSM Q;
+    if not Q.cache#?"glsm" then computeGLSMNew Q;
     Q.cache#"glsm"
     )
 
 -- REVIEW
 --basisIndices = method()
 basisIndices CYPolytopeNew := List => Q -> (
-    if not Q.cache#?"basisIndices" then computeGLSM Q;
+    if not Q.cache#?"basisIndices" then computeGLSMNew Q;
     Q.cache#"basisIndices"
     )
 
 -- REVIEW
 isFavorable CYPolytopeNew := Boolean => Q -> (
-    if not Q.cache#?"favorable" then computeH11H21 Q;
+    if not Q.cache#?"favorable" then computeH11H21New Q;
     Q.cache#"favorable"
     )
 
 -- REVIEW
-computeH11H21 = Q -> (
+computeH11H21New = Q -> (
     if Q#?"h11" then return;
     if dim Q =!= 4 then
         error "Hodge numbers for a CYPolytopeNew are only implemented currently for dim=4";
@@ -396,7 +396,7 @@ computeH11H21 = Q -> (
 
 -- REVIEW
 hh(Sequence, CYPolytopeNew) := (pq, Q) -> (
-    computeH11H21 Q;
+    computeH11H21New Q;
     (p,q) := pq;
     if p > q then (p, q) = (q, p);
     if p == 0 then (
@@ -426,7 +426,7 @@ isomorphisms(CYPolytopeNew, CYPolytopeNew) := (P, Q) -> (
     )
 
 -- REVIEW
-computeAutomorphisms = Q -> (
+computeAutomorphismsNew = Q -> (
     -- Q is a CYPolytopeNew
     -- this functions sets "automorphisms" and "autPermutations" in Q.cache, if needed.
     -- We are setting both versions at once.
@@ -451,13 +451,13 @@ computeAutomorphisms = Q -> (
 
 -- REVIEW
 automorphisms CYPolytopeNew := Q -> (
-    computeAutomorphisms Q;
+    computeAutomorphismsNew Q;
     Q.cache#"automorphisms"
     )
 --automorphismsAsPermutations = method()
 -- REVIEW
 automorphismsAsPermutations CYPolytopeNew := Q -> (
-    computeAutomorphisms Q;
+    computeAutomorphismsNew Q;
     Q.cache#"autPermutations"
     )
 
@@ -483,7 +483,7 @@ isTriangulationOfPolytope(CYPolytopeNew, Triangulation) := (Q, T) -> isTriangula
 
 -- local function
 -- REVIEW
-computeFRVTs = Q -> (
+computeFRVTsNew = Q -> (
     -- sets "ptriangulations", "vtriangulations" (these are the ones that are *not* in ptriangulations.
     -- also sets "allPtriangulations", "allVtriangulations"
     -- maybe: FRSTs, FRVTs
@@ -508,7 +508,7 @@ computeFRVTs = Q -> (
     )
 
 -- REVIEW
-computeFRSTs = Q -> (
+computeFRSTsNew = Q -> (
     if Q.cache#?"allFRSTs" and Q.cache#"allFRSTs" then return;
     Ts := findAllFRSTs transpose matrix rays Q;
     Q.cache#"ptriangulations" = Ts;
@@ -517,14 +517,14 @@ computeFRSTs = Q -> (
 
 -- REVIEW
 findAllFRSTs CYPolytopeNew := List => Q -> (
-    if not Q.cache#?"allFRSTs" then computeFRSTs Q;
+    if not Q.cache#?"allFRSTs" then computeFRSTsNew Q;
     Q.cache#"ptriangulations"
     )
 
 -- REVIEW
-findAllFRVTs = method()
-findAllFRVTs CYPolytopeNew := List => Q -> (
-    if not Q.cache#?"allFRVTs" then computeFRVTs Q;
+findAllFRVTsNew = method()
+findAllFRVTsNew CYPolytopeNew := List => Q -> (
+    if not Q.cache#?"allFRVTs" then computeFRVTsNew Q;
     Q.cache#"vtriangulations"
     )
 
@@ -629,7 +629,7 @@ findAllCYs CYPolytopeNew := List => opts -> Q -> (
     )
 
 -- REMOVE
--- findAllFRVTs CYPolytopeNew := List => Q -> (
+-- findAllFRVTsNew CYPolytopeNew := List => Q -> (
 --   cQ := chirotope(transpose matrix rays Q, Homogenize => false);
 --   "foo-topcomfoo.in" << toString cQ << endl << close;
 --   ctris := for L in lines get ("!chiro2finetriangs <foo-topcomfoo.in") list (
@@ -640,7 +640,7 @@ findAllCYs CYPolytopeNew := List => opts -> Q -> (
 --   ctris)
 
 -- REMOVE
--- findAllFRVTs CYPolytope := List => Q -> (
+-- findAllFRVTsNew CYPolytope := List => Q -> (
 --     alltris := topcomAllTriangulations(transpose matrix rays Q, ConnectedToRegular => false, Fine => true, Homogenize => false, RegularOnly => false);
 --     -- now we need to choose the ones that are regular...
 --     -- this seems to be a good way to do it.
@@ -654,10 +654,10 @@ findAllCYs CYPolytopeNew := List => opts -> Q -> (
 computeBasics CYPolytopeNew := Q -> (
     computeRaysAndDimensions Q;
     annotatedFaces Q; -- compute annotated faces
-    computeGLSM Q;
-    computeH11H21 Q;
-    computeAutomorphisms Q;
-    computeFRSTs Q; -- not FRVTs yet, that takes too long? TODO: which should be here?
+    computeGLSMNew Q;
+    computeH11H21New Q;
+    computeAutomorphismsNew Q;
+    computeFRSTsNew Q; -- not FRVTs yet, that takes too long? TODO: which should be here?
     )
 
 end--

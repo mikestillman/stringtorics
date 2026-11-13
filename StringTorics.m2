@@ -390,7 +390,7 @@ findEquivalence(CalabiYauInToric, CalabiYauInToric) := (X1, X2) -> (
 load (currentFileDirectory | "StringTorics/MyPolyhedra.m2")
 cyPolytope = reflexivePolytope
 load (currentFileDirectory | "StringTorics/ReflexivePolytopes.m2")
---load (currentFileDirectory | "StringTorics/CYPolytopeNew.m2")
+load (currentFileDirectory | "StringTorics/CYPolytopeNew.m2")
 load (currentFileDirectory | "StringTorics/CalabiYauInToric.m2")
 load (currentFileDirectory | "StringTorics/IntersectionNumbers.m2")
 load (currentFileDirectory | "StringTorics/GVInvariants.m2")
